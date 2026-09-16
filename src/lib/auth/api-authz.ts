@@ -83,6 +83,32 @@ export interface AccessRefused {
 export type AccessResult = AccessGranted | AccessRefused
 
 /**
+ * Is anybody signed in at all?
+ *
+ * Some routes cannot call requireAccess first, because the engagement they
+ * must check against is only known once a record has been read: the session
+ * invitation is handed a session id and has to look the session up to learn
+ * whose engagement it belongs to.
+ *
+ * CodeRabbit on #278: reading that record before authenticating anybody meant
+ * an unauthenticated caller could tell a real session id from a made-up one,
+ * by the difference between "that session is not on file" and "not
+ * authenticated". Small on its own, and it is how an identifier space gets
+ * mapped out from the outside. So this gate comes first, and requireAccess
+ * still does the real work once there is something to check against.
+ */
+export async function requireSignedIn(
+  req: NextRequest,
+  admin: SupabaseClient,
+): Promise<{ ok: true; userId: string } | AccessRefused> {
+  const token = getBearerToken(req)
+  if (!token) return { ok: false, error: 'Not authenticated', status: 401 }
+  const { data: { user }, error } = await admin.auth.getUser(token)
+  if (error || !user) return { ok: false, error: 'Not authenticated', status: 401 }
+  return { ok: true, userId: user.id }
+}
+
+/**
  * Authenticate the caller and check they may act on this engagement.
  *
  * Identity comes from the bearer token and the rules come from

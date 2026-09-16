@@ -23,7 +23,7 @@
 // nobody said otherwise is worse than sending nothing.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminClient, requireAccess, refuseAccess } from '@/lib/auth/api-authz'
+import { getAdminClient, requireAccess, requireSignedIn, refuseAccess } from '@/lib/auth/api-authz'
 import { buildIcs, sessionUid } from '@/lib/calendar'
 import { sendEmail, emailAvailable, brandedEmail, escapeHtml, raw } from '@/lib/email'
 import { cleanEmail, emailLooksSendable } from '@/lib/engagement-brief'
@@ -48,6 +48,16 @@ export async function POST(req: NextRequest) {
     if (!sessionId) return NextResponse.json({ error: 'Which session?' }, { status: 400 })
 
     const admin = getAdminClient()
+
+    // NOBODY READS ANYTHING BEFORE THEY ARE SOMEBODY. CodeRabbit on #278: this
+    // looked the session up with the service role and only then checked who
+    // was asking, so an unauthenticated caller could tell a real session id
+    // from a made-up one by the difference between 404 and 401. The engagement
+    // to authorise against is only known once the session is read, which is
+    // why there are two gates rather than one.
+    const signedIn = await requireSignedIn(req, admin)
+    if (!signedIn.ok) return refuseAccess(signedIn)
+
     const { data: session } = await admin.from('gtcv_sessions')
       .select('id,client_id,title,purpose,planned_at,duration_minutes,invite_sent_at,invite_sequence')
       .eq('id', sessionId).maybeSingle()
@@ -81,7 +91,7 @@ export async function POST(req: NextRequest) {
         .select('id', { count: 'exact', head: true }).eq('client_id', session.client_id)
       return NextResponse.json({
         error: count
-          ? 'Nobody is ticked as attending this session, so there is nobody to invite. Tick them under Attendance on this session.'
+          ? 'Nobody is named as being in this session, so there is nobody to invite. Add them under Who is in this session, on the decision point.'
           : 'Nobody has been added to this engagement yet, so there is nobody to invite. Add them under Who is on it, and settings, then tick them under Attendance on this session.',
       }, { status: 409 })
     }
@@ -208,6 +218,11 @@ export async function POST(req: NextRequest) {
       withoutAddress,
     })
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Something went wrong' }, { status: 500 })
+    // WHAT WENT WRONG IS FOR THE LOG, NOT FOR THE CALLER. CodeRabbit on #278:
+    // this returned the raw exception, which names tables, columns and the
+    // email provider. That tells the coach nothing they can act on and tells
+    // anybody watching rather more than they should know.
+    console.error('Session invitation failed', e)
+    return NextResponse.json({ error: 'The invitation could not be sent. Try again.' }, { status: 500 })
   }
 }

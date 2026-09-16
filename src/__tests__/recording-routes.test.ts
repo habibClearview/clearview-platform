@@ -391,16 +391,18 @@ describe('deleting a recording', () => {
     // 12 September 2026. The button existed, but on the list at the bottom,
     // and that list was narrowed the day before to recordings with no session.
     // So every recording made in a session lost the only way to delete it, on
-    // the same day it was moved onto the session card.
-    const PLAN = fs.readFileSync('src/components/gtcv/SessionPlanner.tsx', 'utf8')
+    // the same day it was moved onto the session card. 16 September 2026: the
+    // session card itself moved onto the decision point, and the button went
+    // with it rather than being left behind on a page that now only reads.
+    const PLAN = fs.readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
     expect(PLAN).toContain('async function removeRecording(rec)')
     expect(PLAN).toContain("method: 'DELETE'")
     expect(PLAN).toContain('The audio, the transcript and any signatures on it go with it')
   })
 
   it('offers it only to somebody who may manage the engagement', () => {
-    const PLAN = fs.readFileSync('src/components/gtcv/SessionPlanner.tsx', 'utf8')
-    expect(PLAN).toContain('{canManage && (\n                <button\n                  type="button"\n                  onClick={() => removeRecording(rec)}')
+    const PLAN = fs.readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
+    expect(PLAN).toContain('{canManage && (\n                      <button type="button" style={{ ...btn(C.red), marginLeft: \'auto\' }}\n                        disabled={busy === rec.id} onClick={() => removeRecording(rec)}')
   })
 })
 
@@ -554,7 +556,7 @@ describe('sessions on the decision point', () => {
   })
 
   it('a named participant is recorded against the session itself', () => {
-    expect(STRIP).toContain("supabase.from('gtcv_session_attendance').insert")
+    expect(STRIP).toContain("supabase.from(ATTENDANCE_TABLE).insert")
     expect(STRIP).toContain('Who is in this session')
   })
 
@@ -570,16 +572,19 @@ describe('sessions on the decision point', () => {
     // A recording could only be found by remembering which session it belonged
     // to, which is a record that exists and cannot be found.
     expect(STRIP).toContain('recordings.filter(r => r.session_id === id)')
-    expect(STRIP).toContain('on this session')
+    expect(STRIP).toContain('Recorded {recWhen(rec.started_at)}')
   })
 
   it('a session that failed to read never hides the sessions themselves', () => {
     expect(STRIP).toContain('the sessions still stand on their own')
   })
 
-  it('Sessions and rooms stays as the diary, and says so', () => {
-    expect(DASH3).toContain('Sessions are planned, invited and opened on the decision point they belong to')
-    expect(DASH3).toContain('<SessionPlanner clientId={selClient.id}')
+  it('Sessions and rooms stays as the workplan, reads everything and edits nothing', () => {
+    expect(DASH3).toContain('Sessions are planned, invited, opened and deleted on the decision point they belong to')
+    expect(DASH3).toContain('<SessionWorkplan clientId={selClient.id}')
+    // The old planner is gone, so there is no second place to plan a session.
+    expect(DASH3).not.toContain('<SessionPlanner')
+    expect(fs.existsSync('src/components/gtcv/SessionPlanner.tsx')).toBe(false)
   })
 
   it('a time typed in a browser is stored as an instant, not as a local string', () => {
@@ -638,5 +643,256 @@ describe('the practice’s commercial record stays on the practice’s side', ()
     // and that screen is handed only this one organisation, so no other
     // client's name can appear on it even when a coach is looking.
     expect(DASH4).toContain("{shownTab==='eng_setup'&&!selClient.programme_id&&canViewCoachGuidance(previewRoleId)&&<><ServicesSection payerType=\"client\" payerId={selClient.id} clients={[selClient]}/>")
+  })
+})
+
+// ============================================================
+// PLANNING MOVED ONTO THE DECISION POINT, AND THE WORKPLAN ONLY READS
+//
+// Habib, 16 September 2026: "the decision points are listed and sessions for
+// each are planned in this tab. I am suggesting that all the planning and
+// everything associated with each decision point is moved to that decision
+// tab. The session and room should then draw the details of the sessions,
+// planned or otherwise, into it so it works almost like a summary... and looks
+// like a workplan that can be shared or downloaded." And, on which of the two
+// this page should be: "read only would be better as all editing can happen in
+// the decision tab... printable and spreadsheet for flexibility."
+// ============================================================
+describe('the method comes to the decision point', () => {
+  const STRIP = fs.readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
+
+  it('offers the sessions the guide prescribes here, so nothing is typed from memory', () => {
+    expect(STRIP).toContain('Sessions the method specifies here')
+    expect(STRIP).toContain('methodSessionsFor(dpId)')
+    expect(STRIP).toContain('+ Blank session')
+  })
+
+  it('will not add the same prescribed session twice', () => {
+    expect(STRIP).toContain('usedTitles.has(t.title)')
+    expect(STRIP).toContain('Already here')
+  })
+
+  it('carries the room, the length and the purpose in with it', () => {
+    expect(STRIP).toContain('template ? template.mins')
+    expect(STRIP).toContain('template ? template.purpose')
+  })
+
+  it('says who the method wants in the room, and who it keeps out', () => {
+    expect(STRIP).toContain('attendanceWarnings({')
+    expect(STRIP).toContain('The method requires ')
+    expect(STRIP).toContain('the method keeps that role out of this room')
+  })
+
+  it('never blocks a session that actually happened for being the wrong shape', () => {
+    // A coach who knows why the finance lead is absent should not be stopped
+    // from recording the session that took place.
+    expect(STRIP).not.toContain('disabled={w.missing')
+    expect(STRIP).not.toContain('cannot start until')
+  })
+
+  // Habib: "I should be able to delete sessions that planned but never
+  // happened and so on."
+  it('a session that never happened can be deleted, and it asks first', () => {
+    expect(STRIP).toContain('async function removeSession(s)')
+    expect(STRIP).toContain('This cannot be undone')
+    expect(STRIP).toContain('Who was in it goes with it')
+  })
+
+  it('refuses to delete a session that carries a recording, and says why', () => {
+    // A session with a recording on it is evidence, not a diary entry.
+    expect(STRIP).toContain('Delete the recording first, then the session.')
+  })
+
+  it('puts a session back if the delete failed, rather than hiding it', () => {
+    expect(STRIP).toContain('setSessions(prev => [...prev, s])')
+  })
+
+  // A SESSION PLANNED IN MARCH AND ONE STARTING NOW ARE THE SAME THING. There
+  // is no second route for a session that happens today.
+  it('one that is happening now is the same session as one planned ahead', () => {
+    expect(STRIP).toContain('Happening right now.')
+    expect(STRIP).toContain('leave the time empty')
+  })
+
+  it('everything about a session can be changed where the session is', () => {
+    expect(STRIP).toContain('async function saveEdit(s)')
+    expect(STRIP).toContain('function startEdit(s)')
+    expect(STRIP).toContain('STATUS_OPTIONS.map')
+  })
+
+  it('changing the room names the people that room requires', () => {
+    expect(STRIP).toContain('async function markRequired(session, kind, extra)')
+    expect(STRIP).toContain("update({ required: false }).in('id', noLonger)")
+  })
+
+  it('taking a required person out of the room leaves the requirement standing', () => {
+    // Otherwise unticking somebody quietly removes the method's rule with them.
+    expect(STRIP).toContain('if (row.required) {')
+    expect(STRIP).toContain('update({ attended: null })')
+  })
+})
+
+describe('Sessions and rooms is the workplan', () => {
+  const PLAN = fs.readFileSync('src/components/gtcv/SessionWorkplan.tsx', 'utf8')
+
+  it('reads every session on the engagement, in the order the method runs them', () => {
+    expect(PLAN).toContain('workplanGroups(sessions)')
+    expect(PLAN).toContain("from '@/lib/method-sessions'")
+  })
+
+  it('edits nothing at all, and says so', () => {
+    expect(PLAN).toContain('Read only. A session is changed, invited, opened or deleted on its own decision point.')
+    // No writes of any kind from this screen.
+    expect(PLAN).not.toMatch(/\.insert\(/)
+    expect(PLAN).not.toMatch(/\.update\(/)
+    expect(PLAN).not.toMatch(/\.delete\(/)
+    expect(PLAN).not.toContain('+ New session')
+    expect(PLAN).not.toContain('+ Add session')
+  })
+
+  it('can be printed and downloaded as a spreadsheet, which is what it is for', () => {
+    expect(PLAN).toContain('window.print()')
+    expect(PLAN).toContain('Download the spreadsheet')
+    expect(PLAN).toContain('workplanCsv(sessions, whoFor)')
+    expect(PLAN).toContain('@media print')
+  })
+
+  it('every session name is the way back to where it can be changed', () => {
+    expect(PLAN).toContain('dpHref(clientId, g.id)')
+    expect(PLAN).toContain('Plan sessions here')
+  })
+
+  it('a dropped connection never reads as an engagement with no sessions', () => {
+    // 10 September 2026. One "Failed to fetch" showed zero sessions against
+    // every decision point, which Habib read as his work having been deleted.
+    expect(PLAN).toContain('for (let go = 0; go < 3; go++)')
+    expect(PLAN).toContain('Your sessions are safe on the record')
+  })
+})
+
+// ============================================================
+// WHAT CODERABBIT FOUND ON #278
+//
+// Six of these are the same shape: a failure that reads as a fact. An
+// attendance read that fell over said the session was empty; a load that
+// fell over said nothing was planned; a day with no time on it was written
+// away as no day at all. On an engagement this platform is the record of,
+// a record that quietly says less than the truth is the worst failure it has.
+// ============================================================
+describe('a failure never reads as a fact', () => {
+  const STRIP = fs.readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
+  const PLAN = fs.readFileSync('src/components/gtcv/SessionWorkplan.tsx', 'utf8')
+
+  it('falls back to the pointer only when the name column is genuinely absent', () => {
+    // It used to fall back on any error at all and throw the fallback's own
+    // error away, so a dropped connection read as a session nobody is in.
+    for (const SRC of [STRIP, PLAN]) {
+      expect(SRC).toContain('function missingPartyName(error)')
+      expect(SRC).toContain("error.code === '42703'")
+      expect(SRC).toContain('if (attErr && missingPartyName(attErr))')
+    }
+  })
+
+  it('says so when it could not read who is in a session, instead of showing nobody', () => {
+    expect(STRIP).toContain('Who is in each session could not be read')
+    // The workplan retries instead, because it has a retry loop to fall into.
+    expect(PLAN).toContain('if (attErr) { last = attErr; continue }')
+  })
+
+  it('never prints "nothing is planned" underneath a connection error', () => {
+    // 10 September 2026, twice over: Habib read an empty plan as his work
+    // having been deleted, and it had not been.
+    expect(PLAN).toContain('total === 0 && err ?')
+  })
+
+  it('keeps every other required attendee when one of them clashes', () => {
+    // One batch is one statement, so a unique violation on any single row
+    // aborted all of them and the session then asked for nobody.
+    expect(STRIP).toContain('for (const row of rows) {')
+    expect(STRIP).toContain('insert([row]).select().single()')
+  })
+
+  it('keeps the day when a session that has only a day is edited', () => {
+    // Changing the name of a session somebody had put in the diary as a date
+    // wrote the date away as null.
+    expect(STRIP).toContain("(s.planned_date ? `${s.planned_date}T00:00` : '')")
+    expect(STRIP).toContain('planned_at: draft.when && !draft.dayOnly')
+    // And typing an actual time turns it into a moment.
+    expect(STRIP).toContain('when: e.target.value, dayOnly: false')
+  })
+
+  it('says why a session cannot be deleted before asking whether to delete it', () => {
+    // Asking "this cannot be undone, are you sure" and then refusing anyway
+    // made the one case where the answer is already no look like a decision.
+    const fn = STRIP.slice(STRIP.indexOf('async function removeSession(s)'))
+    expect(fn.indexOf('Delete the recording first')).toBeLessThan(fn.indexOf('window.confirm'))
+  })
+
+  it('gives every workplan table a name a screen reader can read out', () => {
+    expect(PLAN).toContain('<caption')
+  })
+})
+
+// ============================================================
+// THE SECOND PASS ON #278
+// ============================================================
+describe('the invitation route authenticates before it reads anything', () => {
+  const ROUTE = fs.readFileSync('app/api/session-invite/route.ts', 'utf8')
+  const AUTHZ = fs.readFileSync('src/lib/auth/api-authz.ts', 'utf8')
+
+  it('will not tell a stranger whether a session id is real', () => {
+    // It looked the session up with the service role and only then checked who
+    // was asking, so 404 against 401 mapped out the identifier space.
+    expect(AUTHZ).toContain('export async function requireSignedIn(')
+    const before = ROUTE.indexOf('const signedIn = await requireSignedIn(req, admin)')
+    const lookup = ROUTE.indexOf("admin.from('gtcv_sessions')")
+    expect(before).toBeGreaterThan(-1)
+    expect(before).toBeLessThan(lookup)
+  })
+
+  it('still checks the engagement itself, once it knows which one it is', () => {
+    const signedIn = ROUTE.indexOf('requireSignedIn(req, admin)')
+    const access = ROUTE.indexOf("requireAccess(req, admin, session.client_id, 'manage'")
+    expect(signedIn).toBeLessThan(access)
+  })
+
+  it('logs what went wrong and tells the caller nothing about the database', () => {
+    expect(ROUTE).toContain("console.error('Session invitation failed', e)")
+    expect(ROUTE).toContain('The invitation could not be sent. Try again.')
+    expect(ROUTE).not.toContain("e instanceof Error ? e.message")
+  })
+})
+
+describe('an unread list is not an empty one', () => {
+  const STRIP = fs.readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
+
+  it('will not call the engagement empty because the people could not be read', () => {
+    // Every role the method wants would have looked like a role nobody holds.
+    expect(STRIP).toContain('The people on this engagement could not be read')
+  })
+
+  it('shows nothing until all of it has been read, so half a load is never on screen', () => {
+    // The sessions went up first and the people second, so a failed read of
+    // the people left the sessions rendering against a list of nobody, with
+    // the controls live and "nobody is on this engagement yet" underneath.
+    const fn = STRIP.slice(STRIP.indexOf('const load = useCallback'), STRIP.indexOf('}, [clientId, dpId])'))
+    expect(fn.indexOf('const { data: people, error: peopleErr }')).toBeLessThan(fn.indexOf('setSessions(rows || [])'))
+    expect(fn.indexOf('setErr(null)')).toBeGreaterThan(fn.indexOf('setParties(people || [])'))
+  })
+
+  it('will not set up a room from an attendance list it failed to read', () => {
+    // Acting on that inserts duplicates and clears requirements that are live.
+    expect(STRIP).toContain('const { data: fresh, error: freshErr }')
+    expect(STRIP).toContain('who it requires could not be set just now')
+  })
+
+  it('clears what the old room required when the room is taken off', () => {
+    // markRequired used to return before the cleanup whenever the new room
+    // asked for nobody, so the session went on warning about a room it was no
+    // longer in.
+    expect(STRIP).toContain('if (roomChanged) await markRequired(')
+    const fn = STRIP.slice(STRIP.indexOf('async function markRequired'))
+    // The cleanup runs before the "nothing to insert" exit.
+    expect(fn.indexOf('const noLonger =')).toBeLessThan(fn.indexOf('if (!rows.length) return'))
   })
 })

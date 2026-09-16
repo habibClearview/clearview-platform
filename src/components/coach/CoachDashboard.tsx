@@ -18,7 +18,7 @@ import { mayPreview } from '@/lib/role-preview'
 import { gateIsOpen, gateShutBecause } from '@/lib/gtcv-gates'
 import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
-import SessionPlanner from '@/components/gtcv/SessionPlanner'
+import SessionWorkplan from '@/components/gtcv/SessionWorkplan'
 import RecordingsPanel from '@/components/gtcv/RecordingsPanel'
 import SessionsStrip from '@/components/gtcv/SessionsStrip'
 import CopyLink from '@/components/common/CopyLink'
@@ -3396,7 +3396,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 the whole engagement: the method's room rules, and one list of
                 everything planned and everything recorded, so nothing is
                 missed and nothing has to be remembered. */}
-            {shownTab==='sessions'&&<><div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.7rem 0.95rem',marginBottom:'1rem',fontSize:'0.95rem',color:C.navy}}>Sessions are planned, invited and opened on the decision point they belong to. This page is the whole engagement in one view: the rooms the method requires, everything planned, and everything recorded.</div><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>
+            {shownTab==='sessions'&&<><div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.7rem 0.95rem',marginBottom:'1rem',fontSize:'0.95rem',color:C.navy}}>Sessions are planned, invited, opened and deleted on the decision point they belong to. This page reads them all back in one view, and nothing on it is edited: print it or download it as a spreadsheet to share.</div><SessionWorkplan clientId={selClient.id} clientName={selClient.name}/><div style={{height:22}}/>
               {/* WHAT HAS BEEN RECORDED, WHERE THE SESSIONS ARE. 10 September
                   2026. Habib: there is no list anywhere to show what has been
                   recorded and who was on it. A recording could only be found by

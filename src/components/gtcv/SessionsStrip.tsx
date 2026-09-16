@@ -10,15 +10,21 @@
 // point tab... the design must just be user friendly and tidy with less
 // clicks."
 //
-// Before this, running a session for Decision Point 2 meant leaving the
-// decision point, finding it in a list of every session on the engagement,
-// inviting from there, and opening the call from there. Four moves and a tab
-// change to start a conversation you were already standing in front of. And a
-// recording could only be found by remembering which session it belonged to.
+// And then, more precisely: "all the planning and everything associated with
+// each decision point is moved to that decision tab. The session and room
+// should then draw the details of the sessions, planned or otherwise, into it
+// so it works almost like a summary."
 //
-// This is one strip at the top of the decision point. Shut, it is a single
-// line: how many sessions, when the next one is. Open, it is the sessions
-// themselves, with the invitation and the way in on each one.
+// So this is the whole of it. Everything that can be done to a session for
+// this decision point is done here: the sessions the method prescribes, the
+// room and who it requires, when it is, who is in it, the invitation, the way
+// in, what was recorded, and deleting one that never happened. Sessions and
+// rooms now reads all of this back and edits nothing.
+//
+// A SESSION PLANNED FOR MARCH AND A SESSION STARTING NOW ARE THE SAME THING.
+// There is no separate route for one that happens today: leave the time empty
+// and press Open the session, or give it a time and send the invitation. Both
+// end up as one row with one room and one record of who was in it.
 //
 // ONE SESSION, TWO WAYS TO RUN IT. Habib: "it could be that it is recorded on
 // my laptop or my phone with all attendees in the same room, or it could be a
@@ -40,17 +46,20 @@
 // people on the engagement are picked here and recorded against the session,
 // so a single recording from one laptop still knows the room it was made in.
 //
-// The full room rules, who the method requires in each kind of session and who
-// it keeps out, stay in the planner. This is for doing rather than for
-// designing.
+// The method itself lives in src/lib/method-sessions.ts, so this screen and
+// the workplan read one source and cannot drift apart.
 //
 // Reads and writes through the browser client, so row-level security scopes
 // everything to the signed-in viewer. canManage=false renders the same strip
 // read only.
 // ============================================================
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { whenText, nextSession } from '@/lib/session-time'
+import {
+  KINDS, KIND_LABEL, kindDef, ROLE_LABEL, roleLabel,
+  methodSessionsFor, durationLabel, attendanceWarnings, STATUS_OPTIONS,
+} from '@/lib/method-sessions'
 
 const C = {
   card: 'var(--cv-card)', border: 'var(--cv-border)', slate: 'var(--cv-slate)',
@@ -59,6 +68,7 @@ const C = {
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const label = { ...mono, fontSize: '0.78rem', color: C.slate }
 const btn = (col, solid) => ({
   ...mono, fontSize: '0.84rem', fontWeight: 700, padding: '0.35rem 0.8rem',
   border: `1px solid ${col}`, borderRadius: 7,
@@ -70,29 +80,50 @@ const field = {
   border: `1px solid ${C.border}`, background: 'var(--cv-bg-2)', color: 'inherit',
 }
 
-// The same six rooms the planner and the database both know. Named here only
-// so a session can be given one without leaving the decision point; what each
-// room requires is the planner's job to explain.
 const PARTIES_TABLE = 'engagement_parties'
+const SESSIONS_TABLE = 'gtcv_sessions'
+const ATTENDANCE_TABLE = 'gtcv_session_attendance'
 
-// What each role is called out loud, so a dropdown reads as people rather
-// than as database values.
-const ROLE_LABEL = {
-  client_funder: 'Funder', funder_rep: 'Funder representative',
-  lsp_ed: 'Executive Director', lsp_leadership: 'Leadership',
-  lsp_finance: 'Finance', lsp_field: 'Field team', lsp_board: 'Board',
-  lead_consultant: 'Lead consultant', co_implementer: 'Co-implementer',
-  licensed_advisor: 'Licensed advisor', other: 'Other',
+/** A stored instant, as the browser's own date and time box wants it. */
+function localInputValue(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const two = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}`
 }
 
-const KIND_LABEL = {
-  plenary: 'Plenary',
-  joint_with_funder: 'Joint with funder',
-  client_team_only: 'Client team only',
-  finance_restricted: 'Finance restricted',
-  field_team: 'Field team',
-  one_to_one: 'One to one',
+/** When a recording was made, for the line on its session. */
+function recWhen(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
 }
+
+/** How long a recording ran, in words. */
+function recLength(seconds) {
+  const s = Math.max(0, Math.floor(seconds || 0))
+  if (s < 60) return `${s} sec`
+  const m = Math.round(s / 60)
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr ${m % 60} min`
+}
+
+/**
+ * Is this the database telling us the party_name column is not there yet,
+ * rather than telling us something is wrong?
+ *
+ * PostgREST answers 42703 for an undefined column. The message is checked too,
+ * because the column is also named in the schema-cache error a fresh database
+ * gives before it has reloaded.
+ */
+function missingPartyName(error) {
+  if (!error) return false
+  return error.code === '42703' || /party_name/i.test(String(error.message || ''))
+}
+
+const BLANK = { title: '', session_kind: '', when: '', duration_minutes: 60, purpose: '', extra: [] }
 
 export default function SessionsStrip({
   clientId, dpId, canManage = false, heading = 'Sessions', openByDefault = false,
@@ -107,44 +138,80 @@ export default function SessionsStrip({
   const [busy, setBusy] = useState(null)
   const [note, setNote] = useState({})
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ title: '', session_kind: 'plenary', when: '', duration_minutes: 60, purpose: '' })
+  const [picking, setPicking] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [draft, setDraft] = useState({})
+  const [form, setForm] = useState(BLANK)
 
   const load = useCallback(async () => {
     if (!clientId || !dpId) return
     setLoading(true)
-    const { data, error } = await supabase.from('gtcv_sessions')
+
+    // NOTHING IS SHOWN UNTIL ALL OF IT IS READ. CodeRabbit on #278: the
+    // sessions were put on screen first and the people second, so a failed
+    // read of the people left the sessions rendering against a list of nobody.
+    // The strip then said "nobody is on this engagement yet" with the controls
+    // still live, and setting a room on one of those sessions would have
+    // written down that the method wants a role no person holds.
+    //
+    // So this reads everything, and only then shows anything. A read that
+    // fails changes nothing at all: whatever was on screen stays, which on a
+    // refresh is the plan the coach already had.
+    const { data: rows, error } = await supabase.from(SESSIONS_TABLE)
       .select('*').eq('client_id', clientId).eq('dp_id', dpId)
       .order('planned_at', { ascending: true })
-    if (error) { setErr(error.message); setLoading(false); return }
-    setErr(null)
-    setSessions(data || [])
+    if (error) {
+      setErr('The sessions could not be read. Nothing has been lost, this is a connection problem.')
+      setLoading(false)
+      return
+    }
 
     // Everybody on the engagement, which is the list a participant is chosen
     // from. engagement_parties is the only place a person exists whether or
     // not they have a login, so a funder representative who never signs in is
     // still nameable.
-    const { data: people } = await supabase.from(PARTIES_TABLE)
+    const { data: people, error: peopleErr } = await supabase.from(PARTIES_TABLE)
       .select('id,name,party_role,organisation,email')
       .eq('client_id', clientId).order('sort_order', { ascending: true })
-    setParties(people || [])
+    if (peopleErr) {
+      setErr('The people on this engagement could not be read. Nothing has been lost, this is a connection problem.')
+      setLoading(false)
+      return
+    }
 
-    const ids = (data || []).map(r => r.id)
+    const ids = (rows || []).map(r => r.id)
+    let att = []
     if (ids.length) {
       // party_name arrives with 2026_09_16_session_attendance_name.sql. Asked
-      // for by name so that a database without it yet fails here and falls
-      // back to the pointer alone, rather than the whole strip going blank.
-      let { data: att, error: attErr } = await supabase.from('gtcv_session_attendance')
+      // for by name so that a database without it yet falls back to the
+      // pointer alone rather than the whole strip going blank.
+      //
+      // ONLY FOR THE MISSING COLUMN. CodeRabbit on #278: this used to fall
+      // back on any error at all and then throw the fallback's own error away,
+      // so a dropped connection or a permission problem read as a session
+      // nobody is in. Which is the one thing an attendance record must never
+      // say by accident.
+      let { data: first, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
         .select('id,session_id,party_id,party_role,party_name,required,attended')
         .in('session_id', ids)
-      if (attErr) {
-        ;({ data: att } = await supabase.from('gtcv_session_attendance')
+      if (attErr && missingPartyName(attErr)) {
+        ;({ data: first, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
           .select('id,session_id,party_id,party_role,required,attended')
           .in('session_id', ids))
       }
-      setAttendance(att || [])
-    } else {
-      setAttendance([])
+      if (attErr) {
+        setErr('Who is in each session could not be read. Nothing has been lost, this is a connection problem.')
+        setLoading(false)
+        return
+      }
+      att = first || []
     }
+
+    setSessions(rows || [])
+    setParties(people || [])
+    setAttendance(att)
+    setErr(null)
+
     // The recordings are read through the server route, which is the only
     // thing that can see storage. A failure here never hides the sessions.
     try {
@@ -161,30 +228,232 @@ export default function SessionsStrip({
 
   useEffect(() => { load() }, [load])
 
-  async function addSession() {
-    const title = form.title.trim()
+  const namedRoles = useMemo(
+    () => Array.from(new Set(parties.map(p => p.party_role).filter(Boolean))),
+    [parties],
+  )
+
+  // ─── What the method wants in this room ────────────────────
+  // The room's own required roles, plus any the prescribed session added on
+  // top of it, which are kept as attendance rows marked required.
+  function warningsFor(session) {
+    const rows = attendance.filter(a => a.session_id === session.id)
+    return attendanceWarnings({
+      kind: session.session_kind,
+      extraRequired: rows.filter(a => a.required && a.party_role).map(a => a.party_role),
+      presentRoles: rows.filter(a => a.attended).map(a => a.party_role),
+      namedRoles,
+    })
+  }
+
+  // ─── Adding ────────────────────────────────────────────────
+  // The roles the method wants in this room are written down as attendance
+  // rows marked required, so the gap is visible before the session runs and
+  // the invitation knows who it is for. Nobody is ticked as having attended:
+  // that is said afterwards, by the person who was there.
+  async function markRequired(session, kind, extra) {
+    const def = kindDef(kind)
+    const roles = Array.from(new Set([...(def ? def.required : []), ...(extra || [])]))
+
+    // Read what is recorded rather than trusting local state, so two changes
+    // in quick succession cannot both insert the same person. A read that
+    // failed is not a session with nobody on it: acting on that would insert
+    // duplicates and clear requirements that are still live.
+    const { data: fresh, error: freshErr } = await supabase.from(ATTENDANCE_TABLE)
+      .select('id,session_id,party_id,party_role,required,attended').eq('session_id', session.id)
+    if (freshErr) {
+      setNote(prev => ({ ...prev, [session.id]: { text: 'The room changed, and who it requires could not be set just now. Open the room again to retry.', bad: true } }))
+      return
+    }
+    const existing = fresh || []
+    const rows = []
+    // With no room there is nothing to require, and the block below still
+    // runs, so the requirements the old room left behind are cleared rather
+    // than going on warning about a room the session is no longer in.
+    roles.forEach(role => {
+      const named = parties.filter(p => p.party_role === role)
+      if (!named.length) {
+        if (!existing.some(a => a.party_role === role && !a.party_id)) {
+          rows.push({ client_id: clientId, session_id: session.id, party_id: null, party_role: role, required: true })
+        }
+        return
+      }
+      named.forEach(p => {
+        if (!existing.some(a => a.party_id === p.id)) {
+          rows.push({ client_id: clientId, session_id: session.id, party_id: p.id, party_role: role, party_name: p.name || null, required: true })
+        }
+      })
+    })
+    // Roles this room no longer wants stop being required. The row stays, so
+    // an attendance already recorded is never lost.
+    const noLonger = existing.filter(a => a.required && !roles.includes(a.party_role)).map(a => a.id)
+    if (noLonger.length) {
+      await supabase.from(ATTENDANCE_TABLE).update({ required: false }).in('id', noLonger)
+      setAttendance(prev => prev.map(a => (noLonger.includes(a.id) ? { ...a, required: false } : a)))
+    }
+    if (!rows.length) return
+    // ONE AT A TIME, BECAUSE ONE BATCH IS ONE STATEMENT. CodeRabbit on #278:
+    // these went in as a single insert, and a unique violation on any one row
+    // aborts the whole statement. So one person who was already required for
+    // this room silently cost every other required person their row, and the
+    // session then looked as though the method asked for nobody.
+    const added = []
+    for (const row of rows) {
+      let { data, error } = await supabase.from(ATTENDANCE_TABLE).insert([row]).select().single()
+      if (error && missingPartyName(error)) {
+        const { party_name, ...plain } = row
+        void party_name
+        ;({ data, error } = await supabase.from(ATTENDANCE_TABLE).insert([plain]).select().single())
+      }
+      // A unique violation means somebody got there first, which is the end
+      // state this wants anyway. Every other row still goes in.
+      if (error) continue
+      if (data) added.push(data)
+    }
+    if (added.length) setAttendance(prev => [...prev, ...added])
+  }
+
+  async function addSession(template) {
+    const title = (template ? template.title : form.title).trim()
     if (!title) { setNote({ new: { text: 'Give the session a name first.', bad: true } }); return }
     setBusy('new')
     const row = {
       client_id: clientId,
       dp_id: dpId,
       title,
-      session_kind: form.session_kind,
+      session_kind: (template ? template.kind : form.session_kind) || null,
       // A time typed into a browser is that browser's own clock. Stored as an
       // instant so a calendar in another country shows the same moment.
-      planned_at: form.when ? new Date(form.when).toISOString() : null,
-      planned_date: form.when ? form.when.slice(0, 10) : null,
-      duration_minutes: Number(form.duration_minutes) || 60,
-      purpose: form.purpose.trim() || null,
+      planned_at: !template && form.when ? new Date(form.when).toISOString() : null,
+      planned_date: !template && form.when ? form.when.slice(0, 10) : null,
+      duration_minutes: template ? template.mins : (Number(form.duration_minutes) || null),
+      purpose: (template ? template.purpose : form.purpose.trim()) || null,
       status: 'planned',
     }
-    const { data, error } = await supabase.from('gtcv_sessions').insert([row]).select().single()
+    const { data, error } = await supabase.from(SESSIONS_TABLE).insert([row]).select().single()
     setBusy(null)
     if (error) { setNote({ new: { text: 'That did not save: ' + error.message, bad: true } }); return }
     setSessions(prev => [...prev, data].sort((a, b) => new Date(a.planned_at || 0) - new Date(b.planned_at || 0)))
-    setForm({ title: '', session_kind: 'plenary', when: '', duration_minutes: 60, purpose: '' })
+    setForm(BLANK)
     setAdding(false)
+    setPicking(false)
     setNote({})
+    if (data.session_kind) await markRequired(data, data.session_kind, template ? template.extra : [])
+  }
+
+  // ─── Changing one ──────────────────────────────────────────
+  function startEdit(s) {
+    setEditing(s.id)
+    setDraft({
+      title: s.title || '',
+      session_kind: s.session_kind || '',
+      // A DAY WITHOUT A TIME IS STILL A DAY. CodeRabbit on #278: a session
+      // somebody put in the diary as a date had nothing in this box, so
+      // changing its name or its room wrote both the date and the time away
+      // as null and the day was simply gone.
+      when: localInputValue(s.planned_at) || (s.planned_date ? `${s.planned_date}T00:00` : ''),
+      dayOnly: !s.planned_at && !!s.planned_date,
+      held_date: s.held_date || '',
+      duration_minutes: s.duration_minutes ?? '',
+      status: s.status || 'planned',
+      purpose: s.purpose || '',
+      notes: s.notes || '',
+    })
+  }
+
+  async function saveEdit(s) {
+    setBusy(s.id)
+    const kind = draft.session_kind || null
+    const patch = {
+      title: draft.title.trim() || 'Untitled session',
+      session_kind: kind,
+      // Still a day and not a moment, unless somebody actually typed a time.
+      planned_at: draft.when && !draft.dayOnly ? new Date(draft.when).toISOString() : null,
+      planned_date: draft.when ? draft.when.slice(0, 10) : null,
+      held_date: draft.held_date || null,
+      duration_minutes: draft.duration_minutes === '' ? null : Number(draft.duration_minutes),
+      status: draft.status || 'planned',
+      purpose: draft.purpose.trim() || null,
+      notes: draft.notes.trim() || null,
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from(SESSIONS_TABLE).update(patch).eq('id', s.id)
+    setBusy(null)
+    if (error) {
+      setNote(prev => ({ ...prev, [s.id]: { text: 'That did not save, and your changes are still here: ' + error.message, bad: true } }))
+      return
+    }
+    const roomChanged = (s.session_kind || null) !== kind
+    setSessions(prev => prev.map(r => (r.id === s.id ? { ...r, ...patch } : r)))
+    setEditing(null)
+    setNote(prev => ({ ...prev, [s.id]: null }))
+    // Including when the room was taken off altogether: that is exactly when
+    // the requirements it left behind have to stop being requirements.
+    if (roomChanged) await markRequired({ ...s, ...patch }, kind, [])
+  }
+
+  /**
+   * Delete a session.
+   *
+   * Habib, 16 September 2026: "I should be able to delete sessions that
+   * planned but never happened and so on." It asks first, and it says what
+   * else goes, because a session that was recorded is evidence rather than a
+   * diary entry.
+   */
+  async function removeSession(s) {
+    // THE REASON COMES BEFORE THE QUESTION. CodeRabbit on #278: this asked
+    // "this cannot be undone, are you sure" and then refused anyway, so the
+    // one case where the answer is already no was the one that looked most
+    // like a decision.
+    const mine = recordings.filter(r => r.session_id === s.id)
+    if (mine.length) {
+      setNote(prev => ({ ...prev, [s.id]: { text: 'This session has a recording on it. Delete the recording first, then the session.', bad: true } }))
+      return
+    }
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Delete ${s.title || 'this session'}?\n\nWho was in it goes with it. This cannot be undone.`,
+    )) return
+    setBusy(s.id)
+    // Kept, so a failed delete puts the session back rather than leaving the
+    // screen disagreeing with the record.
+    const removedAttendance = attendance.filter(a => a.session_id === s.id)
+    setSessions(prev => prev.filter(r => r.id !== s.id))
+    setAttendance(prev => prev.filter(a => a.session_id !== s.id))
+    const { error } = await supabase.from(SESSIONS_TABLE).delete().eq('id', s.id)
+    setBusy(null)
+    if (error) {
+      setSessions(prev => [...prev, s])
+      setAttendance(prev => [...prev, ...removedAttendance])
+      setNote(prev => ({ ...prev, [s.id]: { text: 'It could not be deleted: ' + error.message, bad: true } }))
+    }
+  }
+
+  /**
+   * Delete a recording made in this session. It asks first and it says what
+   * goes: a recording is the only copy of what somebody said, and the
+   * transcript and any signatures go with the audio, because all three are
+   * about a conversation that will no longer exist.
+   */
+  async function removeRecording(rec) {
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Delete this recording?\n\n${rec.heading || 'Recording'}, ${recWhen(rec.started_at)}\n\nThe audio, the transcript and any signatures on it go with it. This cannot be undone.`,
+    )) return
+    setBusy(rec.id)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      const res = await fetch('/api/session-recording', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ recordingId: rec.id }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || `It could not be deleted (${res.status})`)
+      setRecordings(prev => prev.filter(x => x.id !== rec.id))
+    } catch (e) {
+      setNote(prev => ({ ...prev, [rec.session_id]: { text: e.message, bad: true } }))
+    }
+    setBusy(null)
   }
 
   // WHO WAS IN THE ROOM IS SAID, NOT COUNTED. One recording from one laptop
@@ -200,6 +469,15 @@ export default function SessionsStrip({
     // attendance row survived with no identity on it and a session could no
     // longer say who was in the room. The pointer is still preferred while it
     // resolves, so a corrected spelling reaches old sessions too.
+    const existing = attendance.find(a => a.session_id === session.id && a.party_id === partyId)
+    if (existing) {
+      // Already required for this room, now actually in it.
+      const { error } = await supabase.from(ATTENDANCE_TABLE).update({ attended: true }).eq('id', existing.id)
+      setBusy(null)
+      if (error) { setNote(prev => ({ ...prev, [session.id]: { text: 'That person could not be added: ' + error.message, bad: true } })); return }
+      setAttendance(prev => prev.map(a => (a.id === existing.id ? { ...a, attended: true } : a)))
+      return
+    }
     const row = {
       client_id: clientId,
       session_id: session.id,
@@ -209,12 +487,12 @@ export default function SessionsStrip({
       required: false,
       attended: true,
     }
-    let { data, error } = await supabase.from('gtcv_session_attendance').insert([row]).select().single()
+    let { data, error } = await supabase.from(ATTENDANCE_TABLE).insert([row]).select().single()
     if (error && /party_name/i.test(`${error.code || ''} ${error.message || ''}`)) {
       // The column is not there yet. The person is still recorded.
       const { party_name, ...withoutName } = row
       void party_name
-      ;({ data, error } = await supabase.from('gtcv_session_attendance').insert([withoutName]).select().single())
+      ;({ data, error } = await supabase.from(ATTENDANCE_TABLE).insert([withoutName]).select().single())
     }
     setBusy(null)
     if (error) { setNote(prev => ({ ...prev, [session.id]: { text: 'That person could not be added: ' + error.message, bad: true } })); return }
@@ -224,7 +502,16 @@ export default function SessionsStrip({
 
   async function removeParticipant(row) {
     setBusy(row.id)
-    const { error } = await supabase.from('gtcv_session_attendance').delete().eq('id', row.id)
+    // Somebody the method requires stays on the list and stops being ticked,
+    // so taking them out of the room does not quietly remove the requirement.
+    if (row.required) {
+      const { error } = await supabase.from(ATTENDANCE_TABLE).update({ attended: null }).eq('id', row.id)
+      setBusy(null)
+      if (error) { setNote(prev => ({ ...prev, [row.session_id]: { text: 'That person could not be taken off: ' + error.message, bad: true } })); return }
+      setAttendance(prev => prev.map(a => (a.id === row.id ? { ...a, attended: null } : a)))
+      return
+    }
+    const { error } = await supabase.from(ATTENDANCE_TABLE).delete().eq('id', row.id)
     setBusy(null)
     if (error) { setNote(prev => ({ ...prev, [row.session_id]: { text: 'That person could not be taken off: ' + error.message, bad: true } })); return }
     setAttendance(prev => prev.filter(a => a.id !== row.id))
@@ -254,6 +541,8 @@ export default function SessionsStrip({
   const next = nextSession(sessions)
   const count = sessions.length
   const recordingsFor = (id) => recordings.filter(r => r.session_id === id)
+  const prescribed = methodSessionsFor(dpId)
+  const usedTitles = new Set(sessions.map(s => (s.title || '').trim()))
 
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: '1.1rem' }}>
@@ -287,9 +576,14 @@ export default function SessionsStrip({
               Do not open it on a second device in the same room: two microphones and two speakers in one
               room feed back and spoil the recording.
             </div>
-            <div style={hint}>
+            <div style={{ ...hint, marginBottom: '0.3rem' }}>
               <strong style={{ color: C.navy }}>People in different places.</strong> Send the invitation.
               Everyone opens the same page, the call is there, and each device records the person in front of it.
+            </div>
+            <div style={hint}>
+              <strong style={{ color: C.navy }}>Happening right now.</strong> A session planned for next month and a
+              session starting in a minute are the same thing here. Add it, leave the time empty, and press
+              Open the session.
             </div>
           </div>
 
@@ -300,24 +594,27 @@ export default function SessionsStrip({
           {sessions.map(s => {
             const mine = recordingsFor(s.id)
             const here = attendance.filter(a => a.session_id === s.id)
-            const taken = new Set(here.map(a => a.party_id))
+            const inRoom = here.filter(a => a.attended)
+            const taken = new Set(inRoom.map(a => a.party_id))
             const available = parties.filter(p => !taken.has(p.id))
+            const w = warningsFor(s)
+            const room = kindDef(s.session_kind)
+            const isEditing = editing === s.id
             return (
-              <div key={s.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.6rem 0.75rem', marginBottom: '0.5rem' }}>
+              <div key={s.id} style={{
+                border: `1px solid ${C.border}`,
+                borderLeft: `4px solid ${room ? room.color : C.border}`,
+                borderRadius: 8, padding: '0.6rem 0.75rem', marginBottom: '0.5rem',
+              }}>
                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                     <div style={{ fontWeight: 600, color: C.navy }}>{s.title || 'Working session'}</div>
                     <div style={hint}>
                       {whenText(s)}
                       {s.session_kind ? ` · ${KIND_LABEL[s.session_kind] || s.session_kind}` : ''}
-                      {s.duration_minutes ? ` · ${s.duration_minutes} min` : ''}
-                      {s.status !== 'planned' ? ` · ${s.status}` : ''}
+                      {s.duration_minutes ? ` · ${durationLabel(s.duration_minutes) || `${s.duration_minutes} min`}` : ''}
+                      {s.status && s.status !== 'planned' ? ` · ${s.status}` : ''}
                     </div>
-                    {mine.length > 0 && (
-                      <div style={{ ...hint, color: C.green }}>
-                        {mine.length === 1 ? '1 recording' : `${mine.length} recordings`} on this session
-                      </div>
-                    )}
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     <a href={`/call/${s.id}`} target="_blank" rel="noreferrer"
@@ -329,9 +626,75 @@ export default function SessionsStrip({
                         {busy === s.id ? 'Sending…' : (s.invite_sent_at ? 'Send again' : 'Invite')}
                       </button>
                     )}
+                    {canManage && (
+                      <button type="button" style={btn(C.slate)} onClick={() => (isEditing ? setEditing(null) : startEdit(s))}>
+                        {isEditing ? 'Close' : 'Change'}
+                      </button>
+                    )}
+                    {canManage && (
+                      <button type="button" style={btn(C.red)} disabled={busy === s.id} onClick={() => removeSession(s)}>
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
                 {s.purpose && <div style={{ ...hint, marginTop: '0.35rem' }}>{s.purpose}</div>}
+                {room && <div style={{ ...hint, marginTop: '0.2rem', color: room.color }}>{room.blurb}</div>}
+
+                {/* WHAT THE METHOD WANTS IN THIS ROOM. Said, never enforced: a
+                    coach who knows why the finance lead is absent should not be
+                    stopped from recording the session that actually happened. */}
+                {(w.missing.length > 0 || w.intruders.length > 0 || w.unnamed.length > 0) && (
+                  <div style={{ border: `1px solid ${C.amber}`, background: 'var(--cv-alt)', borderRadius: 7, padding: '0.45rem 0.6rem', marginTop: '0.4rem' }}>
+                    {w.missing.length > 0 && (
+                      <div style={{ ...hint, color: C.amber }}>
+                        The method requires {w.missing.map(roleLabel).join(', ')} in this room, and {w.missing.length === 1 ? 'that attendee is' : 'those attendees are'} not named below.
+                      </div>
+                    )}
+                    {w.intruders.length > 0 && (
+                      <div style={{ ...hint, color: C.red }}>
+                        {w.intruders.map(roleLabel).join(', ')} {w.intruders.length === 1 ? 'is' : 'are'} in this session, and the method keeps that role out of this room.
+                      </div>
+                    )}
+                    {w.unnamed.length > 0 && (
+                      <div style={hint}>
+                        Nobody is named for {w.unnamed.map(roleLabel).join(', ')} on this engagement yet.{' '}
+                        <a href={`/coach?client=${encodeURIComponent(clientId)}&zone=eng_setup`} style={{ color: C.teal }}>
+                          Add them under Who is on it, and settings, and they appear here to pick.
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* WHAT THIS SESSION PRODUCED, ON THIS SESSION. 11 September
+                    2026. Habib: the evidence should be in the session box
+                    rather than at the bottom, by the time you do a lot of
+                    sessions it would be too cluttered. */}
+                {mine.map(rec => (
+                  <div key={rec.id} style={{
+                    marginTop: '0.4rem', padding: '0.4rem 0.55rem', borderLeft: `3px solid ${C.teal}`,
+                    background: 'var(--cv-alt)', borderRadius: 6,
+                    display: 'flex', gap: '0.55rem', alignItems: 'baseline', flexWrap: 'wrap',
+                  }}>
+                    <span style={{ fontWeight: 600, color: C.navy, fontSize: '0.9rem' }}>Recorded {recWhen(rec.started_at)}</span>
+                    {rec.merged_seconds ? <span style={hint}>{recLength(rec.merged_seconds)}</span> : null}
+                    <span style={{ ...hint, color: rec.transcript?.status === 'signed' ? C.green : C.amber }}>
+                      {rec.transcript
+                        ? (rec.transcript.status === 'signed' ? 'Transcript signed and filed as evidence'
+                          : rec.transcript.status === 'issued' ? 'Transcript waiting for signatures'
+                            : 'Transcript is a draft')
+                        : rec.status === 'opening' ? 'Recording now' : 'Not transcribed yet'}
+                    </span>
+                    {canManage && (
+                      <button type="button" style={{ ...btn(C.red), marginLeft: 'auto' }}
+                        disabled={busy === rec.id} onClick={() => removeRecording(rec)}
+                        title="Delete this recording, its transcript and its audio">
+                        {busy === rec.id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    )}
+                  </div>
+                ))}
 
                 {/* WHO IS IN THIS SESSION. Chosen from the people on the
                     engagement, so one recording made on one laptop still knows
@@ -340,10 +703,10 @@ export default function SessionsStrip({
                   <div style={{ ...mono, fontSize: '0.76rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: C.slate, marginBottom: '0.3rem' }}>
                     Who is in this session
                   </div>
-                  {here.length === 0 && <div style={{ ...hint, marginBottom: '0.35rem' }}>Nobody named yet.</div>}
-                  {here.length > 0 && (
+                  {inRoom.length === 0 && <div style={{ ...hint, marginBottom: '0.35rem' }}>Nobody named yet.</div>}
+                  {inRoom.length > 0 && (
                     <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
-                      {here.map(a => {
+                      {inRoom.map(a => {
                         const who = parties.find(p => p.id === a.party_id)
                         // The engagement's own list first, so a corrected
                         // spelling reaches old sessions; the name written down
@@ -359,7 +722,7 @@ export default function SessionsStrip({
                               <button type="button" aria-label={`Take ${name} off the session`}
                                 disabled={busy === a.id} onClick={() => removeParticipant(a)}
                                 style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '0.95rem', lineHeight: 1, padding: 0 }}>
-                                {'\u00D7'}
+                                {'×'}
                               </button>
                             )}
                           </span>
@@ -392,6 +755,67 @@ export default function SessionsStrip({
                     )
                   )}
                 </div>
+
+                {/* CHANGING THE SESSION, WHERE THE SESSION IS. Sessions and
+                    rooms reads and prints; nothing is edited there. */}
+                {canManage && isEditing && (
+                  <div style={{ border: `1px solid ${C.teal}`, borderRadius: 8, padding: '0.7rem 0.8rem', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '0.6rem' }}>
+                      <div style={{ gridColumn: '1/-1' }}>
+                        <label style={label} htmlFor={`ed-title-${s.id}`}>What is this session</label>
+                        <input id={`ed-title-${s.id}`} style={field} value={draft.title}
+                          onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label style={label} htmlFor={`ed-kind-${s.id}`}>Room</label>
+                        <select id={`ed-kind-${s.id}`} style={field} value={draft.session_kind}
+                          onChange={e => setDraft(d => ({ ...d, session_kind: e.target.value }))}>
+                          <option value="">Not set</option>
+                          {KINDS.map(k => <option key={k.v} value={k.v}>{k.l}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={label} htmlFor={`ed-when-${s.id}`}>When it starts</label>
+                        <input id={`ed-when-${s.id}`} type="datetime-local" style={field} value={draft.when}
+                          onChange={e => setDraft(d => ({ ...d, when: e.target.value, dayOnly: false }))} />
+                      </div>
+                      <div>
+                        <label style={label} htmlFor={`ed-mins-${s.id}`}>Minutes</label>
+                        <input id={`ed-mins-${s.id}`} type="number" min="15" step="15" style={field} value={draft.duration_minutes}
+                          onChange={e => setDraft(d => ({ ...d, duration_minutes: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label style={label} htmlFor={`ed-status-${s.id}`}>Status</label>
+                        <select id={`ed-status-${s.id}`} style={field} value={draft.status}
+                          onChange={e => setDraft(d => ({ ...d, status: e.target.value }))}>
+                          {STATUS_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={label} htmlFor={`ed-held-${s.id}`}>Held on</label>
+                        <input id={`ed-held-${s.id}`} type="date" style={field} value={draft.held_date}
+                          onChange={e => setDraft(d => ({ ...d, held_date: e.target.value }))} />
+                      </div>
+                      <div style={{ gridColumn: '1/-1' }}>
+                        <label style={label} htmlFor={`ed-purpose-${s.id}`}>What it has to produce</label>
+                        <textarea id={`ed-purpose-${s.id}`} style={{ ...field, minHeight: 54, resize: 'vertical' }} value={draft.purpose}
+                          onChange={e => setDraft(d => ({ ...d, purpose: e.target.value }))} />
+                      </div>
+                      <div style={{ gridColumn: '1/-1' }}>
+                        <label style={label} htmlFor={`ed-notes-${s.id}`}>Notes</label>
+                        <textarea id={`ed-notes-${s.id}`} style={{ ...field, minHeight: 44, resize: 'vertical' }} value={draft.notes}
+                          onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+                      <button type="button" style={btn(C.teal, true)} disabled={busy === s.id} onClick={() => saveEdit(s)}>
+                        {busy === s.id ? 'Saving…' : 'Save the session'}
+                      </button>
+                      <button type="button" style={btn(C.slate)} onClick={() => setEditing(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
                 {s.invite_sent_at && (
                   <div style={{ ...hint, marginTop: '0.25rem' }}>
                     Invitation sent {new Date(s.invite_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
@@ -404,51 +828,107 @@ export default function SessionsStrip({
             )
           })}
 
-          {canManage && !adding && (
-            <button type="button" style={btn(C.teal)} onClick={() => setAdding(true)}>+ New session</button>
+          {canManage && !adding && !picking && (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button type="button" style={btn(C.teal)} onClick={() => setPicking(true)}>
+                Sessions the method specifies here
+              </button>
+              <button type="button" style={btn(C.slate)} onClick={() => setAdding(true)}>+ New session</button>
+            </div>
+          )}
+
+          {/* THE METHOD'S OWN SESSIONS, AT THE DECISION POINT THEY BELONG TO.
+              These used to be on Sessions and rooms, which meant planning
+              Decision Point 2 happened somewhere other than Decision Point 2.
+              The room, the length and what the session has to produce all come
+              with it, so nothing has to be typed or remembered. */}
+          {canManage && picking && (
+            <div style={{ border: `1px dashed ${C.teal}`, borderRadius: 8, padding: '0.7rem 0.8rem', marginTop: '0.4rem' }}>
+              <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: C.slate, marginBottom: '0.5rem' }}>
+                Sessions the method specifies here
+              </div>
+              {prescribed.length === 0 ? (
+                <div style={hint}>The guide does not specify sessions at this decision point. Add one and set the room.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {prescribed.map(t => {
+                    const already = usedTitles.has(t.title)
+                    const k = kindDef(t.kind)
+                    return (
+                      <div key={t.title} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1 1 320px' }}>
+                          <div style={{ fontWeight: 600, color: C.navy }}>{t.title}</div>
+                          <div style={{ ...mono, fontSize: '0.8rem', color: k ? k.color : C.slate }}>
+                            {k ? k.l : 'Room not set'}{t.mins ? ` · ${durationLabel(t.mins)}` : ''}
+                          </div>
+                          <div style={{ ...hint, marginTop: '0.15rem' }}>{t.purpose}</div>
+                        </div>
+                        <button type="button"
+                          style={already ? { ...btn(C.slate), opacity: 0.5, cursor: 'default' } : btn(C.teal)}
+                          disabled={already || busy === 'new'}
+                          onClick={() => addSession(t)}>
+                          {already ? 'Already here' : '+ Add'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              {note.new && <div style={{ ...hint, marginTop: '0.4rem', color: note.new.bad ? C.red : C.green }}>{note.new.text}</div>}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
+                <button type="button" style={btn(C.slate)} onClick={() => { setPicking(false); setAdding(true) }}>+ Blank session</button>
+                <button type="button" style={btn(C.slate)} onClick={() => setPicking(false)}>Close</button>
+              </div>
+            </div>
           )}
 
           {canManage && adding && (
             <div style={{ border: `1px solid ${C.teal}`, borderRadius: 8, padding: '0.7rem 0.8rem', marginTop: '0.4rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: '0.6rem' }}>
                 <div style={{ gridColumn: '1/-1' }}>
-                  <label style={{ ...mono, fontSize: '0.78rem', color: C.slate }} htmlFor="ss-title">What is this session</label>
+                  <label style={label} htmlFor="ss-title">What is this session</label>
                   <input id="ss-title" style={field} value={form.title} placeholder="Service listing plenary"
                     onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
                 </div>
                 <div>
-                  <label style={{ ...mono, fontSize: '0.78rem', color: C.slate }} htmlFor="ss-kind">Room</label>
+                  <label style={label} htmlFor="ss-kind">Room</label>
                   <select id="ss-kind" style={field} value={form.session_kind}
                     onChange={e => setForm(f => ({ ...f, session_kind: e.target.value }))}>
-                    {Object.entries(KIND_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    <option value="">Not set</option>
+                    {KINDS.map(k => <option key={k.v} value={k.v}>{k.l}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{ ...mono, fontSize: '0.78rem', color: C.slate }} htmlFor="ss-when">When</label>
+                  <label style={label} htmlFor="ss-when">When</label>
                   <input id="ss-when" type="datetime-local" style={field} value={form.when}
                     onChange={e => setForm(f => ({ ...f, when: e.target.value }))} />
                 </div>
                 <div>
-                  <label style={{ ...mono, fontSize: '0.78rem', color: C.slate }} htmlFor="ss-mins">Minutes</label>
+                  <label style={label} htmlFor="ss-mins">Minutes</label>
                   <input id="ss-mins" type="number" min="15" step="15" style={field} value={form.duration_minutes}
                     onChange={e => setForm(f => ({ ...f, duration_minutes: e.target.value }))} />
                 </div>
                 <div style={{ gridColumn: '1/-1' }}>
-                  <label style={{ ...mono, fontSize: '0.78rem', color: C.slate }} htmlFor="ss-purpose">What it has to produce</label>
+                  <label style={label} htmlFor="ss-purpose">What it has to produce</label>
                   <input id="ss-purpose" style={field} value={form.purpose}
                     onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))} />
                 </div>
               </div>
+              {form.session_kind && kindDef(form.session_kind) && (
+                <div style={{ ...hint, marginTop: '0.4rem', color: kindDef(form.session_kind).color }}>
+                  {kindDef(form.session_kind).blurb}
+                </div>
+              )}
               {note.new && <div style={{ ...hint, marginTop: '0.4rem', color: note.new.bad ? C.red : C.green }}>{note.new.text}</div>}
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
-                <button type="button" style={btn(C.teal, true)} disabled={busy === 'new'} onClick={addSession}>
+                <button type="button" style={btn(C.teal, true)} disabled={busy === 'new'} onClick={() => addSession(null)}>
                   {busy === 'new' ? 'Saving…' : 'Add the session'}
                 </button>
                 <button type="button" style={btn(C.slate)} onClick={() => { setAdding(false); setNote({}) }}>Cancel</button>
               </div>
               <p style={{ ...hint, marginTop: '0.5rem' }}>
-                Who the method requires in each room, and who it keeps out, is on Sessions and rooms.
-                Nothing here overrides it.
+                Choosing a room names the people the method wants in it, and this session says so
+                above if one of them is missing. Leave the time empty for a session that is starting now.
               </p>
             </div>
           )}
