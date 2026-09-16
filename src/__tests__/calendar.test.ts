@@ -148,7 +148,7 @@ describe('sending it again updates the entry rather than adding a second one', (
 // ============================================================
 describe('sending the invitation', () => {
   const ROUTE = require('fs').readFileSync('app/api/session-invite/route.ts', 'utf8')
-  const PLANNER = require('fs').readFileSync('src/components/gtcv/SessionPlanner.tsx', 'utf8')
+  const PLANNER = require('fs').readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
 
   it('refuses a session with a date and no time rather than guessing one', () => {
     // Nine in the morning in somebody's diary because nobody said otherwise
@@ -159,7 +159,7 @@ describe('sending the invitation', () => {
 
   it('invites the people ticked as attending and nobody else', () => {
     expect(ROUTE).toContain('gtcv_session_attendance')
-    expect(ROUTE).toContain('Nobody is ticked as attending')
+    expect(ROUTE).toContain('Nobody is named as being in this session')
   })
 
   // 12 September 2026. Habib, on an engagement nobody had been added to:
@@ -169,12 +169,12 @@ describe('sending the invitation', () => {
   it('says whether nobody is ticked or nobody is on the engagement at all', () => {
     expect(ROUTE).toContain('Nobody has been added to this engagement yet')
     expect(ROUTE).toContain('Add them under Who is on it, and settings')
-    expect(ROUTE).toContain('Tick them under Attendance on this session')
+    expect(ROUTE).toContain('Add them under Who is in this session, on the decision point')
   })
 
   it('sends the attendance panel to the page that holds the people', () => {
     expect(PLANNER).toContain('zone=eng_setup')
-    expect(PLANNER).toContain('Add them under Who is on it, and settings, and they appear here to tick.')
+    expect(PLANNER).toContain('Add them under Who is on it, and settings, and they appear here to pick.')
   })
 
   // WHAT THE INVITATION HAS TO SAY. 12 September 2026. Habib: the email sent
@@ -233,12 +233,15 @@ describe('sending the invitation', () => {
   })
 
   it('is offered on the session it belongs to, not on a second list', () => {
-    expect(PLANNER).toContain('Send the calendar invitation')
+    // 16 September 2026: the session it belongs to is now the decision point
+    // it belongs to, so the button went there rather than staying on a page
+    // that reads every session and edits none of them.
+    expect(PLANNER).toContain("s.invite_sent_at ? 'Send again' : 'Invite'")
     expect(PLANNER).toContain('/api/session-invite')
   })
 
   it('records the moment, not the day, on the session', () => {
     expect(PLANNER).toContain("type=\"datetime-local\"")
-    expect(PLANNER).toContain("'planned_at'")
+    expect(PLANNER).toContain('planned_at:')
   })
 })

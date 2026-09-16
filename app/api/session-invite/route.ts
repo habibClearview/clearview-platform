@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         .select('id', { count: 'exact', head: true }).eq('client_id', session.client_id)
       return NextResponse.json({
         error: count
-          ? 'Nobody is ticked as attending this session, so there is nobody to invite. Tick them under Attendance on this session.'
+          ? 'Nobody is named as being in this session, so there is nobody to invite. Add them under Who is in this session, on the decision point.'
           : 'Nobody has been added to this engagement yet, so there is nobody to invite. Add them under Who is on it, and settings, then tick them under Attendance on this session.',
       }, { status: 409 })
     }
