@@ -470,18 +470,117 @@ describe('one list of the people, not two', () => {
 describe('the pre-engagement conversation', () => {
   const DASH2 = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 
-  it('can be recorded where the three questions are', () => {
-    // The answers to those three questions are the thing being recorded and
-    // signed, and there was no way to record them on the tab that asks them.
+  // IT IS A MEETING LIKE ANY OTHER. 16 September 2026. Habib: keep it
+  // flexible, "it could be that it is recorded on my laptop or my phone with
+  // all attendees in the same room, or it could be a call". It used to be a
+  // bare recorder bolted to this tab, with no people invited, no time and no
+  // link, on the reasoning that the three questions come before any session
+  // plan. In practice it is a conversation with the funder and the Executive
+  // Director in three places.
+  it('is planned, invited and opened like every other session', () => {
     const tab = DASH2.slice(DASH2.indexOf('function TabDiagnostic'))
-    expect(tab.slice(0, 4000)).toContain('<SessionRecorder')
+    expect(tab.slice(0, 4000)).toContain('<SessionsStrip')
     expect(tab.slice(0, 4000)).toContain('dpId="setup"')
+    // And the bare recorder is gone from this screen entirely.
+    expect(DASH2).not.toContain('<SessionRecorder')
   })
 
-  it('belongs to the block, because there is no session plan yet', () => {
-    // The three questions are asked once, before there is a plan to hang a
-    // session on.
+  it('still has somewhere for a recording made without a session', () => {
+    // A field interview, or a conversation nobody planned, still has no
+    // session to sit on and must not be lost.
     expect(OPEN).toContain("url.searchParams.get('dpId')")
     expect(OPEN).toContain(".is('session_id', null)")
+  })
+})
+
+// ============================================================
+// THE SESSIONS LIVE ON THE DECISION POINT THEY BELONG TO
+//
+// Habib, 16 September 2026: "how bad clutter would it be to include session
+// planning, calls and all that in each of the decision points rather than have
+// a separate tab called rooms and sessions... the design must just be user
+// friendly and tidy with less clicks."
+//
+// Running a session for Decision Point 2 meant leaving the decision point,
+// finding it among every session on the engagement, inviting from there and
+// opening the call from there.
+// ============================================================
+describe('sessions on the decision point', () => {
+  const DASH3 = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+  const STRIP = fs.readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
+
+  it('every decision point carries its own sessions, at the top of it', () => {
+    expect(DASH3).toContain('<SessionsStrip clientId={selClient.id} dpId="phase_0"')
+    expect(DASH3).toContain('<SessionsStrip clientId={selClient.id} dpId={dpKey}')
+    expect(DASH3).toContain('<SessionsStrip clientId={selClient.id} dpId="handover"')
+  })
+
+  it('the strip is one line until it is opened, so it cannot clutter the point', () => {
+    expect(STRIP).toContain('aria-expanded={open}')
+    expect(STRIP).toContain('nothing planned yet')
+  })
+
+  it('planning, inviting and opening are all on it', () => {
+    expect(STRIP).toContain('+ New session')
+    expect(STRIP).toContain("fetch('/api/session-invite'")
+    expect(STRIP).toContain('Open the session')
+    expect(STRIP).toContain('`/call/${s.id}`')
+  })
+
+  // ONE SESSION, TWO WAYS TO RUN IT. Habib: "it could be that it is recorded
+  // on my laptop or my phone with all attendee in the same room or it could be
+  // a call."
+  it('says plainly that one room and a call are both the same session', () => {
+    expect(STRIP).toContain('Everyone in one room?')
+    expect(STRIP).toContain('In different places? The same page holds the call.')
+    expect(STRIP).toContain('Nothing to choose in advance.')
+  })
+
+  it('a recording is shown against the session it was made on', () => {
+    // A recording could only be found by remembering which session it belonged
+    // to, which is a record that exists and cannot be found.
+    expect(STRIP).toContain('recordings.filter(r => r.session_id === id)')
+    expect(STRIP).toContain('on this session')
+  })
+
+  it('a session that failed to read never hides the sessions themselves', () => {
+    expect(STRIP).toContain('the sessions still stand on their own')
+  })
+
+  it('Sessions and rooms stays as the diary, and says so', () => {
+    expect(DASH3).toContain('Sessions are planned, invited and opened on the decision point they belong to')
+    expect(DASH3).toContain('<SessionPlanner clientId={selClient.id}')
+  })
+
+  it('a time typed in a browser is stored as an instant, not as a local string', () => {
+    // A calendar in another country has to show the same moment.
+    expect(STRIP).toContain('new Date(form.when).toISOString()')
+  })
+})
+
+// ============================================================
+// ASSIGNMENTS ARE NOT ON A CLIENT'S WORKSPACE
+//
+// Habib, 16 September 2026: "why do we have a section called Assignment on the
+// cover page of a client's workspace that lists other clients? No client
+// should be able to see other client's information."
+// ============================================================
+describe('the practice’s commercial record stays on the practice’s side', () => {
+  const DASH4 = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('is gone from the client Cover, on both branches that drew it', () => {
+    expect(DASH4).not.toContain('<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>')
+  })
+
+  it('a payer’s assignments are on the payer’s own page', () => {
+    expect(DASH4).toContain('<ServicesSection payerType="programme" payerId={prog.id} clients={clients}/>')
+  })
+
+  it('an organisation paying for itself keeps a home, on the coaching team’s tab only', () => {
+    // A self-paying organisation IS the payer, so its assignments have to live
+    // somewhere. They live on the tab the method already keeps to the team,
+    // and that screen is handed only this one organisation, so no other
+    // client's name can appear on it even when a coach is looking.
+    expect(DASH4).toContain("{shownTab==='eng_setup'&&!selClient.programme_id&&canViewCoachGuidance(previewRoleId)&&<><ServicesSection payerType=\"client\" payerId={selClient.id} clients={[selClient]}/>")
   })
 })

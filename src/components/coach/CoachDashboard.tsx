@@ -20,9 +20,8 @@ import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
 import RecordingsPanel from '@/components/gtcv/RecordingsPanel'
+import SessionsStrip from '@/components/gtcv/SessionsStrip'
 import CopyLink from '@/components/common/CopyLink'
-import SessionRecorder from '@/components/gtcv/SessionRecorder'
-import TranscriptPanel from '@/components/gtcv/TranscriptPanel'
 import { useNarrowScreen } from '@/lib/narrow-screen'
 import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
@@ -3149,13 +3148,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <button style={addBtn(true)} onClick={()=>window.print()}>Print the cover</button>
           </div>
         </div>
-        {/* ON EVERY CLIENT, NOT ONLY THE SELF-PAYING ONES. 8 September 2026.
-                  This was hidden behind !selClient.programme_id, so a client
-                  under a programme could not be given a service they pay for
-                  themselves. A programme paying for the canvas does not stop
-                  the same organisation buying Market Intelligence with its own
-                  money, and that was unrecordable. */}
-              <ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>
+        {/* ASSIGNMENTS ARE NOT THE CLIENT'S BUSINESS. 16 September 2026.
+            Habib: "why do we have a section called Assignment on the cover
+            page of a client's workspace that lists other clients? No client
+            should be able to see other client's information."
+            He is right. That block is the practice's commercial record: who
+            pays, what they bought, the fee. Row-level security did stop a
+            client reading another organisation's rows, but it was handed the
+            whole client list to offer, it carried fees, and previewing the
+            client's screen as the coach showed all of it, because a preview
+            fetches with the coach's own credentials. An assignment belongs to
+            the payer, so it lives on the payer's page and nowhere else. */}
       </div>
     )
 
@@ -3337,13 +3340,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <div style={{display:'flex',justifyContent:'flex-end'}}>
                 <button style={addBtn(true)} onClick={()=>window.print()}>Print the cover</button>
               </div>
-              {/* ON EVERY CLIENT, NOT ONLY THE SELF-PAYING ONES. 8 September 2026.
-                  This was hidden behind !selClient.programme_id, so a client
-                  under a programme could not be given a service they pay for
-                  themselves. A programme paying for the canvas does not stop
-                  the same organisation buying Market Intelligence with its own
-                  money, and that was unrecordable. */}
-              <ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>
+              {/* Assignments are not on a client's workspace. See the note on
+                  the other Cover branch above: they are the practice's
+                  commercial record and they live on the payer's page. */}
             </>}
             {/* Part K, C67 to C70. The drawing of the canvas is unchanged and
                 sits where it always did; what each gate DECIDED, the evidence,
@@ -3368,6 +3367,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 logins, then how the engagement runs. Sharing a canvas with a
                 prospect is selling, not delivery, so it is not on a client's
                 page; it moves to the coach side. */}
+            {/* An organisation that pays for its own work is a payer, so its
+                assignments have to live somewhere. They live here, on the tab
+                the method already keeps to the coaching team, and this screen
+                is handed only this one organisation so no other client's name
+                can appear on it. A programme's assignments are on the
+                programme's own page. */}
+            {shownTab==='eng_setup'&&!selClient.programme_id&&canViewCoachGuidance(previewRoleId)&&<><ServicesSection payerType="client" payerId={selClient.id} clients={[selClient]}/><div style={{height:22}}/></>}
             {shownTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>
               {/* THE WELCOME PACK SITS WITH THE PEOPLE IT IS SENT TO.
                   9 September 2026. It was on the Cover, which is the reading of
@@ -3383,7 +3389,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   one. Both are now on the person's own line above. */}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
             {shownTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {shownTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
-            {shownTab==='sessions'&&<><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>
+            {/* SESSIONS AND ROOMS IS THE DIARY NOW. 16 September 2026. The
+                sessions themselves are run from the decision point they belong
+                to, which is where somebody standing in front of the work
+                actually is. What is left here is what only makes sense across
+                the whole engagement: the method's room rules, and one list of
+                everything planned and everything recorded, so nothing is
+                missed and nothing has to be remembered. */}
+            {shownTab==='sessions'&&<><div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.7rem 0.95rem',marginBottom:'1rem',fontSize:'0.95rem',color:C.navy}}>Sessions are planned, invited and opened on the decision point they belong to. This page is the whole engagement in one view: the rooms the method requires, everything planned, and everything recorded.</div><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>
               {/* WHAT HAS BEEN RECORDED, WHERE THE SESSIONS ARE. 10 September
                   2026. Habib: there is no list anywhere to show what has been
                   recorded and who was on it. A recording could only be found by
@@ -3400,13 +3413,19 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {shownTab==='tracker'&&<GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(previewRoleId)}/>}
             {shownTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={previewRoleId} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
             {shownTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}
-            {shownTab==='handover'&&<><HandoverIndependence clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
-            {shownTab==='phase0'&&<><TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId="phase_0" clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div></>}
+            {shownTab==='handover'&&<><SessionsStrip clientId={selClient.id} dpId="handover" canManage={canEdit(previewRoleId)}/><HandoverIndependence clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
+            {/* THE SESSIONS FOR THIS DECISION POINT, AT THE TOP OF IT.
+                16 September 2026. Habib: it would be better to have all the
+                elements related to each decision point in the decision point
+                tab, user friendly and tidy with fewer clicks. Running a
+                session used to mean leaving the point, finding it among every
+                session on the engagement, and inviting from there. */}
+            {shownTab==='phase0'&&<><SessionsStrip clientId={selClient.id} dpId="phase_0" canManage={canEdit(previewRoleId)}/><TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId="phase_0" clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div></>}
             {['dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(dpKey=>(
               // One condition per tab. The same nine keys used to be mapped
               // twice with the same test in both, so every render walked the
               // list twice to decide the same thing.
-              activeTab===dpKey&&<div key={dpKey}><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div>
+              activeTab===dpKey&&<div key={dpKey}><SessionsStrip clientId={selClient.id} dpId={dpKey} canManage={canEdit(previewRoleId)}/><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div>
                 {/* The tools belong to the zone that uses them. Interviewing is
                     how Decision Point 2 gets its evidence and observation is how Decision Point 7 gets
                     its, and both used to sit ten and seven places away in a flat
@@ -4137,8 +4156,6 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
 
 function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
   const d=diagnostic||{}
-  // The recording of the three questions, so the transcript sits under them.
-  const [preRecordingId,setPreRecordingId]=useState(null)
   const locked=d.ceo_signed&&d.coach_signed
   const answers=d.readiness_answers||READINESS_QUESTIONS.map(q=>({...q,answer:null}))
   const score=answers.filter(a=>a.answer===true).length
@@ -4146,31 +4163,27 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Pre-Engagement Diagnostic</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       {locked&&<div style={{background:'var(--cv-tint-green)',padding:14,borderRadius:8,marginBottom:16,fontWeight:600,color:C.green}}>Signed and locked. CEO: {d.ceo_signed_name} on {d.ceo_signed_at?.split('T')[0]}. Coach confirmed {d.coach_signed_at?.split('T')[0]}.</div>}
-      {/* THE ANSWERS ARE WHAT IS BEING RECORDED. 11 September 2026.
-          Habib: the pre-engagement session is not listed and the recording
-          feature is not available on the pre-engagement tab, and the answers to
-          these questions are the ones we are recording and transcribing for
-          signature, so this should be shown clearly on the pre-engagement tab.
+      {/* THE PRE-ENGAGEMENT CONVERSATION IS A MEETING LIKE ANY OTHER.
+          16 September 2026. Habib: keep it flexible, "it could be that it is
+          recorded on my laptop or my phone with all attendees in the same
+          room, or it could be a call", and the pre-engagement should work the
+          way the decision points do.
 
-          The three questions are asked once, before there is a session plan to
-          hang a session on, which is why the recording belongs to this block
-          rather than to a planned session. It sits above the questions, where
-          the conversation actually happens. */}
-      <div style={{marginBottom:'1.25rem'}}>
-        <SessionRecorder
-          clientId={client.id}
-          dpId="setup"
-          canManage={canEdit(userRole)}
-          clientName={client.name}
-          title="Pre-engagement conversation, the three questions"
-          onRecording={setPreRecordingId}
-        />
-        {preRecordingId&&(
-          <div style={{marginTop:'0.9rem'}}>
-            <TranscriptPanel recordingId={preRecordingId} canManage={canEdit(userRole)}/>
-          </div>
-        )}
-      </div>
+          It used to be a bare recorder bolted to this tab, on the reasoning
+          that the three questions are asked before any session plan exists. In
+          practice this conversation is a meeting with the funder and the
+          Executive Director, in three places, and it needed what every other
+          meeting has: people invited, a time in a diary, and one link. It is an
+          ordinary session now, on dp_id 'setup', and the session page holds
+          the call for when people are apart and records every device that
+          opens it for when they are round a table. */}
+      <SessionsStrip
+        clientId={client.id}
+        dpId="setup"
+        canManage={canEdit(userRole)}
+        heading="The pre-engagement conversation"
+        openByDefault
+      />
 
       <div style={card}>
         <div style={secH}>Three Questions</div>

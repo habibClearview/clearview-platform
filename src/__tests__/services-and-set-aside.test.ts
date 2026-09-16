@@ -351,7 +351,9 @@ describe('no screen draws the same record twice', () => {
 
   it('each of those tabs renders exactly one panel', () => {
     expect(DASH2).toContain("{shownTab==='tracker'&&<GtcvEngagementTracker")
-    expect(DASH2).toContain("{shownTab==='handover'&&<><HandoverIndependence")
+    // The handover carries its sessions strip first, the same as every
+    // decision point. 16 September 2026.
+    expect(DASH2).toContain("{shownTab==='handover'&&<><SessionsStrip clientId={selClient.id} dpId=\"handover\"")
     expect(DASH2).not.toContain('<TabEvidence')
   })
 
