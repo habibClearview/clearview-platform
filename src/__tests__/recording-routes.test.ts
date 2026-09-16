@@ -949,3 +949,32 @@ describe('the planning section is on every decision point', () => {
     expect(DASH).not.toContain('activeTab===dpKey')
   })
 })
+
+// ============================================================
+// A SHUT GATE IS A LOCK, NOT A DISABLED BUTTON
+//
+// From the review on #279. A block stays shut until the one before it is
+// signed off, and that was enforced by greying the button in the sidebar.
+// ?zone=dp05 typed, pasted, or simply remembered by a browser rendered
+// Decision Point 5 in full for somebody the gate was meant to hold back.
+// ============================================================
+describe('a decision point that is not open yet', () => {
+  const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('is not rendered because the address asked for it', () => {
+    expect(DASH).toContain('const tabIsOpen=(id)=>{')
+    expect(DASH).toContain("const shownTab=tabIsOpen(activeTab)?activeTab:'cover'")
+  })
+
+  it('checks the gate itself, not just whether the tab exists', () => {
+    const fn = DASH.slice(DASH.indexOf('const tabIsOpen=(id)=>{'), DASH.indexOf('const shownTab=tabIsOpen'))
+    expect(fn).toContain('gateIsOpen(tab.dpId')
+    // A tab that is not a decision point has no gate to check.
+    expect(fn).toContain('if(!tab.dpId)return true')
+  })
+
+  it('still lets the coaching team prepare a block before the session that fills it', () => {
+    const fn = DASH.slice(DASH.indexOf('const tabIsOpen=(id)=>{'), DASH.indexOf('const shownTab=tabIsOpen'))
+    expect(fn).toContain('isCoachingTeam:canViewCoachGuidance(previewRoleId)')
+  })
+})

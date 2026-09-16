@@ -3056,7 +3056,21 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     // The zone is in the address now, so a link or a browser's memory can point
     // at a tab this person may not open. Fall back to the cover rather than
     // showing them a blank panel or, worse, the panel itself.
-    const shownTab=visibleTabs.some(t=>t.id===activeTab)?activeTab:'cover'
+    //
+    // AND A SHUT GATE IS ONE OF THE WAYS A TAB IS NOT THEIRS. 16 September
+    // 2026, from the review. A block stays shut until the one before it is
+    // signed off, and that was enforced by disabling the button in the
+    // sidebar. A button is not a lock: ?zone=dp05 typed, pasted or remembered
+    // by a browser rendered Decision Point 5 in full, gate or no gate. The
+    // coaching team is not gated, because the consultant prepares a block
+    // before the session that fills it.
+    const tabIsOpen=(id)=>{
+      const tab=visibleTabs.find(t=>t.id===id)
+      if(!tab)return false
+      if(!tab.dpId)return true
+      return gateIsOpen(tab.dpId,(g)=>canvas.find(d=>d.dp_id===g)?.status,{isCoachingTeam:canViewCoachGuidance(previewRoleId)})
+    }
+    const shownTab=tabIsOpen(activeTab)?activeTab:'cover'
 
     function printSection(){window.print()}
 
