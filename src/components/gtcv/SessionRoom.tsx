@@ -62,7 +62,7 @@ const field = {
 }
 const solid = {
   ...mono, fontSize: '0.9rem', fontWeight: 700, padding: '0.45rem 1rem', border: 'none',
-  borderRadius: 7, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer',
+  borderRadius: 7, background: C.cyan, color: 'var(--cv-on-cyan)', cursor: 'pointer',
 }
 const ghost = {
   ...mono, fontSize: '0.85rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.border}`,

@@ -25,6 +25,7 @@
 // stored per engagement is the result.
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 import { INDEPENDENCE_TESTS } from '@/lib/engagement-types'
 
@@ -46,7 +47,7 @@ const btn = (col, solid) => ({
   ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.34rem 0.8rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 
 // What each result means, kept in the panel rather than in a legend nobody

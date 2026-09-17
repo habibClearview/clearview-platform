@@ -54,6 +54,7 @@
 // read only.
 // ============================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 import { whenText, nextSession } from '@/lib/session-time'
 import {
@@ -67,13 +68,18 @@ const C = {
   amber: 'var(--cv-amber)', purple: 'var(--cv-purple)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
-const label = { ...mono, fontSize: '0.78rem', color: C.slate }
+// THE SIZE THE REST OF THE PLATFORM USES. 17 September 2026. Habib, on the
+// Interview Briefing: "the size of the interview briefing font is the perfect
+// size that should be used for content of tabs throughout." This screen was
+// built at 0.88rem, which is noticeably smaller than every older tab, so
+// moving between them meant the text changed size under you.
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
+const label = { ...mono, fontSize: '0.82rem', color: C.slate }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.84rem', fontWeight: 700, padding: '0.35rem 0.8rem',
+  ...mono, fontSize: '0.95rem', fontWeight: 700, padding: '0.4rem 0.85rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 const field = {
   width: '100%', padding: '0.42rem 0.6rem', borderRadius: 7, fontSize: 16,
@@ -641,7 +647,9 @@ export default function SessionsStrip({
                     )}
                     {canManage && (
                       <button type="button" style={btn(C.slate)} onClick={() => (isEditing ? setEditing(null) : startEdit(s))}>
-                        {isEditing ? 'Close' : 'Change'}
+                        {/* "Change" told nobody what it did. Habib: "I did
+                            not know what it did until I clicked it." */}
+                        {isEditing ? 'Close' : 'Plan or edit this session'}
                       </button>
                     )}
                     {canManage && (

@@ -24,6 +24,7 @@
 // onto words they did not read.
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 
 const C = {
@@ -37,7 +38,7 @@ const btn = (col, solid) => ({
   ...mono, fontSize: '0.86rem', fontWeight: 700, padding: '0.42rem 0.95rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 
 async function api(path, method, body, query) {

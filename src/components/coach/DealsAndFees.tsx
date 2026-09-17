@@ -17,6 +17,7 @@
 // Existing Programmes/Client views are untouched.
 // ============================================================
 import { useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoney } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
@@ -37,14 +38,11 @@ const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1
 const th   = {padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}
 const td   = {padding:'0.4rem 0.6rem',verticalAlign:'top'}
 function addBtn(sm=false,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
-// White on a cyan or teal button is hard to read -- both are light enough that
-// the letters wash out. --cv-on-cyan is the dark ink that already existed for
-// this; the dark navy/slate/red buttons keep the white.
-function onSolid(col){
-  if(col===C.white||col===C.cream)return C.navy
-  if(col===C.cyan||col===C.teal||col===C.green||col===C.amber)return 'var(--cv-on-cyan)'
-  return 'var(--cv-on-accent)'
-}
+// The writing colour for a coloured button is onSolid in src/lib/ink.ts, so
+// every screen on the platform answers this the same way. This file used to
+// carry its own copy, and so did two others, which is why screens built after
+// them went white on cyan again.
+
 function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:onSolid(col),cursor:'pointer'}}
 // A quiet button for the reversible moves -- putting a deal back on the
 // pipeline is not the action anyone came to this screen for, so it does not
@@ -124,7 +122,7 @@ function NewProgrammeForm({onSave,onCancel}){
         <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
           {DEAL_SERVICE_OPTIONS.map(opt=>{
             const active=f.deal_services.includes(opt.key)
-            return<button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.25rem 0.75rem',cursor:'pointer'}}>{opt.label}</button>
+            return<button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-cyan)':C.slate,borderRadius:999,padding:'0.25rem 0.75rem',cursor:'pointer'}}>{opt.label}</button>
           })}
         </div>
       </div>
@@ -163,7 +161,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
     <div>
       <div style={{background:C.navy,color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
         <div style={{fontFamily:'var(--cv-font)',fontWeight:700,fontSize:'1.05rem'}}>Pipeline</div>
-        <button onClick={()=>setShowNew(!showNew)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:700,background:'var(--cv-cyan)',border:'none',color:'var(--cv-on-accent)',borderRadius:6,padding:'0.4rem 0.9rem',cursor:'pointer'}}>+ New Prospect</button>
+        <button onClick={()=>setShowNew(!showNew)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:700,background:'var(--cv-cyan)',border:'none',color:'var(--cv-on-cyan)',borderRadius:6,padding:'0.4rem 0.9rem',cursor:'pointer'}}>+ New Prospect</button>
       </div>
       <div style={{border:'1px solid var(--cv-border-soft)',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'1.2rem',background:C.white}}>
       {showNew&&<NewProgrammeForm onSave={createProgramme} onCancel={()=>setShowNew(false)}/>}
@@ -197,7 +195,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
                     {DEAL_SERVICE_OPTIONS.map(opt=>{
                       const active=services.includes(opt.key)
                       return(
-                        <button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.15rem 0.6rem',cursor:'pointer'}}>{opt.label}</button>
+                        <button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-cyan)':C.slate,borderRadius:999,padding:'0.15rem 0.6rem',cursor:'pointer'}}>{opt.label}</button>
                       )
                     })}
                   </div>

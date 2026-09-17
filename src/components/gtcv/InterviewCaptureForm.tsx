@@ -59,7 +59,7 @@ const lbl = { display: 'block', fontFamily: 'var(--cv-font-mono)', fontSize: '0.
 const cell = { width: '100%', padding: '0.45rem 0.6rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box' }
 const readCell = { fontSize: '1.01rem', color: C.navy, lineHeight: 1.45, padding: '0.45rem 0.6rem', whiteSpace: 'pre-wrap', minHeight: '1.2rem', background: C.alt, borderRadius: 6 }
 const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.91rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
-const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-cyan)', cursor: 'pointer' }
 const th = { padding: '0.45rem 0.6rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { padding: '0.45rem 0.6rem', verticalAlign: 'top', borderBottom: '1px solid var(--cv-border-soft)', fontSize: '1.01rem', color: C.navy }
 

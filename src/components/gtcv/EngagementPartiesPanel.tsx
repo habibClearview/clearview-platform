@@ -21,6 +21,7 @@
 // engagement or any one organisation.
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 import { PARTY_ROLE_LABELS, accountRoleForParty } from '@/lib/engagement-types'
 // R34, R36, R37. One person's permanent link, beside the person it belongs to.
@@ -45,7 +46,7 @@ const btn = (col, solid) => ({
   ...mono, fontSize: '0.84rem', fontWeight: 600, padding: '0.36rem 0.8rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 
 const ROLE_KEYS = Object.keys(PARTY_ROLE_LABELS)

@@ -200,7 +200,7 @@ export default function OperationsTab({ config, clientId, cc, P }: any) {
             padding: '0.45rem 0.95rem', borderRadius: 8,
             border: `1px solid ${tab === id ? C.cyan : C.border}`,
             background: tab === id ? C.cyan : 'transparent',
-            color: tab === id ? 'var(--cv-on-accent)' : C.slate,
+            color: tab === id ? 'var(--cv-on-cyan)' : C.slate,
           }}>{label}</button>
         ))}
       </div>

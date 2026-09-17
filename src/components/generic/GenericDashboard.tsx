@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { onSolid } from '@/lib/ink'
 import CurrencyField from '@/components/common/CurrencyField'
 import QRCode from 'qrcode'
 import { mostRecentTokenUse } from '@/lib/field-auth'
@@ -2065,7 +2066,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
           <button key={u.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
             border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
             background:selUnit===u.id?(u.color||C.cyan):C.white,
-            color:selUnit===u.id?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
+            color:selUnit===u.id?onSolid(u.color||C.cyan):C.navy,cursor:'pointer'}}
             onClick={()=>setSelUnit(u.id)}>
             {u.name}
           </button>
@@ -7660,7 +7661,7 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
             <button key={u.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
               border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
               background:selUnit===u.id?(u.color||C.cyan):C.white,
-              color:selUnit===u.id?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
+              color:selUnit===u.id?onSolid(u.color||C.cyan):C.navy,cursor:'pointer'}}
               onClick={()=>setSelUnit(u.id)}>{u.name}</button>
           ))}
         </div>
@@ -7953,7 +7954,7 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
                 <button key={u.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
                   border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
                   background:selUnit===u.id?(u.color||C.cyan):C.white,
-                  color:selUnit===u.id?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
+                  color:selUnit===u.id?onSolid(u.color||C.cyan):C.navy,cursor:'pointer'}}
                   onClick={()=>setSelUnit(u.id)}>
                   {u.name}
                 </button>

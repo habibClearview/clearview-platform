@@ -53,7 +53,7 @@ const td = { padding: '0.35rem 0.4rem', verticalAlign: 'top', borderBottom: '1px
 const cell = { width: '100%', padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box' }
 const readCell = { fontSize: '1.01rem', color: C.navy, lineHeight: 1.4, padding: '0.4rem 0.5rem', whiteSpace: 'pre-wrap', minHeight: '1.2rem' }
 const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', padding: '0.28rem 0.65rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
-const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-cyan)', cursor: 'pointer' }
 const delBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', padding: '0.25rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
 
 // The decision points, using the app's runtime dp ids.

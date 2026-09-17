@@ -95,7 +95,7 @@ const td = { padding: '0.4rem 0.4rem', verticalAlign: 'top', borderBottom: `1px 
 const cellInput = { width: '100%', minWidth: 0, padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.93rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
 const roInput = { ...cellInput, background: C.disabled, cursor: 'default' }
 const selectStyle = { ...cellInput, minWidth: 108 }
-const addButton = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-accent)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
+const addButton = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-cyan)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
 const delButton = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, padding: '0.28rem 0.55rem', cursor: 'pointer' }
 const emptyNote = { fontSize: '0.93rem', color: C.faint, padding: '0.7rem 0' }
 /** Two controls on one heading, without either wrapping under the other. */

@@ -154,7 +154,7 @@ export default function SessionCall({ clientId, sessionId = null, onConnected = 
         <button onClick={join} disabled={joining} style={{
           fontFamily: 'var(--cv-font-mono)', fontSize: '0.9rem', fontWeight: 700,
           padding: '0.5rem 1.1rem', border: 'none', borderRadius: 7,
-          background: C.teal, color: 'var(--cv-on-accent)', cursor: 'pointer',
+          background: C.teal, color: 'var(--cv-on-cyan)', cursor: 'pointer',
         }}>
           {joining ? 'Joining...' : 'Join the call'}
         </button>

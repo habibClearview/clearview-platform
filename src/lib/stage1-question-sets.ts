@@ -284,12 +284,16 @@ const SERVICE_REALITY: QuestionSeed[] = [
 /**
  * The starting set for a block, or an empty list where Stage 1 defines none.
  *
- * R4: the nine other blocks return nothing, and that is a correct answer rather
- * than a missing one.
+ * A block with no set returns nothing, and that is a correct answer rather than
+ * a missing one. It is not, however, a permanent one: Decision Point 9 read as
+ * "no questions have been set up for this block" for months while the six fit
+ * tests it is entirely about sat in another file, and nobody had noticed
+ * because the answer looked deliberate.
  */
 export function startingQuestionSet(gateId: string): QuestionSeed[] {
   if (gateId === 'phase_0') return [...CLEARING_THE_GROUND, ...PROBLEM_OWNER_BUDGET]
   if (gateId === 'dp01') return SERVICE_REALITY
+  if (gateId === 'dp09') return DP09
   return []
 }
 
@@ -326,8 +330,63 @@ export const TOOL_NAMES: Record<number, string> = {
   5: 'Continue / Pause / Kill',
 }
 
+// ============================================================
+// DECISION POINT 9: THE SIX FIT TESTS, SCORED BY THE ROOM
+//
+// Habib, 17 September 2026: "In decision point 9 the run in the room button
+// says there are no questions, but there are six questions that must be
+// answered by participants and scored. These are the questions that need to be
+// there when running the room. The questions are answered individually,
+// discussed and scores agreed, which is then recorded in the tab."
+//
+// The six are not new. They are the fit tests the Commercial Readiness
+// Diagnostic has always scored, word for word from FIT_TESTS in
+// ReadinessDiagnostic.tsx, and the 0 to 3 scale is that panel's own: 0 no
+// evidence, 1 asserted, 2 evidenced, 3 proven. What was missing was simply
+// that nobody had written them down as questions the room can be asked, so the
+// block said no questions had been set up and the session was run from paper.
+//
+// EACH PERSON SCORES BEFORE ANYBODY ARGUES, which is the point of running it
+// this way. Six separate questions rather than one, so the room's answers to
+// "can delivery grow beyond the founder" arrive on their own and the spread is
+// visible. The agreed score is then entered on the Commercial Readiness table
+// in this block, because the score that counts is the one the room agreed and
+// not the average of what people first thought.
+const DP09: QuestionSeed[] = [
+  q({
+    gate_id: 'dp09', sort_order: 1, scale_min: 0, scale_max: 3, suggested_minutes: 4,
+    question_text: 'Problem-Provider Fit. Do we have the capability and credibility to own this problem in this market?',
+    question_type: 'score',
+  }),
+  q({
+    gate_id: 'dp09', sort_order: 2, scale_min: 0, scale_max: 3, suggested_minutes: 4,
+    question_text: 'Problem-Solution Fit. Does the service solve the problem as the client experiences it?',
+    question_type: 'score',
+  }),
+  q({
+    gate_id: 'dp09', sort_order: 3, scale_min: 0, scale_max: 3, suggested_minutes: 4,
+    question_text: 'Solution-Customer Fit. Does it reach a decision maker with budget, not a client without one?',
+    question_type: 'score',
+  }),
+  q({
+    gate_id: 'dp09', sort_order: 4, scale_min: 0, scale_max: 3, suggested_minutes: 4,
+    question_text: 'Solution-Pilot Fit. Is it testable in a real client environment inside the engagement window?',
+    question_type: 'score',
+  }),
+  q({
+    gate_id: 'dp09', sort_order: 5, scale_min: 0, scale_max: 3, suggested_minutes: 4,
+    question_text: 'Solution-Market Fit. Is there a reachable segment that buys this, at the price it costs to deliver?',
+    question_type: 'score',
+  }),
+  q({
+    gate_id: 'dp09', sort_order: 6, scale_min: 0, scale_max: 3, suggested_minutes: 4,
+    question_text: 'Solution-Scale Fit. Can delivery grow beyond the founder and the first client?',
+    question_type: 'score',
+  }),
+]
+
 /** The blocks Stage 1 gives questions to. */
-export const BLOCKS_WITH_QUESTIONS = ['phase_0', 'dp01']
+export const BLOCKS_WITH_QUESTIONS = ['phase_0', 'dp01', 'dp09']
 
 /** Shown beside "Run this with the room" on a block that has none (Q8). */
 export const NO_QUESTIONS_YET = 'No questions have been set up for this block yet.'
