@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { WALKTHROUGH_CSS, WALKTHROUGH_PAIRING_CSS } from '@/lib/walkthrough/styles'
+import { WALKTHROUGH_CSS, WALKTHROUGH_PAIRING_CSS, WALKTHROUGH_ROOM_CSS } from '@/lib/walkthrough/styles'
 import { WIDE, TALL } from '@/lib/walkthrough/geometry'
 
 const ROOT = process.cwd()
@@ -34,7 +34,7 @@ function selectors(css: string): string[] {
 describe('the walkthrough cannot paint anything but itself', () => {
   it('every rule is inside the walkthrough wrapper', () => {
     const strays: string[] = []
-    for (const sel of selectors(WALKTHROUGH_CSS + WALKTHROUGH_PAIRING_CSS)) {
+    for (const sel of selectors(WALKTHROUGH_CSS + WALKTHROUGH_PAIRING_CSS + WALKTHROUGH_ROOM_CSS)) {
       for (const one of sel.split(',')) {
         const t = one.trim()
         if (!t) continue
@@ -47,6 +47,23 @@ describe('the walkthrough cannot paint anything but itself', () => {
   it('styles nothing global: no html, body or bare element rules', () => {
     expect(WALKTHROUGH_CSS).not.toMatch(/(^|\})\s*(html|body)\s*[,{]/)
     expect(WALKTHROUGH_CSS).not.toMatch(/(^|\})\s*:root\s*\{/)
+  })
+})
+
+describe('the laptop rules never reach the projector', () => {
+  it('everything that changes the approved sizes is behind a width limit', () => {
+    // Above 1400 points nothing in here applies, which is the width the
+    // walkthrough is shown at in a room. A rule that escaped that limit would
+    // quietly shrink the design Habib approved.
+    const blocks = WALKTHROUGH_ROOM_CSS.split('@media').map((b) => b.trim()).filter((b) => b.length > 0)
+    for (const b of blocks) {
+      const head = b.slice(0, b.indexOf('{'))
+      expect(head).toContain('min-width: 721px')
+    }
+    // The block that changes sizes is the bounded one; the unbounded block only
+    // stops the header wrapping and sets the question list to fit a line.
+    const unbounded = blocks.find((b) => !b.includes('max-width: 1400px')) || ''
+    expect(unbounded).not.toMatch(/logo\{height|padding:10px 20px|font-size:19px/)
   })
 })
 

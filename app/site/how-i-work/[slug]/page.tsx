@@ -16,6 +16,7 @@ import { notFound } from 'next/navigation'
 import Walkthrough from '@/components/walkthrough/Walkthrough'
 import { loadWalkthrough } from '@/lib/walkthrough/loader'
 import { appBaseUrl } from '@/lib/app-url'
+import { remoteWalkthroughUrl } from '@/lib/walkthrough/links'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -32,7 +33,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
     <Walkthrough
       ctx={found.ctx}
       slug={found.slug}
-      remotePath={`/how-i-work/${found.slug}/remote`}
+      remoteUrl={remoteWalkthroughUrl(found.slug)}
     />
   )
 }

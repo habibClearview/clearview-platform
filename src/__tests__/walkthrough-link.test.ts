@@ -7,7 +7,9 @@
 // from deliverables that have no milestone against them.
 // ============================================================
 import { describe, it, expect } from 'vitest'
-import { slugify, PUBLIC_SITE } from '@/lib/walkthrough/links'
+import {
+  slugify, PUBLIC_SITE, genericWalkthroughUrl, clientWalkthroughUrl, remoteWalkthroughUrl,
+} from '@/lib/walkthrough/links'
 import { axisDate, spanLabel, middleLabel, milestonesFrom } from '@/lib/walkthrough/loader'
 
 describe('the end of the address', () => {
@@ -27,6 +29,33 @@ describe('the end of the address', () => {
 
   it('the public site is the address a funder would type', () => {
     expect(PUBLIC_SITE).toBe('https://habibonifade.com')
+  })
+})
+
+describe('the screen is on the public site and the remote is not', () => {
+  // 17 September 2026. The square code sent the phone to the public site, and
+  // the phone could never be signed in there: a browser keeps a sign in per
+  // address, and habibonifade.com is a different address from the platform. It
+  // was also sent to the public site's front door to sign in, which is the
+  // marketing home page rather than a password box. So the two ends live on
+  // two addresses on purpose, and this is the rule that keeps them there.
+
+  it('the walkthrough a funder opens is on the public site', () => {
+    expect(genericWalkthroughUrl()).toBe(`${PUBLIC_SITE}/how-i-work`)
+    expect(clientWalkthroughUrl('tanager')).toBe(`${PUBLIC_SITE}/how-i-work/tanager`)
+  })
+
+  it('the remote the coach signs in to is on the platform', () => {
+    const remote = remoteWalkthroughUrl('tanager')
+    expect(remote.startsWith(PUBLIC_SITE)).toBe(false)
+    expect(remote).toContain('clearview.habibonifade.com')
+    expect(remote).toContain('/how-i-work/tanager/remote')
+  })
+
+  it('the generic remote too', () => {
+    const remote = remoteWalkthroughUrl()
+    expect(remote.startsWith(PUBLIC_SITE)).toBe(false)
+    expect(remote).toContain('/how-i-work/remote')
   })
 })
 
