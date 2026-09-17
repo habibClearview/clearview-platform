@@ -165,11 +165,24 @@ export default function WalkthroughRemote({ slug, pairing }: { slug: string; pai
         <div className="rm-body">
           {note ? (
             <>
+              {!!state?.beats && state.beats > 0 && (state.beat ?? -1) >= 0 && (
+                <span className="rm-beat">
+                  Item {(state.beat ?? 0) + 1} of {state.beats}
+                </span>
+              )}
               <p className="rm-note">{note.cue}</p>
               {note.points.length > 0 && (
                 <ul className="rm-points">
                   {note.points.map((point, i) => <li key={i}>{point}</li>)}
                 </ul>
+              )}
+              {/* The presenter's own phone is signed in to the platform, so it
+                  can open the workspace itself. The laptop's button is the one
+                  the room watches. */}
+              {state?.workspace && (
+                <a className="rm-open" href={state.workspace} target="_blank" rel="noopener noreferrer">
+                  Open the workspace on this phone
+                </a>
               )}
             </>
           ) : (

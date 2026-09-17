@@ -14,7 +14,9 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { WALKTHROUGH_CSS, WALKTHROUGH_PAIRING_CSS, WALKTHROUGH_ROOM_CSS } from '@/lib/walkthrough/styles'
+import {
+  WALKTHROUGH_CSS, WALKTHROUGH_PAIRING_CSS, WALKTHROUGH_ROOM_CSS, WALKTHROUGH_STEP_CSS,
+} from '@/lib/walkthrough/styles'
 import { WIDE, TALL } from '@/lib/walkthrough/geometry'
 
 const ROOT = process.cwd()
@@ -34,7 +36,8 @@ function selectors(css: string): string[] {
 describe('the walkthrough cannot paint anything but itself', () => {
   it('every rule is inside the walkthrough wrapper', () => {
     const strays: string[] = []
-    for (const sel of selectors(WALKTHROUGH_CSS + WALKTHROUGH_PAIRING_CSS + WALKTHROUGH_ROOM_CSS)) {
+    const everything = WALKTHROUGH_CSS + WALKTHROUGH_PAIRING_CSS + WALKTHROUGH_ROOM_CSS + WALKTHROUGH_STEP_CSS
+    for (const sel of selectors(everything)) {
       for (const one of sel.split(',')) {
         const t = one.trim()
         if (!t) continue

@@ -63,6 +63,11 @@ export interface ScreenState {
   speed?: number
   /** True while the sequence is held where it is. */
   held?: boolean
+  /** How many things this screen takes one at a time, and which one is up. */
+  beats?: number
+  beat?: number
+  /** Where the engagement's own workspace is, for the presenter's own phone. */
+  workspace?: string
   /** Whether the panel on the screen has more text above or below the fold. */
   more?: { down: boolean; up: boolean }
   /** The presenter's cue and talking points, so the phone never guesses. */

@@ -167,10 +167,18 @@ export async function loadWalkthrough(slug: string, workspaceOrigin: string): Pr
       close: client.close_phrase,
       portfolio: client.portfolio_phrase,
       timeline,
-      // Screen 18. The workspace is on a different address from the public
-      // site, so this is an ordinary link the presenter clicks on the laptop.
-      // A browser will not open a tab on one computer because a phone asked.
-      workspaceUrl: client.slug ? `${workspaceOrigin}/engagement/${client.slug}` : '',
+      // Screen 18. THE WORKSPACE, NOT THE PAGE ABOUT THE WORKSPACE.
+      // 17 September 2026. This pointed at /engagement/<slug>, which is the
+      // journey page: a description of the method with the organisation's name
+      // on it. Habib, showing it: "it goes to the marketing screen ... that is
+      // a problem, a massive one, it should go straight to Ikore workspace."
+      // He is right. The moment after saying "here is what your keys open" is
+      // not the moment to open a page that explains what the keys are for.
+      // /dashboard/<slug> is the working record itself.
+      //
+      // It is an ordinary link the presenter clicks on the laptop, because a
+      // browser will not open a tab on one computer because a phone asked it to.
+      workspaceUrl: client.slug ? `${workspaceOrigin}/dashboard/${client.slug}` : '',
     }),
   }
 }

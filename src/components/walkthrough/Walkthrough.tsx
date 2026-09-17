@@ -13,7 +13,9 @@
 // connects or not, which is why the pairing code below can fail quietly.
 // ============================================================
 import { useEffect, useRef, useState } from 'react'
-import { WALKTHROUGH_CSS, WALKTHROUGH_PAIRING_CSS, WALKTHROUGH_ROOM_CSS } from '@/lib/walkthrough/styles'
+import {
+  WALKTHROUGH_CSS, WALKTHROUGH_PAIRING_CSS, WALKTHROUGH_ROOM_CSS, WALKTHROUGH_STEP_CSS,
+} from '@/lib/walkthrough/styles'
 import { mount, type Controller } from '@/lib/walkthrough/engine'
 import { speakerNotes } from '@/lib/walkthrough/notes'
 import type { WalkthroughContext } from '@/lib/walkthrough/context'
@@ -92,6 +94,9 @@ export default function Walkthrough({
 
     const notes = speakerNotes(ctx)
     const names = ctrl.steps().map((s) => s.name)
+    // The presenter's own phone is signed in to the platform, so it can open
+    // the workspace itself. The laptop's button is for the room to watch.
+    const workspace = ctx.workspaceUrl
 
     const link = joinAsScreen(slug, mine, {
       onMessage: (m: RemoteMessage) => {
@@ -112,12 +117,12 @@ export default function Walkthrough({
           const btn = root.querySelector('#revealBtn') as HTMLAnchorElement | null
           if (btn) { btn.focus(); btn.style.outline = '3px solid #F5F5DC'; btn.style.outlineOffset = '4px' }
         }
-        link.publish({ type: 'state', ...ctrl.state(), notes, names })
+        link.publish({ type: 'state', ...ctrl.state(), notes, names, workspace })
       },
       onReady: () => {},
       onLost: () => { if (!connected) status('Use the arrow keys', false) },
     })
-    const off = ctrl.onState((s) => { link.publish({ type: 'state', ...s, notes, names }) })
+    const off = ctrl.onState((s) => { link.publish({ type: 'state', ...s, notes, names, workspace }) })
     const timer = setTimeout(() => { if (!connected) status('Use the arrow keys', false) }, CONNECT_TIMEOUT_MS)
     return () => { off(); link.leave(); clearTimeout(timer) }
   }, [ctx, slug, remoteUrl, ready])
@@ -174,7 +179,7 @@ export default function Walkthrough({
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: WALKTHROUGH_CSS + WALKTHROUGH_PAIRING_CSS + WALKTHROUGH_ROOM_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: WALKTHROUGH_CSS + WALKTHROUGH_PAIRING_CSS + WALKTHROUGH_ROOM_CSS + WALKTHROUGH_STEP_CSS }} />
       <div className="gtcvw" ref={rootRef} data-room="dark" data-kind="scene">
         <header className="top">
           <div className="brand">

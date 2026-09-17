@@ -86,6 +86,17 @@ describe('an engagement that recorded nothing still reads as sentences', () => {
       .toBe('Prepared for Tanager and Ikore · IGNITE+ Nigeria')
   })
 
+  it('never capitalises a fallback in the middle of a sentence', () => {
+    // "What The funder receives" was on the generic walkthrough, which is the
+    // version a prospect opens. A name that is a phrase rather than a name has
+    // to stay lower case wherever a sentence does not start with it.
+    const text = allCopy(buildContext({}))
+    expect(text).not.toContain('The funder receives')
+    expect(text).not.toContain('the The ')
+    expect(text).not.toMatch(/\bthe The organisation\b/)
+    expect(text).toContain('What the funder receives')
+  })
+
   it('the service keeps its article with it, so nothing reads "the this service"', () => {
     const bare = buildContext({})
     expect(allCopy(bare)).not.toContain('the this service')
