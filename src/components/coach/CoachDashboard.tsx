@@ -28,6 +28,9 @@ import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
 import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
 import SetupChecklist from '@/components/gtcv/SetupChecklist'
+import { servicePhrase, funderWord, threeQuestions, QUESTION_FIELDS,
+  THREE_QUESTIONS_INTRO, VERBATIM_HELPER, ANSWER_PLACEHOLDER,
+  SERVICE_SETTING_LABEL, SERVICE_SETTING_HELPER } from '@/lib/engagement-words'
 import ShowcaseSharing from '@/components/gtcv/ShowcaseSharing'
 import EngagementSettings from '@/components/gtcv/EngagementSettings'
 import WelcomePack from '@/components/gtcv/WelcomePack'
@@ -3431,7 +3434,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   to carry whether they had a login and a button to give them
                   one. Both are now on the person's own line above. */}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
             {shownTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
-            {shownTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
+            {shownTab==='diagnostic'&&<TabDiagnostic client={selClient} programmes={programmes} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
             {/* SESSIONS AND ROOMS IS THE DIARY NOW. 16 September 2026. The
                 sessions themselves are run from the decision point they belong
                 to, which is where somebody standing in front of the work
@@ -4185,6 +4188,28 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
           address, mobile, whether they sign and which letter they get. The
           same person typed in two boxes on one screen, with no way for either
           to know about the other. The party list above is the list. */}
+      {/* WHAT THIS ENGAGEMENT IS COMMERCIALISING, IN ITS OWN WORDS.
+          17 September 2026. The Three Questions and the Engagement Charter
+          both name the service out loud, and until now there was nowhere to
+          say what it is. Written as it would be said in a sentence, because
+          that is how it is used: "what would the gender and nutrition service
+          need to be earning". A heading-cased name would read wrongly in the
+          middle of a question, so the example shows lower case. */}
+      <div style={card}>
+        <div style={secH}>What this engagement commercialises</div>
+        <div style={{marginBottom:'0.5rem'}}>
+          <label style={lbl} htmlFor="commercialised-service">{SERVICE_SETTING_LABEL}</label>
+          <p style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.4rem'}}>{SERVICE_SETTING_HELPER}</p>
+          <input id="commercialised-service" style={inp}
+            value={client.commercialised_service||''}
+            onChange={e=>onUpdate({commercialised_service:e.target.value})}
+            placeholder="gender and nutrition service"/>
+        </div>
+        <p style={{fontSize:'1.01rem',color:C.slate,margin:0}}>
+          Leave it empty and the questions and the Charter say &ldquo;this service&rdquo; instead.
+        </p>
+      </div>
+
       <div style={card}>
         <div style={secH}>Document Links</div>
         <p style={{fontSize:'1.07rem',color:C.slate,marginBottom:'1rem'}}>Add links to Google Drive, Dropbox, or any URL for key documents.</p>
@@ -4224,7 +4249,7 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
   )
 }
 
-function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
+function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate,programmes}){
   const d=diagnostic||{}
   const locked=d.ceo_signed&&d.coach_signed
   const answers=d.readiness_answers||READINESS_QUESTIONS.map(q=>({...q,answer:null}))
@@ -4255,19 +4280,27 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
         openByDefault
       />
 
+      {/* THE THREE QUESTIONS NAME THE SERVICE. 17 September 2026. Habib
+          rewrote all three. The old first question asked what commercial
+          success looks like "for your organisation", and was answered about
+          the organisation; this one names the service being commercialised,
+          and asks what it would be earning and FROM WHOM, which is the answer
+          the rest of the method is built on. The third names the funder whose
+          support the service has to survive without.
+          The words themselves are in src/lib/engagement-words.ts so the
+          Charter fills in the same two names the same way. */}
       <div style={card}>
         <div style={secH}>Three Questions</div>
-        <p style={{...hint,marginBottom:'0.9rem'}}>
-          Record the conversation above and these three answers come back in the client&rsquo;s own words,
-          to be read, corrected and signed. Typing them here is for a conversation that was not recorded.
-        </p>
-        {[['question_1','What does commercial success look like for your organisation in 18 months?'],['question_2','What is the biggest thing stopping you from earning commercial revenue right now?'],['question_3','What would have to be true for your organisation to stop needing grant funding?']].map(([field,question])=>(
+        <p style={{...hint,marginBottom:'0.9rem'}}>{THREE_QUESTIONS_INTRO}</p>
+        {threeQuestions(servicePhrase(client),funderWord(client,programmes)).map((question,i)=>{
+          const field=QUESTION_FIELDS[i]
+          return(
           <div key={field} style={{marginBottom:'1.25rem'}}>
             <label style={lbl}>{question}</label>
-            <p style={{...hint,marginBottom:'0.4rem'}}>Capture the answer verbatim — use the client's own words.</p>
-            <textarea style={{...inp,minHeight:80,resize:'vertical',background:locked?'var(--cv-disabled)':undefined}} value={d[field]||''} onChange={e=>!locked&&onUpdate({[field]:e.target.value})} placeholder="Enter answer exactly as given..." disabled={locked}/>
+            <p style={{...hint,marginBottom:'0.4rem'}}>{VERBATIM_HELPER}</p>
+            <textarea style={{...inp,minHeight:80,resize:'vertical',background:locked?'var(--cv-disabled)':undefined}} value={d[field]||''} onChange={e=>!locked&&onUpdate({[field]:e.target.value})} placeholder={ANSWER_PLACEHOLDER} disabled={locked}/>
           </div>
-        ))}
+        )})}
         <div style={{display:'flex',gap:'1rem',alignItems:'center',flexWrap:'wrap',marginTop:'0.5rem'}}>
           {!d.ceo_signed&&canSignOff(userRole)&&(
             <button style={solidBtn('var(--cv-header)')} onClick={()=>onUpdate({ceo_signed:true,ceo_signed_at:new Date().toISOString(),ceo_signed_name:client.contact_name||userName})}>CEO Sign-Off</button>

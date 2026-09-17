@@ -12,9 +12,12 @@
 import { describe, it, expect } from 'vitest'
 import { setupState } from '@/lib/engagement-setup'
 
-const ed = { id: 'p1', name: 'A Director', is_signatory: true }
-const funder = { id: 'p2', name: 'A Funder', is_signatory: true }
-const staffer = { id: 'p3', name: 'Somebody Else', is_signatory: false }
+// The three parties who must sign, and one person who does not.
+const ed = { id: 'p1', name: 'A Director', party_role: 'lsp_ed', is_signatory: true }
+const coach = { id: 'p4', name: 'A Coach', party_role: 'lead_consultant', is_signatory: true }
+const funder = { id: 'p2', name: 'A Funder', party_role: 'funder_rep', is_signatory: true }
+const staffer = { id: 'p3', name: 'Somebody Else', party_role: 'lsp_finance', is_signatory: false }
+const allThree = [ed, coach, funder]
 const issued = { id: 'c1', status: 'issued', issued_at: '2026-09-01T00:00:00Z' }
 const paidDeliverable = { milestone_no: 1, payment_amount: 5000 }
 
@@ -46,15 +49,41 @@ describe('the people', () => {
     expect(s.steps[0].detail).toContain('nobody is marked as signing')
   })
 
+  // ALL THREE PARTIES SIGN. Habib, 17 September 2026: "these are the 3 parties
+  // including Ikore that must sign the charter so all parties have witness at
+  // the meeting." The platform always allowed it and never said when one was
+  // missing, so it was found out in the room.
+  it('names the party nobody is signing for, rather than just saying not done', () => {
+    const s = setupState({ parties: [ed, staffer] })
+    expect(s.steps[0].done).toBe(false)
+    expect(s.steps[0].detail).toContain('the coach, the funder')
+  })
+
+  it('names one missing party on its own', () => {
+    const s = setupState({ parties: [ed, coach] })
+    expect(s.steps[0].detail).toContain('Nobody is signing for the funder.')
+  })
+
+  it('says why all three matter, where it is read', () => {
+    const s = setupState({ parties: [ed] })
+    expect(s.steps[0].detail).toContain('each has witnessed the others agree')
+  })
+
+  it('does not count somebody present but not signing', () => {
+    const s = setupState({ parties: [...allThree, staffer] })
+    expect(s.steps[0].done).toBe(true)
+    expect(s.steps[0].detail).toBe('4 named, and all three parties are signing.')
+  })
+
   it('ignores a row with no name on it', () => {
     const s = setupState({ parties: [{ id: 'x', name: '  ', is_signatory: true }] })
     expect(s.steps[0].done).toBe(false)
   })
 
-  it('is finished once somebody is named and somebody signs', () => {
-    const s = setupState({ parties: [ed, staffer] })
+  it('is finished once all three parties are signing', () => {
+    const s = setupState({ parties: allThree })
     expect(s.steps[0].done).toBe(true)
-    expect(s.steps[0].detail).toBe('2 named, 1 of them signing.')
+    expect(s.steps[0].detail).toBe('3 named, and all three parties are signing.')
     expect(s.steps[0].goTo).toBeNull()
   })
 })
@@ -88,16 +117,17 @@ describe('the Charter', () => {
 
   it('is finished when every signatory has signed, and only then', () => {
     const s = setupState({
-      parties: [ed, funder, staffer],
+      parties: [...allThree, staffer],
       charter: issued,
       signatures: [
         { charter_id: 'c1', party_id: 'p1', signed_at: '2026-09-02T00:00:00Z' },
+        { charter_id: 'c1', party_id: 'p4', signed_at: '2026-09-02T00:00:00Z' },
         { charter_id: 'c1', party_id: 'p2', signed_at: '2026-09-03T00:00:00Z' },
       ],
     })
-    // The third person does not sign, so the Charter is not waiting on them.
+    // The fourth person does not sign, so the Charter is not waiting on them.
     expect(s.steps[1].done).toBe(true)
-    expect(s.steps[1].detail).toBe('Signed by all 2.')
+    expect(s.steps[1].detail).toBe('Signed by all 3.')
   })
 })
 
@@ -124,10 +154,11 @@ describe('the deliverables', () => {
 
 describe('an engagement that is genuinely ready', () => {
   const s = setupState({
-    parties: [ed, funder],
+    parties: allThree,
     charter: issued,
     signatures: [
       { charter_id: 'c1', party_id: 'p1', signed_at: '2026-09-02T00:00:00Z' },
+      { charter_id: 'c1', party_id: 'p4', signed_at: '2026-09-02T00:00:00Z' },
       { charter_id: 'c1', party_id: 'p2', signed_at: '2026-09-03T00:00:00Z' },
     ],
     deliverables: [paidDeliverable],
@@ -175,7 +206,7 @@ describe('when something could not be read', () => {
 
   it('never counts an unknown step as finished', () => {
     const s = setupState({
-      parties: [ed],
+      parties: allThree,
       charter: issued,
       signatures: [{ charter_id: 'c1', party_id: 'p1', signed_at: '2026-09-02T00:00:00Z' }],
       deliverables: [paidDeliverable],
@@ -188,7 +219,7 @@ describe('when something could not be read', () => {
   it('leaves the steps it could read alone', () => {
     // The point of saying "not known" is to keep the rest of the checklist
     // useful, rather than hiding all three because one read failed.
-    const s = setupState({ parties: [ed], deliverablesUnavailable: true })
+    const s = setupState({ parties: allThree, deliverablesUnavailable: true })
     expect(s.steps[0].done).toBe(true)
     expect(s.steps[0].unknown).toBeFalsy()
   })
