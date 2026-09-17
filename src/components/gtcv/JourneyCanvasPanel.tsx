@@ -113,7 +113,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
         <div>
           <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>Part K</div>
           <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.45rem', fontWeight: 700 }}>Journey Canvas</div>
-          <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '80ch', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '1.01rem', color: C.slate, maxWidth: '80ch', marginTop: '0.25rem' }}>
             Every gate, what was decided at it, the evidence it rests on, who agreed, who dissented and who signed.
             {fixed ? ' This is a fixed copy and is not updating.' : ' It updates as decisions are taken.'}
           </div>
@@ -139,7 +139,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
       </div>
 
       {error && !fixed ? (
-        <div className="journey-no-print" style={{ border: `1px solid ${C.amber}`, background: C.tintAmber, borderRadius: 8, padding: '0.6rem 0.8rem', marginBottom: '0.9rem', fontSize: '0.9rem' }}>
+        <div className="journey-no-print" style={{ border: `1px solid ${C.amber}`, background: C.tintAmber, borderRadius: 8, padding: '0.6rem 0.8rem', marginBottom: '0.9rem', fontSize: '1.01rem' }}>
           {error}
         </div>
       ) : null}
@@ -150,14 +150,14 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
         {fixed ? (
           <div style={{ border: `2px solid ${C.navy}`, borderRadius: 10, padding: '0.7rem 0.9rem', marginBottom: '1rem', background: C.alt }}>
             <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.05rem', fontWeight: 700 }}>{fixed.stamp}</div>
-            <div style={{ fontSize: '0.88rem', color: C.slate, marginTop: '0.15rem' }}>
+            <div style={{ fontSize: '1.01rem', color: C.slate, marginTop: '0.15rem' }}>
               Fixed for printing and handover. It does not change. The live canvas may have moved on since.
             </div>
           </div>
         ) : null}
 
         {decidedCount === 0 ? (
-          <div style={{ fontSize: '0.95rem', color: C.slate, border: `1px solid ${C.borderSoft}`, borderRadius: 10, padding: '0.9rem 1rem' }}>
+          <div style={{ fontSize: '1.01rem', color: C.slate, border: `1px solid ${C.borderSoft}`, borderRadius: 10, padding: '0.9rem 1rem' }}>
             {NOTHING_DECIDED_YET}
           </div>
         ) : null}
@@ -195,8 +195,8 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                   const open = !fold.is('answer', d.id)
                   return (
                     <div key={d.id} style={{ borderLeft: `3px solid ${C.teal}`, paddingLeft: '0.6rem', marginBottom: '0.6rem' }}>
-                      <div style={{ fontSize: '0.88rem', color: C.slate }}>{d.question}</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 600, color: C.navy, marginTop: '0.1rem' }}>
+                      <div style={{ fontSize: '1.01rem', color: C.slate }}>{d.question}</div>
+                      <div style={{ fontSize: '1.01rem', fontWeight: 600, color: C.navy, marginTop: '0.1rem' }}>
                         {d.agreed || <span style={{ color: C.amber, fontWeight: 400 }}>Discussed, nothing agreed</span>}
                       </div>
                       <div style={{ ...mono, fontSize: '0.78rem', color: C.faint, marginTop: '0.12rem' }}>
@@ -221,15 +221,15 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                               them. A count is not identifying; four names in a
                               room of five identifies the fifth. */}
                           {d.namesWithheld ? (
-                            <div style={{ fontSize: '0.84rem', color: C.slate }}>
+                            <div style={{ fontSize: '1.01rem', color: C.slate }}>
                               {d.submissionCount} answered. {NAME_WITHHELD}.
                             </div>
                           ) : d.agreedBy.length ? (
-                            <div style={{ fontSize: '0.84rem', color: C.slate }}>
+                            <div style={{ fontSize: '1.01rem', color: C.slate }}>
                               Agreed by {d.agreedBy.join(', ')}.
                             </div>
                           ) : (
-                            <div style={{ fontSize: '0.84rem', color: C.faint }}>No answers recorded.</div>
+                            <div style={{ fontSize: '1.01rem', color: C.faint }}>No answers recorded.</div>
                           )}
                         </div>
                       ) : null}
@@ -241,7 +241,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                             Dissent, recorded
                           </div>
                           {d.dissent.map((v, i) => (
-                            <div key={i} style={{ fontSize: '0.88rem', marginTop: '0.2rem' }}>
+                            <div key={i} style={{ fontSize: '1.01rem', marginTop: '0.2rem' }}>
                               <span>{v.note}</span>
                               <span style={{ ...mono, fontSize: '0.78rem', color: C.slate }}>
                                 {' '}— {v.name ? v.name : NAME_WITHHELD}
@@ -273,7 +273,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                   <div style={{ marginTop: '0.5rem' }}>
                     <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>Signed</div>
                     {gate.signoffs.map((s, i) => (
-                      <div key={i} style={{ fontSize: '0.88rem', marginTop: '0.15rem' }}>
+                      <div key={i} style={{ fontSize: '1.01rem', marginTop: '0.15rem' }}>
                         <span style={{ fontWeight: 600 }}>{s.signer_name || 'Name not recorded'}</span>
                         <span style={{ color: C.slate }}>
                           {s.signer_role ? ` (${String(s.signer_role).replace(/_/g, ' ')})` : ''}
@@ -281,7 +281,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                           <span style={{ color: s.decision === 'returned' ? C.red : C.green, fontWeight: 600 }}>{s.decision || 'signed'}</span>
                           {s.signed_at ? ` ${when(s.signed_at)}` : ''}
                         </span>
-                        {s.note ? <div style={{ fontSize: '0.84rem', color: C.slate }}>{s.note}</div> : null}
+                        {s.note ? <div style={{ fontSize: '1.01rem', color: C.slate }}>{s.note}</div> : null}
                       </div>
                     ))}
                   </div>

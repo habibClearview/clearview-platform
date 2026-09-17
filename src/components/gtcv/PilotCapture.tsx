@@ -66,13 +66,13 @@ const C = {
 }
 const card = { background: C.white, border: '1px solid var(--cv-border-soft)', borderRadius: 14, padding: '1.25rem 1.4rem', marginBottom: '1.1rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
 const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
-const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.45 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const lbl = { display: 'block', fontWeight: 600, fontSize: '0.86rem', marginBottom: '0.2rem', color: C.navy }
-const inp = { width: '100%', padding: '0.36rem 0.55rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
+const lbl = { display: 'block', fontWeight: 600, fontSize: '1.01rem', marginBottom: '0.2rem', color: C.navy }
+const inp = { width: '100%', padding: '0.36rem 0.55rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
 const area = { ...inp, minHeight: 62, resize: 'vertical', lineHeight: 1.4 }
-const btn = (col) => ({ ...mono, fontSize: '0.86rem', fontWeight: 600, padding: '0.4rem 0.85rem', border: `1px solid ${col}`, borderRadius: 7, background: 'transparent', color: col, cursor: 'pointer' })
-const pill = (active, col) => ({ ...mono, fontSize: '0.84rem', padding: '0.35rem 0.75rem', borderRadius: 8, border: `1px solid ${active ? col : C.border}`, background: active ? col : 'transparent', color: active ? 'var(--cv-on-accent)' : C.slate, cursor: 'pointer', fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' })
+const btn = (col) => ({ ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.4rem 0.85rem', border: `1px solid ${col}`, borderRadius: 7, background: 'transparent', color: col, cursor: 'pointer' })
+const pill = (active, col) => ({ ...mono, fontSize: '1.01rem', padding: '0.35rem 0.75rem', borderRadius: 8, border: `1px solid ${active ? col : C.border}`, background: active ? col : 'transparent', color: active ? 'var(--cv-on-accent)' : C.slate, cursor: 'pointer', fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' })
 const phaseHead = (col) => ({ ...mono, fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: col, fontWeight: 700, borderBottom: `1px solid ${C.border}`, paddingBottom: '0.3rem', marginBottom: '0.6rem' })
 const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '0.75rem' }
 
@@ -212,7 +212,7 @@ export default function PilotCapture({ clientId, canManage }) {
       <div key={r.id} style={{ border: '1px solid var(--cv-border-soft)', borderRadius: 12, marginBottom: '0.8rem', background: 'var(--cv-bg-2)' }}>
         <div style={{ display: 'flex', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.7rem 0.9rem', borderLeft: `4px solid ${Number(r.iteration) === 2 ? C.purple : C.cyan}`, borderRadius: '12px 0 0 12px' }}>
           <button type="button" onClick={() => setOpen((o) => ({ ...o, [r.id]: !expanded }))}
-            style={{ ...mono, border: 'none', background: 'transparent', color: C.navy, cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' }}>
+            style={{ ...mono, border: 'none', background: 'transparent', color: C.navy, cursor: 'pointer', fontSize: '1.01rem', padding: '0 0.2rem' }}>
             {expanded ? 'v' : '>'}
           </button>
           <span style={{ ...mono, fontSize: '0.78rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: 4, background: Number(r.iteration) === 2 ? C.purple : C.cyan, color: onSolid(Number(r.iteration) === 2 ? C.purple : C.cyan) }}>
@@ -228,7 +228,7 @@ export default function PilotCapture({ clientId, canManage }) {
           <span style={{ ...mono, fontSize: '0.8rem', color: C.slate }}>Viability {r.viability || '-'} of 5</span>
           {canManage && (
             <button type="button" title="Delete this session" disabled={busy} onClick={() => removeSession(r)}
-              style={{ ...mono, marginLeft: 'auto', border: 'none', background: 'transparent', color: C.red, cursor: 'pointer', fontSize: '1rem' }}>x</button>
+              style={{ ...mono, marginLeft: 'auto', border: 'none', background: 'transparent', color: C.red, cursor: 'pointer', fontSize: '1.01rem' }}>x</button>
           )}
         </div>
 
@@ -373,7 +373,7 @@ export default function PilotCapture({ clientId, canManage }) {
         <div style={{ ...hint, marginTop: '0.15rem' }}>{ITERATION_RULE[s.iteration].summary}</div>
         <div style={{ fontFamily: 'var(--cv-font)', fontSize: '2rem', fontWeight: 700, color: C.navy, marginTop: '0.5rem', lineHeight: 1.1 }}>
           {s.viability === null ? '-' : s.viability.toFixed(1)}
-          <span style={{ fontSize: '0.9rem', color: C.slate, fontWeight: 400 }}> of 5 average viability</span>
+          <span style={{ fontSize: '1.01rem', color: C.slate, fontWeight: 400 }}> of 5 average viability</span>
         </div>
         <div style={{ ...hint, marginTop: '0.3rem' }}>
           {s.sessions} session{s.sessions === 1 ? '' : 's'} across {s.clientsCovered} of 2 paying clients

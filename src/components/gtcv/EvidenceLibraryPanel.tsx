@@ -52,9 +52,9 @@ const th = { padding: '0.45rem 0.55rem', textAlign: 'left', fontFamily: 'var(--c
 const td = { padding: '0.35rem 0.4rem', verticalAlign: 'top', borderBottom: '1px solid var(--cv-border-soft)' }
 const cell = { width: '100%', padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box' }
 const readCell = { fontSize: '1.01rem', color: C.navy, lineHeight: 1.4, padding: '0.4rem 0.5rem', whiteSpace: 'pre-wrap', minHeight: '1.2rem' }
-const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', padding: '0.28rem 0.65rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
-const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-cyan)', cursor: 'pointer' }
-const delBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', padding: '0.25rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
+const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', padding: '0.28rem 0.65rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
+const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-cyan)', cursor: 'pointer' }
+const delBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', padding: '0.25rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
 
 // The decision points, using the app's runtime dp ids.
 const DP_OPTIONS = [
@@ -364,7 +364,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           {savePill && (
-            <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: savePill.color, border: `1px solid ${savePill.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
+            <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', color: savePill.color, border: `1px solid ${savePill.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
               {savePill.text}
             </span>
           )}
@@ -394,7 +394,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
             { k: 'unset', l: 'Not set', c: C.purple },
           ].map((s) => (
             <div key={s.k} style={{ borderTop: `3px solid ${s.c}`, background: C.alt, borderRadius: 8, padding: '0.5rem 0.9rem', minWidth: 100 }}>
-              <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }}>{s.l}</div>
+              <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }}>{s.l}</div>
               <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.5rem', fontWeight: 700, color: s.c, lineHeight: 1.1 }}>{counts[s.k]}</div>
             </div>
           ))}

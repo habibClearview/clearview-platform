@@ -37,14 +37,14 @@ const C = {
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const cell = {
   width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8,
   border: `1px solid ${C.border}`, background: 'transparent', color: 'inherit',
-  fontFamily: "var(--cv-font)", fontSize: '0.93rem', lineHeight: 1.5,
+  fontFamily: "var(--cv-font)", fontSize: '1.01rem', lineHeight: 1.5,
 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.34rem 0.8rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.34rem 0.8rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -222,7 +222,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
         </div>
       </div>
 
-      {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>{err}</div> : null}
+      {err ? <div style={{ color: C.red, fontSize: '1.01rem', marginTop: '0.7rem' }}>{err}</div> : null}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', marginTop: '1rem' }}>
         {INDEPENDENCE_TESTS.map((t, i) => {

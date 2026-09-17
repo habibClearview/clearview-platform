@@ -342,3 +342,89 @@ describe('where an accepted answer actually goes', () => {
     expect(NOT_FILED_HERE).not.toContain('the score the room agrees')
   })
 })
+
+// ============================================================
+// AN ANSWER THE DATABASE WILL REFUSE IS AN ANSWER THROWN AWAY
+//
+// From the review on #282. Three of the columns these prompts write into
+// accept only a short list of words: the adoption test is yes, no or unsure,
+// a cost has one of five categories, a pipeline row has one of five stages,
+// and a scale route is entry, scale or both. I wrote prompts that asked for
+// sentences, or offered options in prettier words than the table allows.
+//
+// What that costs is worse than an error: the room answers, the facilitator
+// presses Accept, the write is refused, and nobody is told. The session's work
+// is gone and everybody watched it happen.
+//
+// So this reads the real constraints out of the migrations, table by table,
+// and holds every prompt to them.
+// ============================================================
+describe('every prompt sends a value its column will accept', () => {
+  /** The text columns of every table, with the words each one is limited to. */
+  const tables: Record<string, Record<string, string[] | null>> = {}
+  {
+    const sql = fs.readdirSync('supabase/migrations')
+      .filter((f) => f.endsWith('.sql')).sort()
+      .map((f) => fs.readFileSync(`supabase/migrations/${f}`, 'utf8')).join('\n')
+    for (const m of sql.matchAll(/create table if not exists (?:public\.)?([a-z_]+)\s*\(([\s\S]*?)\n\);/g)) {
+      const cols: Record<string, string[] | null> = {}
+      for (const line of m[2].split('\n')) {
+        const c = /^\s*([a-z_]+)\s+text\b(.*)$/.exec(line)
+        if (!c) continue
+        // Both shapes the schema uses: "check (x in (...))" and
+        // "check (x is null or x in (...))".
+        const k = /\bin\s*\(([^)]*)\)/.exec(c[2])
+        cols[c[1]] = k ? k[1].split(',').map((x) => x.trim().replace(/'/g, '')) : null
+      }
+      tables[m[1]] = cols
+    }
+  }
+
+  /** Which table each block's accepted answers land in. */
+  const blockTable: Record<string, string> = {}
+  {
+    const route = fs.readFileSync('app/api/facilitate/route.ts', 'utf8')
+    const start = route.indexOf('const BLOCK_TABLE')
+    const body = route.slice(start, route.indexOf('}', start))
+    for (const m of body.matchAll(/(\w+):\s*'([^']+)'/g)) blockTable[m[1]] = m[2]
+  }
+
+  it('read the real schema, rather than testing against nothing', () => {
+    expect(Object.keys(tables).length).toBeGreaterThan(40)
+    // And it found at least one genuinely constrained column, so the checks
+    // below are not all passing because every column looks unconstrained.
+    expect(tables['gtcv_customer_segments']?.willing).toEqual(['yes', 'no', 'unsure'])
+  })
+
+  it('never asks for a sentence where the column takes one of a few words', () => {
+    const bad: string[] = []
+    for (const gate of GATES) {
+      for (const seed of startingQuestionSet(gate.id)) {
+        for (const f of seed.target_fields) {
+          const allowed = tables[blockTable[gate.id]]?.[f.column]
+          if (!allowed) continue
+          if (seed.question_type !== 'classify') {
+            bad.push(`${gate.id}.${f.column} takes only ${allowed.join('/')} but is asked as ${seed.question_type}`)
+          }
+        }
+      }
+    }
+    expect(bad).toEqual([])
+  })
+
+  it('never offers the room a choice the column would refuse', () => {
+    const bad: string[] = []
+    for (const gate of GATES) {
+      for (const seed of startingQuestionSet(gate.id)) {
+        for (const f of seed.target_fields) {
+          const allowed = tables[blockTable[gate.id]]?.[f.column]
+          if (!allowed) continue
+          for (const o of seed.options) {
+            if (!allowed.includes(o)) bad.push(`${gate.id}.${f.column} offers "${o}", allowed ${allowed.join('/')}`)
+          }
+        }
+      }
+    }
+    expect(bad).toEqual([])
+  })
+})

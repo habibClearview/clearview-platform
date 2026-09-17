@@ -47,7 +47,7 @@ const C = {
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 
 export default function InterviewReporting({ clientId }) {
   const [captures, setCaptures] = useState([])
@@ -127,7 +127,7 @@ export default function InterviewReporting({ clientId }) {
           </p>
         ) : null}
 
-        {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>{err}</div> : null}
+        {err ? <div style={{ color: C.red, fontSize: '1.01rem', marginTop: '0.7rem' }}>{err}</div> : null}
       </div>
 
       {report.rows.length === 0 ? (
@@ -220,7 +220,7 @@ export default function InterviewReporting({ clientId }) {
                   <blockquote key={i} style={{
                     margin: 0, padding: '0.5rem 0.75rem', borderLeft: `3px solid ${C.teal}`,
                     background: C.alt, borderRadius: '0 8px 8px 0',
-                    fontSize: '0.93rem', color: C.navy, fontStyle: 'italic', lineHeight: 1.5,
+                    fontSize: '1.01rem', color: C.navy, fontStyle: 'italic', lineHeight: 1.5,
                   }}>{v}</blockquote>
                 ))}
               </div>
@@ -240,7 +240,7 @@ const th = {
 }
 const td = {
   padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--cv-border-soft)',
-  fontSize: '0.9rem', color: 'var(--cv-navy)',
+  fontSize: '1.01rem', color: 'var(--cv-navy)',
 }
 
 function Stat({ label, value, tone }) {

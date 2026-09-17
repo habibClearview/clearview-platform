@@ -19,6 +19,7 @@
 // Surfaces are loaded on demand. A coach who opens Block 1 should not pay
 // for the pilot capture or the costing model they are not looking at.
 // ============================================================
+import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import { zoneBrief } from '@/lib/gtcv-zone-brief'
 // R20. What the room sent, waiting to become rows, drawn under the block's own
@@ -29,7 +30,7 @@ import PendingRows from '@/components/gtcv/PendingRows'
 import RoomControlBar from '@/components/gtcv/RoomControlBar'
 // R24. The button at the top of every block, and the sentence that stands
 // beside it on a block Stage 1 gives no questions to (Q8).
-import { BLOCKS_WITH_QUESTIONS, NO_QUESTIONS_YET } from '@/lib/stage1-question-sets'
+import { BLOCKS_WITH_QUESTIONS, NO_QUESTIONS_YET, startingQuestionSet } from '@/lib/stage1-question-sets'
 
 // ------------------------------------------------------------
 // R24. "Run this with the room", at the top of every block.
@@ -64,7 +65,7 @@ function RunThisWithTheRoom({ dpId, clientId }) {
   const base = {
     fontFamily: 'var(--cv-font-mono)',
     fontSize: 13, fontWeight: 700, padding: '8px 14px', borderRadius: 8,
-    border: '1px solid #2A9D8F', background: '#2A9D8F', color: '#FFFFFF',
+    border: '1px solid #2A9D8F', background: '#2A9D8F', color: 'var(--cv-on-cyan)',
   }
   return (
     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -77,10 +78,97 @@ function RunThisWithTheRoom({ dpId, clientId }) {
       {/* Q8, word for word, on the blocks Stage 1 gives no questions to. */}
       {!has ? (
         <span style={{
-          fontFamily: "var(--cv-font)", fontSize: 13.5, color: '#6B7A8C',
+          fontFamily: "var(--cv-font)", fontSize: '1.01rem', color: 'var(--cv-slate)',
         }}>{NO_QUESTIONS_YET}</span>
       ) : null}
     </div>
+  )
+}
+
+// ------------------------------------------------------------
+// WHAT THE ROOM WILL BE ASKED, BEFORE ANYBODY IS ASKED IT
+//
+// Habib, 17 September 2026: "And I can't see the prompt anywhere."
+//
+// He was right and the reason is plain once you look: the prompts only ever
+// appeared on the facilitator's own page, which opens in a SECOND TAB when you
+// press "Run this with the room". So unless you had started a session you
+// could not read them, and you certainly could not check them before standing
+// up in front of a room with them.
+//
+// They are the method's words and they are his to correct, so they belong on
+// the block, in the open, next to what the zone has to produce.
+// ------------------------------------------------------------
+function WhatTheRoomIsAsked({ dpId }) {
+  const [open, setOpen] = useState(false)
+  const prompts = startingQuestionSet(dpId)
+  if (!prompts.length) return null
+
+  const cap = {
+    fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '.1em',
+    textTransform: 'uppercase', color: 'var(--cv-slate)',
+  }
+  const KIND = {
+    collect: 'they write an answer',
+    score: 'they give it a number',
+    classify: 'they choose one',
+  }
+
+  return (
+    <section style={{
+      border: '1px solid var(--cv-border)', borderLeft: '3px solid var(--cv-teal)',
+      borderRadius: 12, padding: '12px 16px', background: 'var(--cv-card)', marginTop: 12,
+    }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+          background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+          textAlign: 'left', color: 'inherit',
+        }}
+      >
+        <span style={cap}>{open ? '▾' : '▸'} What the room will be asked here</span>
+        <span style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, color: 'var(--cv-navy)' }}>
+          {prompts.length}
+        </span>
+        <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem', color: 'var(--cv-teal)', marginLeft: 'auto' }}>
+          {open ? 'Hide' : 'Read them'}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          <p style={{
+            fontFamily: 'var(--cv-font)', fontSize: '1.01rem', lineHeight: 1.5,
+            color: 'var(--cv-slate)', margin: '0 0 10px', maxWidth: '78ch',
+          }}>
+            One at a time, on everybody&rsquo;s own phone or laptop. The answers arrive on the
+            projected screen, the room discusses them, and what you agree is saved into the
+            table below. Change any of these on the facilitator&rsquo;s page when you run the room.
+          </p>
+          <ol style={{ margin: 0, paddingLeft: 20, maxWidth: '78ch' }}>
+            {prompts.map((p) => (
+              <li key={`${p.gate_id}-${p.sort_order}-${p.question_text.slice(0, 20)}`} style={{ marginBottom: 8 }}>
+                <span style={{
+                  fontFamily: 'var(--cv-font)', fontSize: '1.01rem', lineHeight: 1.5,
+                  color: 'var(--cv-navy)',
+                }}>{p.question_text}</span>
+                <span style={{
+                  display: 'block', fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem',
+                  color: 'var(--cv-slate)', marginTop: 2,
+                }}>
+                  {KIND[p.question_type] || p.question_type}
+                  {p.question_type === 'score' ? ` , ${p.scale_min} to ${p.scale_max}` : ''}
+                  {p.target_fields.length ? ` , saved as ${p.target_fields[0].heading}` : ''}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -255,6 +343,7 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
         <>
           <RunThisWithTheRoom dpId={dpId} clientId={clientId} />
           <ZoneBriefPanel dpId={dpId} />
+          <WhatTheRoomIsAsked dpId={dpId} />
         </>
       )}
 

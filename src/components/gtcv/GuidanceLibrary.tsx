@@ -33,13 +33,13 @@ const C = {
   amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const field = {
   width: '100%', padding: '0.45rem 0.6rem', borderRadius: 7, fontSize: 16,
   border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit', minHeight: 40,
 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.86rem', fontWeight: 700, padding: '0.45rem 0.95rem', minHeight: 40,
+  ...mono, fontSize: '1.01rem', fontWeight: 700, padding: '0.45rem 0.95rem', minHeight: 40,
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',

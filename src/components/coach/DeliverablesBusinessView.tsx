@@ -27,7 +27,7 @@ const C = {
   slate: 'var(--cv-slate)', teal: 'var(--cv-teal)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.92rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 
 export default function DeliverablesBusinessView({ clients = [] }) {
   const [clientId, setClientId] = useState('')
@@ -58,7 +58,7 @@ export default function DeliverablesBusinessView({ clients = [] }) {
           onChange={(e) => setClientId(e.target.value)}
           style={{
             width: '100%', padding: '0.5rem 0.6rem', border: `1px solid ${C.border}`,
-            borderRadius: 7, background: 'var(--cv-bg-2)', color: C.navy, fontSize: '0.98rem',
+            borderRadius: 7, background: 'var(--cv-bg-2)', color: C.navy, fontSize: '1.01rem',
           }}
         >
           <option value="">Choose one</option>

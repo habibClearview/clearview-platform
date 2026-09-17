@@ -65,12 +65,12 @@ const LABEL = {
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle = {
-  fontFamily: 'inherit', fontSize: '0.85rem', padding: '0.4rem 0.55rem',
+  fontFamily: 'inherit', fontSize: '1.01rem', padding: '0.4rem 0.55rem',
   border: `1px solid ${C.border}`, borderRadius: 7, background: C.card,
   color: C.navy, width: '100%', boxSizing: 'border-box',
 }
 const th = { ...LABEL, textAlign: 'left', padding: '0.5rem 0.7rem', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
-const td = { padding: '0.5rem 0.7rem', fontSize: '0.86rem', color: C.navy, verticalAlign: 'top' }
+const td = { padding: '0.5rem 0.7rem', fontSize: '1.01rem', color: C.navy, verticalAlign: 'top' }
 function btn(color, solid = false) {
   return solid
     ? { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
@@ -158,8 +158,8 @@ function ReadinessStrip({ row }) {
         <Pill text={g.pass ? 'Evidence rule met' : 'Evidence rule not met'} tone={g.pass ? C.green : C.red} />
         <Pill text={stageWord(st)} tone={stageTone(st)} />
       </div>
-      <div style={{ fontSize: '0.83rem', color: C.navy, lineHeight: 1.45 }}>{countLine}</div>
-      <div style={{ fontSize: '0.83rem', color: C.navy, lineHeight: 1.45 }}>{stageLine}</div>
+      <div style={{ fontSize: '1.01rem', color: C.navy, lineHeight: 1.45 }}>{countLine}</div>
+      <div style={{ fontSize: '1.01rem', color: C.navy, lineHeight: 1.45 }}>{stageLine}</div>
     </div>
   )
 }
@@ -279,7 +279,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.3rem' }}>
         <div>
           <div style={H('1.2rem')}>Customer profile and adoption test</div>
-          <div style={{ color: C.slate, fontSize: '0.85rem', marginTop: 3, maxWidth: '92ch', lineHeight: 1.5 }}>
+          <div style={{ color: C.slate, fontSize: '1.01rem', marginTop: 3, maxWidth: '92ch', lineHeight: 1.5 }}>
             One row per segment. A customer must be willing, then able, then prioritised, in that
             order. Prioritised is the signal that counts. Each segment needs {MIN_CONVERSATIONS} validation
             conversations, with at least {MIN_CONVERGING} converging on the same problem, budget and
@@ -311,9 +311,9 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
       )}
 
       {loading ? (
-        <div style={{ color: C.slate, fontSize: '0.85rem', fontStyle: 'italic', marginTop: '0.9rem' }}>Loading segments...</div>
+        <div style={{ color: C.slate, fontSize: '1.01rem', fontStyle: 'italic', marginTop: '0.9rem' }}>Loading segments...</div>
       ) : rows.length === 0 ? (
-        <div style={{ color: C.slate, fontSize: '0.85rem', fontStyle: 'italic', marginTop: '0.9rem' }}>
+        <div style={{ color: C.slate, fontSize: '1.01rem', fontStyle: 'italic', marginTop: '0.9rem' }}>
           No segments yet. {canManage ? 'Add the first segment you are testing.' : 'Nothing has been recorded yet.'}
         </div>
       ) : (

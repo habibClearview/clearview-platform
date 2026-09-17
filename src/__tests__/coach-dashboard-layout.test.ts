@@ -278,8 +278,20 @@ describe('the welcome letter to a co-implementer', () => {
   })
 
   it('the letter box can be read out and does not shrink on a phone', () => {
-    expect(DASH).toContain('aria-label="The welcome letter sent to a new co-implementer"')
-    expect(DASH).toContain("fontSize:'1rem'")
+    const LABEL = 'aria-label="The welcome letter sent to a new co-implementer"'
+    // ASSERT THE BOX IS THERE BEFORE MEASURING IT. From the review on #282:
+    // indexOf returns -1 when it is gone, a slice from -1 reads the whole
+    // file, and the regex then finds somebody else's font size and passes. A
+    // test that survives the deletion of the thing it tests is not a test.
+    const at = DASH.indexOf(LABEL)
+    expect(at, 'the welcome letter box is not on the dashboard at all').toBeGreaterThan(-1)
+    // A text box under 16px makes iOS zoom the whole page the moment you tap
+    // it, and it does not zoom back. 1rem is 16px, so this is a floor rather
+    // than an exact number.
+    const near = DASH.slice(Math.max(0, at - 700), at + 700)
+    const m = /fontSize:\s*'([\d.]+)rem'/.exec(near)
+    expect(m, 'the letter box sets no font size at all').not.toBeNull()
+    expect(Number(m![1])).toBeGreaterThanOrEqual(1)
   })
 
   it('reading and saving it are held to a sensible number of knocks', () => {

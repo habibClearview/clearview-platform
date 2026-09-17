@@ -76,7 +76,7 @@ export default function JoinPage() {
           fontFamily: 'var(--cv-font)', fontSize: '1.5rem', fontWeight: 600,
           margin: 0, lineHeight: 1.2,
         }}>Join the session</h1>
-        <p style={{ color: C.slate, fontSize: '1rem', lineHeight: 1.55, margin: '0.6rem 0 1.4rem' }}>
+        <p style={{ color: C.slate, fontSize: '1.01rem', lineHeight: 1.55, margin: '0.6rem 0 1.4rem' }}>
           Type the code that is on the screen at the front of the room. You do not need an account
           and there is nothing to install.
         </p>
@@ -109,7 +109,7 @@ export default function JoinPage() {
           />
 
           {err ? (
-            <p role="alert" style={{ color: C.red, fontSize: '0.95rem', margin: '0.7rem 0 0' }}>{err}</p>
+            <p role="alert" style={{ color: C.red, fontSize: '1.01rem', margin: '0.7rem 0 0' }}>{err}</p>
           ) : null}
 
           <button
@@ -117,16 +117,16 @@ export default function JoinPage() {
             disabled={!ready || busy}
             style={{
               width: '100%', marginTop: '1.1rem', padding: '0.7rem 1rem',
-              fontFamily: 'var(--cv-font-mono)', fontSize: '1rem', fontWeight: 700,
+              fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', fontWeight: 700,
               border: 'none', borderRadius: 10,
               background: ready && !busy ? C.teal : C.border,
-              color: ready && !busy ? 'var(--cv-on-accent, #FFFFFF)' : C.slate,
+              color: ready && !busy ? 'var(--cv-on-cyan, #062230)' : C.slate,
               cursor: ready && !busy ? 'pointer' : 'default',
             }}
           >{busy ? 'Opening...' : 'Join'}</button>
         </form>
 
-        <p style={{ color: C.slate, fontSize: '0.88rem', lineHeight: 1.5, margin: '1.2rem 0 0' }}>
+        <p style={{ color: C.slate, fontSize: '1.01rem', lineHeight: 1.5, margin: '1.2rem 0 0' }}>
           Eight characters. Capitals and the dash do not matter. If you were sent a full link
           instead, open that and you will not need a code at all.
         </p>

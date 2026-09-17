@@ -407,7 +407,10 @@ export const CANVAS_TABS = [
   // open at all. It follows the Charter, which is the document it belongs to.
   { id: 'diagnostic',   label: 'Pre-engagement diagnostic', marker: '4',  group: 'engagement' },
   { id: 'eng_setup',    label: 'Who is on it, and settings', marker: '5', group: 'engagement', teamOnly: true },
-  { id: 'sessions',     label: 'Sessions and rooms',        marker: '6',  group: 'engagement', teamOnly: true },
+  // ONE NAME FOR ONE PAGE. 17 September 2026. Habib: "The tab title is sessions
+  // and rooms, the content shows workplan, please make this consistent, just
+  // call the tab workplan."
+  { id: 'sessions',     label: 'Workplan',                  marker: '6',  group: 'engagement', teamOnly: true },
 
   { id: 'phase0',       label: 'Clearing the ground',       marker: 'P0', group: 'work', dpId: 'phase_0' },
   { id: 'dp01',         label: 'Decision Point 1 · Service Reality',      marker: '1',  group: 'work', dpId: 'dp01' },

@@ -28,7 +28,7 @@ const C = {
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const labelText = {
   ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase',
   color: C.slate,
@@ -36,10 +36,10 @@ const labelText = {
 const field = {
   width: '100%', padding: '0.44rem 0.58rem', borderRadius: 7,
   border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit',
-  fontFamily: "var(--cv-font)", fontSize: '0.93rem',
+  fontFamily: "var(--cv-font)", fontSize: '1.01rem',
 }
 const smallBtn = (col, solid) => ({
-  ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.36rem 0.85rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.36rem 0.85rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -188,8 +188,8 @@ export default function EngagementSettings({ clientId, canManage }) {
         decide what they are called, what this engagement agreed to do, and how it is going.
       </p>
 
-      {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>{err}</div> : null}
-      {note ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.7rem' }}>{note}</div> : null}
+      {err ? <div style={{ color: C.red, fontSize: '1.01rem', marginTop: '0.7rem' }}>{err}</div> : null}
+      {note ? <div style={{ color: C.green, fontSize: '1.01rem', marginTop: '0.7rem' }}>{note}</div> : null}
 
       <Setting
         label="Set this engagement up"
@@ -229,7 +229,7 @@ export default function EngagementSettings({ clientId, canManage }) {
                 disabled={busy === 'momentum' || on}
                 onClick={() => save('momentum', { momentumStatus: m.v }, `Recorded as ${m.l.toLowerCase()}.`)}
                 style={{
-                  ...mono, fontSize: '0.84rem', fontWeight: 600, padding: '0.36rem 0.85rem',
+                  ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.36rem 0.85rem',
                   border: `1px solid ${m.c}`, borderRadius: 7,
                   background: on ? m.c : 'transparent',
                   color: on ? 'var(--cv-on-accent)' : m.c,

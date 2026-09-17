@@ -61,12 +61,12 @@ const LABEL = {
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle = {
-  fontFamily: 'inherit', fontSize: '0.85rem', padding: '0.4rem 0.55rem',
+  fontFamily: 'inherit', fontSize: '1.01rem', padding: '0.4rem 0.55rem',
   border: `1px solid ${C.border}`, borderRadius: 7, background: C.card,
   color: C.navy, width: '100%', boxSizing: 'border-box',
 }
 const th = { ...LABEL, textAlign: 'left', padding: '0.5rem 0.7rem', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
-const td = { padding: '0.5rem 0.7rem', fontSize: '0.86rem', color: C.navy, verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
+const td = { padding: '0.5rem 0.7rem', fontSize: '1.01rem', color: C.navy, verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
 function btn(color, solid = false) {
   return solid
     ? { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
@@ -261,7 +261,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <div style={H('1.2rem')}>Problem prioritisation</div>
-          <div style={{ color: C.slate, fontSize: '0.85rem', marginTop: 3, maxWidth: '92ch', lineHeight: 1.5 }}>
+          <div style={{ color: C.slate, fontSize: '1.01rem', marginTop: 3, maxWidth: '92ch', lineHeight: 1.5 }}>
             Score each candidate problem 1 to 5 on urgency, ownership clarity, willingness to pay and
             access. The total out of {MAX_TOTAL} sorts the list. Only the top {ADVANCING_COUNT} advance to the value
             proposition work. A problem can be urgent and still be worth nothing commercially if
@@ -329,9 +329,9 @@ export default function ProblemScoringTable({ clientId, canManage }) {
       )}
 
       {loading ? (
-        <div style={{ color: C.slate, fontSize: '0.85rem', fontStyle: 'italic', marginTop: '0.9rem' }}>Loading problems...</div>
+        <div style={{ color: C.slate, fontSize: '1.01rem', fontStyle: 'italic', marginTop: '0.9rem' }}>Loading problems...</div>
       ) : rows.length === 0 ? (
-        <div style={{ color: C.slate, fontSize: '0.85rem', fontStyle: 'italic', marginTop: '0.9rem' }}>
+        <div style={{ color: C.slate, fontSize: '1.01rem', fontStyle: 'italic', marginTop: '0.9rem' }}>
           No problems scored yet. {canManage ? 'Add the candidate problems you heard in the conversations.' : 'Nothing has been recorded yet.'}
         </div>
       ) : (
@@ -426,7 +426,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
       {rows.length > 0 && (
         <div style={{ borderLeft: `4px solid ${advancingRows.length > 0 ? C.green : C.amber}`, background: C.alt, borderRadius: 8, padding: '0.6rem 0.8rem', marginTop: '0.9rem' }}>
           <div style={{ ...LABEL, marginBottom: 4 }}>What advances</div>
-          <div style={{ fontSize: '0.83rem', color: C.navy, lineHeight: 1.45 }}>
+          <div style={{ fontSize: '1.01rem', color: C.navy, lineHeight: 1.45 }}>
             {advancingRows.length === 0
               ? 'Nothing advances yet. Score at least one problem on the four dimensions.'
               : `${advancingRows.map((x) => x.row.problem_statement || 'an unnamed problem').join('; ')}. Build a value proposition for these and no others.`}

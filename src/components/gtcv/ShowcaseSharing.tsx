@@ -29,9 +29,9 @@ const C = {
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.34rem 0.8rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.34rem 0.8rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -102,8 +102,8 @@ export default function ShowcaseSharing({ clientId, canManage }) {
         recorded. That is enforced where the page is built, not by hiding things on screen.
       </p>
 
-      {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>{err}</div> : null}
-      {note ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.7rem', wordBreak: 'break-all' }}>{note}</div> : null}
+      {err ? <div style={{ color: C.red, fontSize: '1.01rem', marginTop: '0.7rem' }}>{err}</div> : null}
+      {note ? <div style={{ color: C.green, fontSize: '1.01rem', marginTop: '0.7rem', wordBreak: 'break-all' }}>{note}</div> : null}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', margin: '1rem 0 0' }}>
         <label style={{ ...hint, display: 'flex', gap: '0.55rem', alignItems: 'flex-start', cursor: 'pointer' }}>
@@ -155,7 +155,7 @@ export default function ShowcaseSharing({ clientId, canManage }) {
             style={{
               width: '100%', padding: '0.42rem 0.55rem', borderRadius: 7,
               border: `1px solid ${C.border}`, background: 'transparent', color: 'inherit',
-              fontFamily: "var(--cv-font)", fontSize: '0.92rem',
+              fontFamily: "var(--cv-font)", fontSize: '1.01rem',
             }}
           />
         </div>
@@ -187,7 +187,7 @@ export default function ShowcaseSharing({ clientId, canManage }) {
                   padding: '0.5rem 0.75rem', opacity: dead ? 0.6 : 1,
                 }}>
                   <div style={{ minWidth: 0, flex: '1 1 320px' }}>
-                    <div style={{ fontSize: '0.97rem', color: C.navy, fontWeight: 600 }}>{l.grantee_name}</div>
+                    <div style={{ fontSize: '1.01rem', color: C.navy, fontWeight: 600 }}>{l.grantee_name}</div>
                     <div style={{ ...mono, fontSize: '0.78rem', color: C.slate }}>
                       {l.revoked_at
                         ? `Withdrawn ${fmtDate(l.revoked_at)}`

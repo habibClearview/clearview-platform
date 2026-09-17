@@ -46,7 +46,7 @@ export default function TestEngagementPanel() {
   }
 
   const btn = (bg) => ({
-    fontFamily:'var(--cv-font-mono)', fontSize:'0.85rem', fontWeight:700,
+    fontFamily:'var(--cv-font-mono)', fontSize: '1.01rem', fontWeight:700,
     padding:'0.42rem 0.85rem', borderRadius:4, border:'none',
     background:bg, color:'#fff', cursor:'pointer', marginRight:8,
   })
@@ -54,7 +54,7 @@ export default function TestEngagementPanel() {
   if (!open) {
     return (
       <button type="button" onClick={()=>setOpen(true)} style={{
-        fontFamily:'var(--cv-font-mono)', fontSize:'0.85rem', padding:'0.4rem 0.8rem',
+        fontFamily:'var(--cv-font-mono)', fontSize: '1.01rem', padding:'0.4rem 0.8rem',
         borderRadius:4, border:`1px solid ${C.border}`, background:'transparent',
         color:C.slate, cursor:'pointer',
       }}>Test engagement</button>
@@ -67,7 +67,7 @@ export default function TestEngagementPanel() {
         <strong style={{color:C.navy}}>The test engagement</strong>
         <button type="button" onClick={()=>setOpen(false)} style={{border:'none', background:'transparent', color:C.slate, cursor:'pointer', fontSize:'1.1rem'}}>×</button>
       </div>
-      <p style={{fontSize:'0.86rem', color:C.slate, margin:'0 0 0.85rem'}}>
+      <p style={{fontSize: '1.01rem', color:C.slate, margin:'0 0 0.85rem'}}>
         An engagement that exists to be broken, with its own logins on an address that cannot
         receive mail. Nothing here can touch a real client. Use it instead of a live engagement
         whenever something needs proving.
@@ -85,11 +85,11 @@ export default function TestEngagementPanel() {
       </div>
 
       {error && (
-        <div style={{color:C.red, fontSize:'0.86rem', padding:'0.6rem', background:'#FDF0EE', borderRadius:5}}>{error}</div>
+        <div style={{color:C.red, fontSize: '1.01rem', padding:'0.6rem', background:'#FDF0EE', borderRadius:5}}>{error}</div>
       )}
 
       {result?.action === 'create' && (
-        <div style={{fontSize:'0.86rem', color:C.navy}}>
+        <div style={{fontSize: '1.01rem', color:C.navy}}>
           <div style={{marginBottom:'0.5rem'}}>Made: {result.data.made.join(', ')}</div>
           <div style={{marginBottom:'0.4rem', color:C.slate}}>{result.data.note}</div>
           <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.82rem'}}>
@@ -107,7 +107,7 @@ export default function TestEngagementPanel() {
       )}
 
       {result?.action === 'check' && (
-        <div style={{fontSize:'0.86rem'}}>
+        <div style={{fontSize: '1.01rem'}}>
           <div style={{fontWeight:700, marginBottom:'0.5rem', color: result.data.ok ? C.green : C.red}}>
             {result.data.summary || result.data.error}
           </div>
@@ -127,7 +127,7 @@ export default function TestEngagementPanel() {
       )}
 
       {result?.action === 'remove' && (
-        <div style={{fontSize:'0.86rem', color:C.navy}}>Removed: {result.data.removed.join(', ')}</div>
+        <div style={{fontSize: '1.01rem', color:C.navy}}>Removed: {result.data.removed.join(', ')}</div>
       )}
     </div>
   )

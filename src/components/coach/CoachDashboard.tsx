@@ -46,7 +46,7 @@ import dynamic from 'next/dynamic'
 // uploading is occasional. Loads on demand when the upload panel is opened.
 const SpreadsheetUpload = dynamic(() => import('@/components/intake/SpreadsheetUpload'), {
   ssr: false,
-  loading: () => <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem',padding:'0.6rem 0',color:'var(--cv-slate)'}}>Loading uploader…</div>,
+  loading: () => <div style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.6rem 0',color:'var(--cv-slate)'}}>Loading uploader…</div>,
 })
 import BuildStamp from '@/components/BuildStamp'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -94,7 +94,7 @@ function addBtn(sm=false,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fo
 
 function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:onSolid(col),cursor:'pointer'}}
 // Pill toggle for mode / filter subtabs (new design language)
-function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
+function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 
 function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem 1.15rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.13rem',letterSpacing:'0.12em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.65rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.22rem'}}>{sub}</div>}</div>)}
 /**
@@ -119,7 +119,7 @@ function DPDot({status}){
   const said=done?'Complete':going?'In progress':stuck?'Blocked':'Not started'
   return <span role="img" aria-label={said} title={said} style={{width:11,height:11,borderRadius:'50%',background:col,flexShrink:0,display:'inline-block'}}/>
 }
-function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
+function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
 function Spinner(){return<div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3rem',color:C.slate,fontSize:'1.11rem'}}>Loading...</div>}
 // Donut score circle — reused for real scores that already exist in the data (e.g. the readiness self-assessment). No score is invented.
 function ScoreDonut({label,display,frac,rating,color}){const r=26,circ=2*Math.PI*r,f=Math.max(0,Math.min(1,frac||0));return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.15rem',borderLeft:`4px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',display:'flex',alignItems:'center',gap:'0.9rem'}}><svg width="60" height="60" viewBox="0 0 62 62" style={{flexShrink:0}}><circle cx="31" cy="31" r={r} fill="none" style={{stroke:'var(--cv-border-soft)'}} strokeWidth="6"/><circle cx="31" cy="31" r={r} fill="none" style={{stroke:color}} strokeWidth="6" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform="rotate(-90 31 31)"/></svg><div style={{minWidth:0}}><div style={{fontSize:'1.11rem',color:C.slate,marginBottom:'0.18rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.55rem',fontWeight:700,color:C.navy,lineHeight:1}}>{display}</div><div style={{fontSize:'1.07rem',fontWeight:700,color,marginTop:'0.22rem'}}>{rating}</div></div></div>)}
@@ -134,8 +134,8 @@ function GlanceBar({frac,color}){return<div style={{height:6,borderRadius:3,back
 // Numbered LEVEL badge + "drilled from" connector -- matches the approved
 // Portfolio Intelligence mockup's Level 1 -> 2 -> 3 drill-down structure
 // (portfolio overview -> filtered segment -> one anonymised business).
-function LevelMarker({n,label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.7rem 0 0.9rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.15rem 0.7rem'}}>LEVEL {n}</span><span style={{fontFamily:'var(--cv-font)',fontSize:'1.08rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.86rem'}}>{sub}</span>}</div>)}
-function DrillConnector({children}){return<div style={{display:'flex',justifyContent:'center',textAlign:'center',padding:'0.25rem 0',color:C.teal,fontSize:'0.92rem',fontFamily: 'var(--cv-font-mono)'}}>{children}</div>}
+function LevelMarker({n,label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.7rem 0 0.9rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.15rem 0.7rem'}}>LEVEL {n}</span><span style={{fontFamily:'var(--cv-font)',fontSize:'1.08rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize: '1.01rem'}}>{sub}</span>}</div>)}
+function DrillConnector({children}){return<div style={{display:'flex',justifyContent:'center',textAlign:'center',padding:'0.25rem 0',color:C.teal,fontSize: '1.01rem',fontFamily: 'var(--cv-font-mono)'}}>{children}</div>}
 // Navy header + bordered body + bordered/sunk KPI cards -- the exact colour
 // tokens and card chrome from the approved Portfolio Intelligence mockup
 // (pi-header / pi-body / pi-kpi / mini-dist / delta-badge), reused here so
@@ -151,7 +151,7 @@ function PiChip({active,onClick,children}){return(
   <button onClick={onClick} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',border:`1px solid ${active?C.cyan:'rgba(255,255,255,0.35)'}`,color:active?'#0B1420':'rgba(255,255,255,0.85)',background:active?C.cyan:'transparent',borderRadius:999,padding:'0.32rem 0.8rem',cursor:'pointer',fontWeight:active?700:400}}>{children}</button>
 )}
 function PiBody({children}){return<div style={{border:'1px solid var(--cv-border-soft)',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'1.3rem',background:C.white,marginBottom:'2rem'}}>{children}</div>}
-function PiSectionHeading({label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.9rem 0 0.8rem'}}><span style={{fontFamily:'var(--cv-font)',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.85rem'}}>{sub}</span>}</div>)}
+function PiSectionHeading({label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.9rem 0 0.8rem'}}><span style={{fontFamily:'var(--cv-font)',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize: '1.01rem'}}>{sub}</span>}</div>)}
 function PiKpiCard({label,value,rev,sub,total,color,deltaBadge}){return(
   <div style={total?{border:`2px solid ${C.cyan}`,borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-tint-cyan)'}:{border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-bg-2)'}}>
     <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate}}>{label}</div>
@@ -190,21 +190,21 @@ function CoImplementerPerfCard({ci,clients,canvasByClient}){
   return(
     <div style={{...card,padding:'1rem 1.1rem',marginBottom:0}}>
       <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.8rem'}}>
-        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontSize:'0.99rem',fontWeight:700}}>{initials}</div>
-        <div><div style={{fontWeight:700,fontSize:'1.19rem'}}>{ci.name}</div><div style={{fontSize:'0.99rem',color:C.slate}}>{ci.country||''}{ci.country&&' · '}Serving {served.length} client{served.length===1?'':'s'}</div></div>
+        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700}}>{initials}</div>
+        <div><div style={{fontWeight:700,fontSize:'1.19rem'}}>{ci.name}</div><div style={{fontSize: '1.01rem',color:C.slate}}>{ci.country||''}{ci.country&&' · '}Serving {served.length} client{served.length===1?'':'s'}</div></div>
       </div>
       {served.length===0?(
-        <div style={{fontSize:'0.95rem',color:C.slate}}>No clients assigned yet.</div>
+        <div style={{fontSize: '1.01rem',color:C.slate}}>No clients assigned yet.</div>
       ):(
         <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
           {served.map(c=>{
             const isCanvas=c.engagement_mode==='canvas'
             const stageLabel=isCanvas?canvasProgress(canvasByClient[c.id]||[]).currentLabel:null
             return(
-              <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem',fontSize:'0.95rem',borderTop:'1px solid var(--cv-border-soft)',paddingTop:'0.5rem'}}>
+              <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem',fontSize: '1.01rem',borderTop:'1px solid var(--cv-border-soft)',paddingTop:'0.5rem'}}>
                 <div style={{minWidth:0}}>
                   <div style={{fontWeight:600,color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
-                  <div style={{fontSize:'0.85rem',color:C.slate}}>{isCanvas?'GtCV Canvas':'Clearview Financial Model'}</div>
+                  <div style={{fontSize: '1.01rem',color:C.slate}}>{isCanvas?'GtCV Canvas':'Clearview Financial Model'}</div>
                 </div>
                 {stageLabel&&<Badge text={stageLabel} color={C.purple}/>}
               </div>
@@ -233,7 +233,7 @@ const quietNoticeBtn={fontFamily:'var(--cv-font-mono)',fontSize:'0.8rem',fontWei
 // back, is what keeps that honest.
 function DismissedLine({label,onRestore,busy}){
   return(
-    <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',fontSize:'0.9rem',color:C.slate,border:'1px dashed var(--cv-border)',borderRadius:8,padding:'0.45rem 0.8rem',marginBottom:'1rem'}}>
+    <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',fontSize: '1.01rem',color:C.slate,border:'1px dashed var(--cv-border)',borderRadius:8,padding:'0.45rem 0.8rem',marginBottom:'1rem'}}>
       <span>{label}</span>
       <button style={{...quietNoticeBtn,marginLeft:'auto'}} disabled={!!busy} onClick={onRestore}>Show them again</button>
     </div>
@@ -242,7 +242,7 @@ function DismissedLine({label,onRestore,busy}){
 
 function SetAsideLine({label,onBringBack,busy}){
   return(
-    <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',fontSize:'0.9rem',color:C.slate,border:'1px dashed var(--cv-border)',borderRadius:8,padding:'0.45rem 0.8rem',marginBottom:'1rem'}}>
+    <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',fontSize: '1.01rem',color:C.slate,border:'1px dashed var(--cv-border)',borderRadius:8,padding:'0.45rem 0.8rem',marginBottom:'1rem'}}>
       <span>{label}</span>
       <button style={{...quietNoticeBtn,marginLeft:'auto'}} disabled={!!busy} onClick={onBringBack}>Bring it back</button>
     </div>
@@ -293,12 +293,12 @@ function ClientDocumentActions({clientId,clientName,clients,programmes}){
   return(
     <div style={{marginTop:'0.6rem',display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
       <button
-        style={{fontSize:'0.85rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.3rem 0.65rem',cursor:'pointer'}}
+        style={{fontSize: '1.01rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.3rem 0.65rem',cursor:'pointer'}}
         disabled={downloading}
         onClick={download}
       >{downloading?'Generating…':'⬇ Investment Brief'}</button>
       <button
-        style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:`1px solid var(--cv-border-soft)`,borderRadius:6,padding:'0.3rem 0.65rem',cursor:'pointer'}}
+        style={{fontSize: '1.01rem',fontWeight:600,color:C.navy,background:'none',border:`1px solid var(--cv-border-soft)`,borderRadius:6,padding:'0.3rem 0.65rem',cursor:'pointer'}}
         onClick={()=>setShowAccess(true)}
       >🔗 External Access</button>
       {error&&<div style={{width:'100%',fontSize:'0.78rem',color:C.red}}>{error}</div>}
@@ -415,7 +415,7 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,clients,progra
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.9rem'}}>
           <div>
             <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>External Access{clientName?` — ${clientName}`:' — Portfolio'}</div>
-            <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>Give an investor, programme officer, DFI, or subscriber a read-only link -- to one business's Investment Brief, the whole portfolio, or a filtered segment -- without giving them a login. If you enter their email, they must confirm it before the link works for them. Revoke any time.</div>
+            <div style={{fontSize: '1.01rem',color:C.slate,marginTop:'0.2rem'}}>Give an investor, programme officer, DFI, or subscriber a read-only link -- to one business's Investment Brief, the whole portfolio, or a filtered segment -- without giving them a login. If you enter their email, they must confirm it before the link works for them. Revoke any time.</div>
           </div>
           <button onClick={onClose} style={{background:'none',border:'none',fontSize:'1.3rem',color:C.slate,cursor:'pointer',lineHeight:1}}>×</button>
         </div>
@@ -423,7 +423,7 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,clients,progra
         <form onSubmit={createGrant} style={{display:'flex',flexDirection:'column',gap:'0.5rem',marginBottom:'1rem',padding:'0.8rem',background:'var(--cv-tint-cyan)',borderRadius:8}}>
           <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem'}}>
             {Object.entries(GRANT_SCOPE_LABELS).filter(([k])=>k!=='client'||clientId).map(([k,l])=>(
-              <label key={k} style={{display:'flex',alignItems:'center',gap:'0.35rem',fontSize:'0.85rem',color:C.navy,cursor:'pointer',padding:'0.3rem 0.6rem',borderRadius:6,border:`1px solid ${scope===k?C.teal:'var(--cv-border-soft)'}`,background:scope===k?'var(--cv-tint-teal)':'transparent'}}>
+              <label key={k} style={{display:'flex',alignItems:'center',gap:'0.35rem',fontSize: '1.01rem',color:C.navy,cursor:'pointer',padding:'0.3rem 0.6rem',borderRadius:6,border:`1px solid ${scope===k?C.teal:'var(--cv-border-soft)'}`,background:scope===k?'var(--cv-tint-teal)':'transparent'}}>
                 <input type="radio" name="scope" checked={scope===k} onChange={()=>setScope(k)} style={{margin:0}}/>{l}
               </label>
             ))}
@@ -464,7 +464,7 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,clients,progra
         {loading?(
           <div style={{textAlign:'center',color:C.slate,padding:'1rem'}}>Loading…</div>
         ):grants.length===0?(
-          <div style={{textAlign:'center',color:C.slate,padding:'1rem',fontSize:'0.92rem'}}>No external access has been granted {clientId?'for this client':'at the portfolio level'} yet.</div>
+          <div style={{textAlign:'center',color:C.slate,padding:'1rem',fontSize: '1.01rem'}}>No external access has been granted {clientId?'for this client':'at the portfolio level'} yet.</div>
         ):(
           <div style={{display:'flex',flexDirection:'column',gap:'0.6rem'}}>
             {grants.map(g=>{
@@ -474,7 +474,7 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,clients,progra
                 <div key={g.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.7rem 0.85rem'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
                     <div>
-                      <div style={{fontWeight:700,fontSize:'0.96rem',color:C.navy}}>{g.grantee_name}</div>
+                      <div style={{fontWeight:700,fontSize: '1.01rem',color:C.navy}}>{g.grantee_name}</div>
                       <div style={{fontSize:'0.82rem',color:C.slate}}>{GRANT_TYPE_LABELS[g.grant_type]||g.grant_type} · {GRANT_SCOPE_LABELS[g.scope_type]||g.scope_type}{g.grantee_email?` · ${g.grantee_email}${g.email_confirmed_at?' (confirmed)':' (not yet confirmed)'}`:''}</div>
                       {segDesc&&<div style={{fontSize:'0.8rem',color:C.teal,marginTop:'0.1rem'}}>Segment: {segDesc}</div>}
                     </div>
@@ -529,7 +529,7 @@ function RevenueCostTrendChart({periods,revenueByPeriod,costByPeriod,cur}){
           )
         })}
       </svg>
-      <div style={{display:'flex',gap:'1.1rem',fontSize:'0.87rem',fontFamily: 'var(--cv-font-mono)',color:C.slate,marginTop:'0.4rem'}}>
+      <div style={{display:'flex',gap:'1.1rem',fontSize: '1.01rem',fontFamily: 'var(--cv-font-mono)',color:C.slate,marginTop:'0.4rem'}}>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.teal,marginRight:5,verticalAlign:'middle'}}/>Revenue</span>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.purple,marginRight:5,verticalAlign:'middle'}}/>Team cost</span>
       </div>
@@ -684,7 +684,7 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
       <PiBody>
 
         <PiSectionHeading label="The practice" sub="who pays, what they bought, and who the work is done with. Three different numbers, because they are three different things."/>
-        {servicesUnread&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.6rem 0.9rem',marginBottom:'0.7rem',fontSize:'0.95rem',color:C.navy}}>The assignments could not be read just now, so every figure below is showing nothing rather than a real number: {servicesUnread}</div>}
+        {servicesUnread&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.6rem 0.9rem',marginBottom:'0.7rem',fontSize: '1.01rem',color:C.navy}}>The assignments could not be read just now, so every figure below is showing nothing rather than a real number: {servicesUnread}</div>}
         <PiKpiRow cols={3}>
           <PiKpiCard total label="Paying Clients" value={String(shape.payers)} sub="who the invoice is made out to"/>
           <PiKpiCard label="Assignments" value={String(shape.assignments)} color={C.teal} sub={shape.assignmentsWithNobodyYet?`${shape.assignmentsWithNobodyYet} not yet serving anybody`:'each one is a fee you invoiced'}/>
@@ -850,15 +850,15 @@ function ClientCard({client,programmes,onClick,onEdit}){
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.35rem'}}>
         <div style={{fontWeight:700,fontSize:'1.13rem',color:C.navy,lineHeight:1.3}}>{client.name}</div>
         <div style={{display:'flex',gap:'0.3rem',flexShrink:0,marginLeft:'0.5rem'}}>
-          {client.clearview_active&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>CRV</span>}
-          {client.engagement_mode==='canvas'&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>GtCV</span>}
+          {client.clearview_active&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>CRV</span>}
+          {client.engagement_mode==='canvas'&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>GtCV</span>}
         </div>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.35rem',gap:'0.5rem'}}>
-        <div style={{fontSize:'0.93rem',color:prog?C.slate:C.amber}}>{CLIENT_TYPE_LABELS[client.type]} · {prog?prog.name:'No programme -- self-paying'}</div>
+        <div style={{fontSize: '1.01rem',color:prog?C.slate:C.amber}}>{CLIENT_TYPE_LABELS[client.type]} · {prog?prog.name:'No programme -- self-paying'}</div>
         {onEdit&&<button onClick={e=>{e.stopPropagation();onEdit()}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',padding:'0.12rem 0.5rem',borderRadius:4,background:C.navy,color:'var(--cv-on-accent)',border:'none',cursor:'pointer',flexShrink:0}}>Edit</button>}
       </div>
-      {client.contact_name&&<div style={{fontSize:'0.93rem',color:C.navy,marginBottom:'0.3rem'}}>{client.contact_name}</div>}
+      {client.contact_name&&<div style={{fontSize: '1.01rem',color:C.navy,marginBottom:'0.3rem'}}>{client.contact_name}</div>}
       <Badge text={statusLabel(client.status)} color={statusColor(client.status)}/>
     </div>
   )
@@ -890,7 +890,7 @@ function InviteLoginButton({email,fullName,role,coImplementerId,funderProgrammeI
   return(
     <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
       <button style={addBtn(true,C.teal)} disabled={busy} onClick={invite}>{busy?'Sending…':'Invite login'}</button>
-      {msg&&<span style={{fontSize:'0.93rem',color:C.slate}}>{msg}</span>}
+      {msg&&<span style={{fontSize: '1.01rem',color:C.slate}}>{msg}</span>}
     </div>
   )
 }
@@ -944,7 +944,7 @@ function WelcomeLetterButton({coImplementerId}){
       {sentAlready&&<button style={addBtn(true,C.slate)} disabled={busy} onClick={()=>send(true)}
         title="Sends the same letter again with a fresh sign-in link. Use this when their first link has expired.">
         Send again with a new link</button>}
-      {msg&&<span style={{fontSize:'0.93rem',color:C.slate}}>{msg}</span>}
+      {msg&&<span style={{fontSize: '1.01rem',color:C.slate}}>{msg}</span>}
     </div>
   )
 }
@@ -1010,7 +1010,7 @@ function CoImplementerLetterPanel(){
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
         <div>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>The welcome letter for a new co-implementer</div>
-          <div style={{fontSize:'0.93rem',color:C.slate}}>
+          <div style={{fontSize: '1.01rem',color:C.slate}}>
             What their role is, who they report to, how they are paid, and how to use the platform.
             {edited?' Your edited version is in use.':' The generated letter is in use.'}
           </div>
@@ -1022,8 +1022,8 @@ function CoImplementerLetterPanel(){
         </div>
       </div>
 
-      {err&&<div style={{fontSize:'0.95rem',color:C.red,marginTop:'0.6rem'}}>{err}</div>}
-      {msg&&<div style={{fontSize:'0.95rem',color:C.teal,marginTop:'0.6rem'}}>{msg}</div>}
+      {err&&<div style={{fontSize: '1.01rem',color:C.red,marginTop:'0.6rem'}}>{err}</div>}
+      {msg&&<div style={{fontSize: '1.01rem',color:C.teal,marginTop:'0.6rem'}}>{msg}</div>}
 
       {open&&preview&&(
         <div style={{marginTop:'0.9rem'}}>
@@ -1038,7 +1038,7 @@ function CoImplementerLetterPanel(){
       {open&&draft!==null&&(
         <div style={{marginTop:'0.9rem'}}>
           <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.82rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate,marginBottom:'0.35rem'}}>Edit the letter</div>
-          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.45rem',lineHeight:1.45}}>
+          <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.45rem',lineHeight:1.45}}>
             Your words, sent over your name. A line starting with <strong>#</strong> is a heading,
             a line starting with <strong>-</strong> is a bullet, and a blank line separates paragraphs.
             Save, then read it again to see it as it will arrive.
@@ -1046,7 +1046,7 @@ function CoImplementerLetterPanel(){
           {/* THE GREETING IS YOURS TO WRITE. 14 September 2026. Habib: there
               was no way to edit the salutation, because it was added by the
               server above the text rather than being part of it. */}
-          <p style={{fontSize:'0.9rem',color:C.navy,margin:'0 0 0.45rem',lineHeight:1.45,background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.5rem 0.7rem'}}>
+          <p style={{fontSize: '1.01rem',color:C.navy,margin:'0 0 0.45rem',lineHeight:1.45,background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.5rem 0.7rem'}}>
             The greeting is the first line and it is yours to change. Write <code>{'{name}'}</code> where
             their full name should go, or <code>{'{first name}'}</code> for just the first.
             So <code>Dear Ms {'{name}'},</code> reaches Ganiyat Ettu as <strong>Dear Ms Ganiyat Ettu,</strong>.
@@ -1057,7 +1057,7 @@ function CoImplementerLetterPanel(){
             disabled={busy==='save'}
             // 16px, so a phone does not zoom the page the moment this is
             // tapped and does not shrink the words below reading size.
-            style={{...inp,minHeight:340,fontFamily:'var(--cv-font-mono)',fontSize:'1rem',lineHeight:1.55,opacity:busy==='save'?0.6:1}}
+            style={{...inp,minHeight:340,fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem',lineHeight:1.55,opacity:busy==='save'?0.6:1}}
             value={draft}
             onChange={e=>setDraft(e.target.value)}
           />
@@ -1134,7 +1134,7 @@ function ClientTeamInvite({client}){
       {loading?<Spinner/>:(
         <>
           {loadErr?(
-            <div style={{fontSize:'1.0rem',color:C.red,marginBottom:'0.9rem',display:'flex',gap:'0.6rem',alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{fontSize: '1.01rem',color:C.red,marginBottom:'0.9rem',display:'flex',gap:'0.6rem',alignItems:'center',flexWrap:'wrap'}}>
               <span>{loadErr}</span>
               <button style={addBtn(true,C.slate)} onClick={load}>Try again</button>
             </div>
@@ -1144,13 +1144,13 @@ function ClientTeamInvite({client}){
                 <div key={m.id} style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',padding:'0.4rem 0',borderBottom:'1px solid var(--cv-border-soft)'}}>
                   <span style={{fontWeight:600,color:C.navy}}>{m.full_name||'—'}</span>
                   <Badge text={roleLabel(m.role)} color={C.teal}/>
-                  <span style={{fontSize:'0.95rem',color:C.slate}}>{m.email}</span>
+                  <span style={{fontSize: '1.01rem',color:C.slate}}>{m.email}</span>
                   <Badge text={m.confirmed?'Active':'Invite pending'} color={m.confirmed?C.green:C.amber}/>
                 </div>
               ))}
             </div>
           ):(
-            <div style={{fontSize:'1.0rem',color:C.amber,marginBottom:'0.9rem'}}>No logins yet — this client can't sign in until you invite someone. The spreadsheet upload creates the client, but not a login.</div>
+            <div style={{fontSize: '1.01rem',color:C.amber,marginBottom:'0.9rem'}}>No logins yet — this client can't sign in until you invite someone. The spreadsheet upload creates the client, but not a login.</div>
           )}
           <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
             <input style={{...inp,maxWidth:200}} placeholder="Full name" value={form.full_name} onChange={e=>setForm(f=>({...f,full_name:e.target.value}))}/>
@@ -1160,7 +1160,7 @@ function ClientTeamInvite({client}){
             </select>
             <button style={addBtn(true,C.teal)} disabled={busy} onClick={invite}>{busy?'Sending…':'Send invite'}</button>
           </div>
-          {msg&&<div style={{marginTop:'0.6rem',fontSize:'0.98rem',fontWeight:600,color:msg.ok?C.green:C.red}}>{msg.text}</div>}
+          {msg&&<div style={{marginTop:'0.6rem',fontSize: '1.01rem',fontWeight:600,color:msg.ok?C.green:C.red}}>{msg.text}</div>}
         </>
       )}
     </div>
@@ -1252,7 +1252,7 @@ function CopyIntakeLink({client}){
   if(!link){
     return(
       <div style={{display:'flex',flexDirection:'column',gap:'0.3rem'}}>
-        <button onClick={generateLink} disabled={creating} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:`1px solid ${err?C.red:'var(--cv-wa-40)'}`,color:err?C.red:'var(--cv-wa-80)',cursor:creating?'not-allowed':'pointer'}}>
+        <button onClick={generateLink} disabled={creating} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:`1px solid ${err?C.red:'var(--cv-wa-40)'}`,color:err?C.red:'var(--cv-wa-80)',cursor:creating?'not-allowed':'pointer'}}>
           {creating?'Creating link...':`Generate ${client.name} Data Capture Link`}
         </button>
         {err&&<span style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.82rem',color:C.red}}>{err}</span>}
@@ -1270,13 +1270,13 @@ function CopyIntakeLink({client}){
       />
     </div>
     <a href="/Clearview_Data_Capture_Template_v8.xlsx" download="Clearview_Data_Capture_Template_v8.xlsx"
-      style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,
+      style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.4rem 0.85rem',borderRadius:4,
         background:'transparent',border:'1px solid var(--cv-wa-40)',
         color:'var(--cv-wa-80)',cursor:'pointer',textDecoration:'none',display:'inline-block',marginLeft:'0.5rem'}}>
       ⬇ Download Template
     </a>
     <button onClick={()=>setShowUpload(v=>!v)}
-      style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,
+      style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.4rem 0.85rem',borderRadius:4,
         background:'transparent',border:'1px solid var(--cv-wa-40)',
         color:'var(--cv-wa-80)',cursor:'pointer',marginLeft:'0.5rem'}}>
       {showUpload?'Hide upload':'⬆ Upload completed file'}
@@ -1503,11 +1503,11 @@ function PortfolioIntelligenceHub({clients,programmes}){
           <option value="">All readiness stages</option>
           {Object.entries(READINESS_STAGE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
         </select>
-        {hasFilter&&<button onClick={()=>{setFilter({});load({})}} style={{fontSize:'0.85rem',color:C.slate,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>Clear filters</button>}
-        <button title="Numbers are cached for up to 60 seconds so filtering stays fast -- click to force a fresh recompute" onClick={()=>load(filter,true)} style={{marginLeft:'auto',fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>↻ Refresh now</button>
-        <button onClick={()=>window.print()} title="Opens your browser's print dialog -- choose 'Save as PDF' to download a styled PDF of exactly this view" style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>⬇ PDF</button>
-        <button disabled={downloading} onClick={()=>downloadBrief(filter)} style={{fontSize:'0.85rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>{downloading?'Generating…':'⬇ Word Summary'}</button>
-        <button onClick={()=>setShowAccess(true)} style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>🔗 External Access</button>
+        {hasFilter&&<button onClick={()=>{setFilter({});load({})}} style={{fontSize: '1.01rem',color:C.slate,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>Clear filters</button>}
+        <button title="Numbers are cached for up to 60 seconds so filtering stays fast -- click to force a fresh recompute" onClick={()=>load(filter,true)} style={{marginLeft:'auto',fontSize: '1.01rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>↻ Refresh now</button>
+        <button onClick={()=>window.print()} title="Opens your browser's print dialog -- choose 'Save as PDF' to download a styled PDF of exactly this view" style={{fontSize: '1.01rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>⬇ PDF</button>
+        <button disabled={downloading} onClick={()=>downloadBrief(filter)} style={{fontSize: '1.01rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>{downloading?'Generating…':'⬇ Word Summary'}</button>
+        <button onClick={()=>setShowAccess(true)} style={{fontSize: '1.01rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>🔗 External Access</button>
         <div style={{width:'100%',fontSize:'0.78rem',color:C.slate}}>To send a subscribed client (e.g. a donor programme like CSJ) an analysis of just <b>their own clients</b>: pick their <b>programme</b> above, then <b>External Access → Create Link</b> — the link is pre-scoped to exactly that client's businesses.</div>
         {downloadError&&<div style={{width:'100%',fontSize:'0.78rem',color:C.red}}>{downloadError}</div>}
       </div>
@@ -1559,7 +1559,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {perfSum&&(
         <div style={card}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Performance — the numbers that decide bankability</div>
-          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem'}}>
+          <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.9rem'}}>
             Each figure is the <b>median</b> shown over the <b>spread across businesses</b> — the distribution, not a single
             average, is what a lender reads. The highlighted bar is where the median sits. These ratios are currency-neutral,
             so they compare across the whole {hasFilter?'segment':'portfolio'}.
@@ -1580,7 +1580,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {perfSum&&(
         <div style={card}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Business quality &amp; durability</div>
-          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem'}}>
+          <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.9rem'}}>
             The efficiency and durability ratios — the numbers that tell a funder whether growth is economically
             real and whether revenue will still be there to repay. Distributions across the {hasFilter?'segment':'portfolio'}; cut by sector below.
           </p>
@@ -1599,10 +1599,10 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
           {data.performanceBySector&&data.performanceBySector.length>0&&(
             <div style={{marginTop:'1.1rem'}}>
-              <div style={{fontFamily:'var(--cv-font)',fontSize:'1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Quality ratios by sector</div>
-              <p style={{fontSize:'0.84rem',color:C.slate,margin:'0 0 0.6rem'}}>Ranked by Rule of 40. Margins, Rule of 40 and burn compute now; the customer ratios fill in as each business reports.</p>
+              <div style={{fontFamily:'var(--cv-font)',fontSize: '1.01rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Quality ratios by sector</div>
+              <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.6rem'}}>Ranked by Rule of 40. Margins, Rule of 40 and burn compute now; the customer ratios fill in as each business reports.</p>
               <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:680}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:680}}>
                   <thead>
                     <tr>{['Sector','Biz','Rule of 40','Gross','EBITDA','Net','Burn','LTV:CAC','Churn','NRR'].map((h,i)=>(
                       <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
@@ -1649,9 +1649,9 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {data.performanceBySector&&data.performanceBySector.length>0&&(
         <div style={card}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Benchmarked by segment</div>
-          <p style={{fontSize:'0.88rem',color:C.slate,margin:'0 0 0.7rem'}}>Every factor cut by sector, ranked strongest-first. The portfolio row is the baseline. Peer comparisons within this portfolio, not external industry norms.</p>
+          <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.7rem'}}>Every factor cut by sector, ranked strongest-first. The portfolio row is the baseline. Peer comparisons within this portfolio, not external industry norms.</p>
           <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:640}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:640}}>
               <thead>
                 <tr>{['Sector','Biz','Ready','LRS','Growth','Cost','Cover','EBITDA','Weakest'].map((h,i)=>(
                   <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
@@ -1696,7 +1696,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
           {pipelineEntries.map(([stage,color])=>(
             <div key={stage} style={{flex:'1 1 140px',borderLeft:`4px solid ${color}`,padding:'0.5rem 0.8rem',background:'var(--cv-tint-cyan)',borderRadius:4}}>
               <div style={{fontSize:'1.3rem',fontWeight:700,color}}>{view.readinessPipeline[stage]}</div>
-              <div style={{fontSize:'0.85rem',color:C.slate}}>{READINESS_STAGE_LABELS[stage]} · {Math.round(view.readinessPipelinePct[stage])}%</div>
+              <div style={{fontSize: '1.01rem',color:C.slate}}>{READINESS_STAGE_LABELS[stage]} · {Math.round(view.readinessPipelinePct[stage])}%</div>
             </div>
           ))}
         </div>
@@ -1706,18 +1706,18 @@ function PortfolioIntelligenceHub({clients,programmes}){
         <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.4rem'}}>
           Seven-dimension average{hasFilter?' — this segment vs. portfolio':''}
         </div>
-        {view.mostCommonWeakDimension&&<div style={{fontSize:'0.9rem',color:C.slate,marginBottom:'0.8rem'}}>Weakest dimension: <b style={{color:C.red}}>{LRS_DIM_LABELS[view.mostCommonWeakDimension]}</b></div>}
+        {view.mostCommonWeakDimension&&<div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Weakest dimension: <b style={{color:C.red}}>{LRS_DIM_LABELS[view.mostCommonWeakDimension]}</b></div>}
         <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
           {Object.entries(view.dimensionAverages).map(([dim,avg])=>{
             const portfolioAvg=portfolio.dimensionAverages[dim]
             return(
               <div key={dim} style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-                <div style={{width:150,fontSize:'0.9rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
+                <div style={{width:150,fontSize: '1.01rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
                 <div style={{flex:1,background:'var(--cv-tint-cyan)',borderRadius:4,height:14,position:'relative'}}>
                   <div style={{width:`${Math.max(2,avg)}%`,background:C.teal,height:'100%',borderRadius:4}}/>
                   {hasFilter&&<div style={{position:'absolute',left:`${Math.max(0,portfolioAvg-0.5)}%`,top:-2,width:2,height:18,background:C.navy}} title={`Portfolio average: ${Math.round(portfolioAvg)}`}/>}
                 </div>
-                <div style={{width:40,fontSize:'0.88rem',color:C.slate,textAlign:'right'}}>{Math.round(avg)}</div>
+                <div style={{width:40,fontSize: '1.01rem',color:C.slate,textAlign:'right'}}>{Math.round(avg)}</div>
               </div>
             )
           })}
@@ -1731,7 +1731,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
             const maxCount=Math.max(1,...view.verificationDistribution.map(x=>x.count))
             return(
               <div key={b.label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'0.3rem'}}>
-                <div style={{fontSize:'0.85rem',color:C.navy,fontWeight:600}}>{b.count}</div>
+                <div style={{fontSize: '1.01rem',color:C.navy,fontWeight:600}}>{b.count}</div>
                 <div style={{width:'100%',height:`${Math.max(4,(b.count/maxCount)*70)}px`,background:C.cyan,borderRadius:'3px 3px 0 0'}}/>
                 <div style={{fontSize:'0.78rem',color:C.slate}}>{b.label}</div>
               </div>
@@ -1742,12 +1742,12 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       <div style={card}>
         <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Current fund absorption capacity</div>
-        <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.8rem'}}>Average of what each business could absorb TODAY, by type -- not a hypothetical "if all were investment-ready" ceiling. Shown separately per currency; never blended across currencies.</div>
+        <div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Average of what each business could absorb TODAY, by type -- not a hypothetical "if all were investment-ready" ceiling. Shown separately per currency; never blended across currencies.</div>
         {currencies.length===0?(
-          <div style={{color:C.slate,fontSize:'0.9rem'}}>Not yet available.</div>
+          <div style={{color:C.slate,fontSize: '1.01rem'}}>Not yet available.</div>
         ):currencies.map(cc=>(
           <div key={cc} style={{marginBottom:'0.8rem'}}>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',color:C.slate,marginBottom:'0.4rem'}}>{cc}</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.slate,marginBottom:'0.4rem'}}>{cc}</div>
             <div className="cv-grid-4">
               {Object.entries(portfolio.currentFundAbsorption[cc]).map(([type,val])=>(
                 <div key={type} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.6rem 0.8rem'}}>
@@ -1767,7 +1767,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
             {segment.weakestDimensionsInSegment.slice(0,3).map(dim=>{
               const cmp=segment.dimensionComparison.find(d=>d.dimension===dim)
               return(
-                <li key={dim} style={{fontSize:'0.95rem',color:C.navy,marginBottom:'0.3rem'}}>
+                <li key={dim} style={{fontSize: '1.01rem',color:C.navy,marginBottom:'0.3rem'}}>
                   {LRS_DIM_LABELS[dim]}: {Math.round(cmp.segmentAvg)} vs. portfolio {Math.round(cmp.portfolioAvg)}
                   {cmp.delta<0&&<span style={{color:C.red}}> ({Math.round(cmp.delta)} below portfolio)</span>}
                 </li>
@@ -1780,16 +1780,16 @@ function PortfolioIntelligenceHub({clients,programmes}){
       <DrillConnector>↓ individual businesses within this view ↓</DrillConnector>
       <LevelMarker n={3} label="Individual businesses" sub="click one to drill in"/>
       <div style={card}>
-        <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.8rem'}}>Anonymised by default -- a business only shows its real name here once its owner has explicitly consented (toggled from the Client Health tab).</div>
+        <div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Anonymised by default -- a business only shows its real name here once its owner has explicitly consented (toggled from the Client Health tab).</div>
         {(data.profiles||[]).length===0
-          ? <div style={{color:C.slate,fontSize:'0.9rem'}}>No businesses match the current filter.</div>
+          ? <div style={{color:C.slate,fontSize: '1.01rem'}}>No businesses match the current filter.</div>
           : (()=>{
               const tierPill=(t:string)=>{const map:any={'Investment Ready':['Ready',C.green],'Near Ready':['Near',C.cyan],'Development Stage':['Dev',C.amber],'Pre-Investment':['Pre',C.red]};const [lbl,col]=map[t]||[t,C.slate];return <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.05rem 0.4rem',borderRadius:5,color:col,background:'var(--cv-wa-10)',border:`1px solid ${col}`}}>{lbl}</span>}
               const pv=(v:any,unit='',dec=0,sign=false)=> v===null||v===undefined?'—':`${sign&&v>0?'+':''}${(typeof v==='number'?v.toFixed(dec):v)}${unit}`
               const rows=[...(data.profiles||[])].sort((a:any,b:any)=>b.irScore-a.irScore)
               return (
                 <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
-                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:720}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:720}}>
                     <thead>
                       <tr>{['Business','Sector','Size','Ready','LRS','Growth','Cost','Cover','EBITDA','Conf.'].map((h,i)=>(
                         <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 9px',textAlign:i<=2?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
@@ -1820,7 +1820,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {/* DFI risk layer — roadmap */}
       <div style={{...card,background:'var(--cv-tint-amber)',borderLeft:`4px solid ${C.amber}`}}>
         <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.amber,fontWeight:700,marginBottom:'0.3rem'}}>Roadmap · DFI risk layer</div>
-        <div style={{fontSize:'0.94rem',color:C.navy,lineHeight:1.55}}>
+        <div style={{fontSize: '1.01rem',color:C.navy,lineHeight:1.55}}>
           To let a credit committee price risk directly, per-enterprise <b>collateral coverage</b>, <b>working-capital cycle</b>
           (largely derivable from the model), <b>FX exposure</b>, and sector <b>default / recovery proxies</b> — benchmarked to
           the GEMs consortium data DFIs already use — can be added. This is the granular detail that today exists only at pooled-portfolio level.
@@ -1833,13 +1833,13 @@ function PortfolioIntelligenceHub({clients,programmes}){
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>Impact &amp; inclusion</div>
           <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
         </div>
-        <p style={{fontSize:'0.92rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem'}}>
+        <p style={{fontSize: '1.01rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem'}}>
           The reach a donor or impact investor weighs — smallholder farmers and farmer groups reached, and the share of
           <b> women</b> and <b>youth</b> spelled out by where it sits: <b>supply chain</b>, <b>customers</b>, or <b>workforce</b>.
           Captured per enterprise via a short per-period return, then rolled up and cut by sector, geography and size.
           Not yet collected — shown here so the structure is ready.
         </p>
-        <div style={{fontSize:'0.84rem',color:C.slate,background:'var(--cv-tint-cyan)',borderRadius:8,padding:'0.7rem 0.9rem'}}>
+        <div style={{fontSize: '1.01rem',color:C.slate,background:'var(--cv-tint-cyan)',borderRadius:8,padding:'0.7rem 0.9rem'}}>
           Maps to <b>IRIS+</b> (supply-chain &amp; client counts by gender/age), the <b>2X Criteria</b> (gender), and <b>SDGs 1 / 5 / 8</b>.
         </div>
       </div>
@@ -1847,7 +1847,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {/* Methodology */}
       <div style={card}>
         <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.6rem'}}>Methodology — every factor, defined</div>
-        <div style={{display:'grid',gridTemplateColumns:'minmax(150px,190px) minmax(0,1fr)',gap:'0.5rem 1.2rem',fontSize:'0.88rem'}}>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(150px,190px) minmax(0,1fr)',gap:'0.5rem 1.2rem',fontSize: '1.01rem'}}>
           <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Growth / cost / DSCR / EBITDA</div>
           <div style={{color:C.navy}}>Year-on-year revenue change; total costs ÷ revenue; operating cash ÷ debt due (1.5× = lender comfort line); operating profit ÷ revenue. Medians over the full distribution.</div>
           <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Readiness &amp; LRS</div>
@@ -1871,7 +1871,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
               <div>
                 <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.1rem 0.6rem',marginBottom:'0.4rem',display:'inline-block'}}>LEVEL 3</span>
                 <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{openProfile.displayName}{openProfile.isNamed&&<span style={{marginLeft:'0.5rem'}}><Badge text="Verified" color={C.green}/></span>}</div>
-                <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>{openProfile.sector||'Sector n/a'} · {openProfile.country||'Country n/a'} · {openProfile.sizeBracket}</div>
+                <div style={{fontSize: '1.01rem',color:C.slate,marginTop:'0.2rem'}}>{openProfile.sector||'Sector n/a'} · {openProfile.country||'Country n/a'} · {openProfile.sizeBracket}</div>
               </div>
               <button onClick={()=>setOpenProfile(null)} style={{background:'none',border:'none',fontSize:'1.3rem',color:C.slate,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -1882,37 +1882,37 @@ function PortfolioIntelligenceHub({clients,programmes}){
               <GlanceKPI label="Liquidity Readiness" value={`${Math.round(openProfile.lrs.score)}/100`} sub="seven dimensions" color={C.purple}/>
             </div>
 
-            <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.5rem'}}>Readiness scorecard</div>
+            <div style={{fontWeight:700,fontSize: '1.01rem',color:C.navy,marginBottom:'0.5rem'}}>Readiness scorecard</div>
             <div style={{display:'flex',flexDirection:'column',gap:'0.4rem',marginBottom:'1rem'}}>
               {Object.entries(openProfile.lrs.dimensions).map(([dim,d])=>(
                 <div key={dim} style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-                  <div style={{width:150,fontSize:'0.88rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
+                  <div style={{width:150,fontSize: '1.01rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
                   <div style={{flex:1,background:'var(--cv-tint-cyan)',borderRadius:4,height:12}}>
                     <div style={{width:`${Math.max(2,d.score)}%`,background:C.teal,height:'100%',borderRadius:4}}/>
                   </div>
-                  <div style={{width:36,fontSize:'0.85rem',color:C.slate,textAlign:'right'}}>{Math.round(d.score)}</div>
+                  <div style={{width:36,fontSize: '1.01rem',color:C.slate,textAlign:'right'}}>{Math.round(d.score)}</div>
                 </div>
               ))}
             </div>
 
-            <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.5rem'}}>Fund absorption capacity</div>
+            <div style={{fontWeight:700,fontSize: '1.01rem',color:C.navy,marginBottom:'0.5rem'}}>Fund absorption capacity</div>
             <div className="cv-grid-3" style={{marginBottom:'1rem'}}>
               {Object.entries(FAC_TYPE_LABELS).map(([key,label])=>{
                 const t=openProfile.fac[key]
                 return(
                   <div key={key} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.5rem 0.7rem'}}>
                     <div style={{fontSize:'0.78rem',color:C.slate}}>{label}</div>
-                    <div style={{fontSize:'0.95rem',fontWeight:700,color:C.navy}}>{t.capacity===null?'n/a':fmtPortfolioMoney(t.capacity,openProfile.currency)}</div>
+                    <div style={{fontSize: '1.01rem',fontWeight:700,color:C.navy}}>{t.capacity===null?'n/a':fmtPortfolioMoney(t.capacity,openProfile.currency)}</div>
                   </div>
                 )
               })}
             </div>
 
             {openProfile.businessUnits.length>0&&<>
-              <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.5rem'}}>Business unit structure ({openProfile.businessUnits.length} unit{openProfile.businessUnits.length===1?'':'s'})</div>
+              <div style={{fontWeight:700,fontSize: '1.01rem',color:C.navy,marginBottom:'0.5rem'}}>Business unit structure ({openProfile.businessUnits.length} unit{openProfile.businessUnits.length===1?'':'s'})</div>
               <div style={{display:'flex',flexDirection:'column',gap:'0.3rem'}}>
                 {openProfile.businessUnits.map(u=>(
-                  <div key={u.name} style={{display:'flex',justifyContent:'space-between',fontSize:'0.88rem',color:C.navy}}>
+                  <div key={u.name} style={{display:'flex',justifyContent:'space-between',fontSize: '1.01rem',color:C.navy}}>
                     <span>{u.name}</span><span style={{color:C.slate}}>{Math.round(u.revenuePct)}% of revenue</span>
                   </div>
                 ))}
@@ -2014,6 +2014,38 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [clientData,setClientData]=useState({})
   const [clientLoading,setClientLoading]=useState(false)
   const [activeTab,setActiveTab]=useState('cover')
+
+  // A TAB OPENS AT ITS TOP. 17 September 2026. Habib: "When I click on a
+  // decision point tab, it goes to the bottom of that tab rather than the top,
+  // I then have to scroll to the top, that is just stupid."
+  //
+  // Nothing was ever resetting the scroll. The menu is long, so by the time you
+  // have reached Decision Point 6 in it you are a long way down the page, and a
+  // browser keeps its scroll position when the content underneath changes. So
+  // the new tab opened at whatever height the old one had been left at, which
+  // for a shorter tab is its bottom, and for a longer one is the middle of
+  // something you have not read yet.
+  //
+  // This runs on every tab change including the first, and on a zone arriving
+  // in the address, which is exactly when somebody has followed a link and
+  // should be looking at the beginning of what they were sent.
+  //
+  // AND IT HAS TO SCROLL AGAIN AFTER THE CONTENT ARRIVES. 17 September 2026.
+  // Habib: "The tab now starts in the middle not at the bottom." A tab's
+  // panels load their own data, so the page is short when the tab changes and
+  // grows as each panel answers. Scrolling once, at the moment of the change,
+  // puts you at the top of a page that is not there yet; the browser then
+  // restores roughly where you were as the height comes back. So it scrolls on
+  // the change, again on the next paint, and once more shortly after, which
+  // covers the panels that fetch before they draw.
+  useEffect(()=>{
+    if(typeof window==='undefined')return
+    const top=()=>window.scrollTo({top:0,left:0,behavior:'auto'})
+    top()
+    const frame=requestAnimationFrame(top)
+    const settle=setTimeout(top,250)
+    return ()=>{cancelAnimationFrame(frame);clearTimeout(settle)}
+  },[activeTab,selClientId,view])
   // ──────────────────────────────────────────────────────────────
   // THE BLOCK IS IN THE ADDRESS. 15 August 2026.
   //
@@ -2516,7 +2548,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem',flexWrap:'wrap',padding:'0.5rem 0.75rem',background:C.white,borderRadius:5,marginBottom:'0.4rem',border:`1px solid ${C.border}`}}>
                 <div>
                   <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{c.name}</div>
-                  <div style={{fontSize:'0.93rem',color:C.slate}}>{c.contact_name}{c.created_at?(' · submitted '+new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</div>
+                  <div style={{fontSize: '1.01rem',color:C.slate}}>{c.contact_name}{c.created_at?(' · submitted '+new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</div>
                 </div>
                 <span style={{display:'flex',gap:'0.4rem',marginLeft:'auto',alignItems:'center'}}>
                   <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]} onClick={()=>dismissNoticeRecords(NOTICE_NEW_SUBMISSIONS,[c.id],false)} title="Takes this one off the notice for good.">Dismiss</button>
@@ -2595,7 +2627,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         style={{border:'1px solid var(--cv-border-soft)',borderLeft:edge?`4px solid ${edge}`:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:isPayer?'default':'pointer',background:C.white,display:'flex',flexDirection:'column',gap:'0.4rem'}}
         onClick={open}>
         <div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem'}}>
-          <div style={{fontWeight:700,fontSize:'0.95rem',flex:1,minWidth:0}}>{client.name}</div>
+          <div style={{fontWeight:700,fontSize: '1.01rem',flex:1,minWidth:0}}>{client.name}</div>
           {live&&<span title={`${flag.status.label} — from the latest health check`} style={{width:10,height:10,borderRadius:'50%',background:edge,flexShrink:0,marginTop:'0.3rem'}}/>}
         </div>
         {payer&&<div style={{fontSize:'0.8rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{isPayer?'Bought it for themselves':payer}</div>}
@@ -2603,7 +2635,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <Badge text={label} color={color}/>
           {live&&<Badge text={flag.status.label} color={edge}/>}
         </div>
-        {live&&<div style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.35}}>{flag.why}</div>}
+        {live&&<div style={{fontSize: '1.01rem',color:C.slate,lineHeight:1.35}}>{flag.why}</div>}
         {live&&<button type="button" onClick={e=>{e.stopPropagation();onDismiss&&onDismiss()}}
           title="Dismiss this flag. It comes back by itself as soon as a newer health check is generated."
           style={{...smallBtn,alignSelf:'flex-start'}}>Dismiss flag</button>}
@@ -2884,7 +2916,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             if(cameFromAWonDeal){setSelClientId(data.id);setActiveTab('eng_setup');setView('client')}
           }
         }} onCancel={()=>{setShowNew(false);setNewClientPrefill(null)}}/>}
-        {newClientPrefill&&<div style={{fontSize:'0.85rem',color:C.teal,marginTop:'-0.9rem',marginBottom:'1rem'}}>Pre-filled from the Pipeline deal you just marked Won.</div>}
+        {newClientPrefill&&<div style={{fontSize: '1.01rem',color:C.teal,marginTop:'-0.9rem',marginBottom:'1rem'}}>Pre-filled from the Pipeline deal you just marked Won.</div>}
 
         {/* SERVICES ACROSS THE TOP, WITH THE REAL NUMBERS ON THEM. 13 September
             2026. Each service says how many clients are on it and carries a red
@@ -2899,13 +2931,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <button key={t.key} onClick={()=>setService(t.key)}
                 style={{...subPill(on),display:'inline-flex',alignItems:'center',gap:'0.45rem'}}>
                 <span>{t.label}</span>
-                <span style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',opacity:on?1:0.7}}>{n}</span>
+                <span style={{fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem',opacity:on?1:0.7}}>{n}</span>
                 {f>0&&<span title={`${f} flagged`} style={{width:8,height:8,borderRadius:'50%',background:C.red,flexShrink:0}}/>}
               </button>
             )
           })}
         </div>
-        <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1rem'}}>
+        <div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'1rem'}}>
           {rows.length} client{rows.length===1?'':'s'} on {serviceLabel}
           {flaggedNow>0&&<> · <strong style={{color:C.red}}>{flaggedNow} flagged</strong>, shown first</>}
           {service==='financial'?' · flags come from the weekly health check':' · no automated health check on this service yet'}
@@ -2977,7 +3009,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div style={{...card,padding:0,overflow:'hidden'}}>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
-                <thead><tr style={{background:C.navy}}>{['Client','Level','Paid Up To','Term','Status'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:400,fontSize:'0.93rem',color:'var(--cv-on-accent)',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:C.navy}}>{['Client','Level','Paid Up To','Term','Status'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:400,fontSize: '1.01rem',color:'var(--cv-on-accent)',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
                 <tbody>
                   {subscriptionRows.map(({se,client:c})=>{
                     const dueSoon=se.paid_through_date&&new Date(se.paid_through_date)<new Date(Date.now()+14*86400000)
@@ -3020,7 +3052,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <button
           type="button"
           onClick={()=>{setSelClientId(null);setView(isSuperCoach?'overview':'clients')}}
-          style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.93rem',color:C.teal,background:'transparent',border:`1px solid ${C.teal}`,borderRadius:4,cursor:'pointer',padding:'0.35rem 0.8rem'}}
+          style={{fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem',color:C.teal,background:'transparent',border:`1px solid ${C.teal}`,borderRadius:4,cursor:'pointer',padding:'0.35rem 0.8rem'}}
         >{isSuperCoach?'← Coach Dashboard':'← All clients'}</button>
       </div>
     )
@@ -3095,7 +3127,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         type="button"
         onClick={leaveEngagement}
         title="Leave this engagement and go back"
-        style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',whiteSpace:'nowrap'}}
+        style={{fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',whiteSpace:'nowrap'}}
       >{leaveLabel}</button>
     )
 
@@ -3120,8 +3152,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   for and have no data in. */}
               {selClient.engagement_mode==='financial'&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-cyan)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>}
               {isSuperCoach&&<CopyIntakeLink client={selClient}/>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
-              {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
+              {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
             </div>
           </div>
         </div>
@@ -3189,8 +3221,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
-              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-cyan)',textDecoration:'none'}}>Open Clearview ↗</a>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
+              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-cyan)',textDecoration:'none'}}>Open Clearview ↗</a>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
           </div>
@@ -3277,14 +3309,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               type="button"
               onClick={leaveEngagement}
               title={isSuperCoach?'Back to the coach dashboard':'Back to all clients'}
-              style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.teal,cursor:'pointer',fontFamily:'var(--cv-font-mono)',fontSize:'0.9rem'}}
+              style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.teal,cursor:'pointer',fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem'}}
             >{navCollapsed?'←':leaveLabel}</button>
             <button
               type="button"
               onClick={()=>setNavCollapsed(v=>!v)}
               aria-expanded={!navCollapsed}
               title={navCollapsed?'Show the tab names':'Collapse to give the content more room'}
-              style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.slate,cursor:'pointer',fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem'}}
+              style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.slate,cursor:'pointer',fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem'}}
             >{navCollapsed?'»':'« Collapse'}</button>
             {visibleTabs.map((tab,i)=>{
               const isActive=shownTab===tab.id
@@ -3320,10 +3352,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                       Point 1 · Service Reality" does not fit a 220px sidebar on
                       one line and should not have to. */}
                   <span style={{minWidth:0,flex:1,lineHeight:1.3,whiteSpace:'normal',overflowWrap:'anywhere'}}>
-                    {navCollapsed?<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.slate}}>{tab.marker}</span>:tab.label}
+                    {navCollapsed?<span style={{fontSize: '1.01rem',color:isActive?C.cyan:C.slate}}>{tab.marker}</span>:tab.label}
                   </span>
                   {dpCanvas&&<DPDot status={dpCanvas.status}/>}
-                  {tab.coachOnly&&!navCollapsed&&<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.amber}}>👁</span>}
+                  {tab.coachOnly&&!navCollapsed&&<span style={{fontSize: '1.01rem',color:isActive?C.cyan:C.amber}}>👁</span>}
                 </button>
                 </div>
               )
@@ -3334,9 +3366,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               than forcing the track to grow to it. */}
           <div style={{minWidth:0}}>
             {flashLocked?(
-              <div role="status" style={{marginBottom:'1rem',padding:'0.7rem 1rem',borderRadius:10,border:`1px solid ${C.amber}`,background:'var(--cv-alt)',color:C.navy,fontSize:'0.97rem',display:'flex',gap:'0.8rem',alignItems:'center',flexWrap:'wrap'}}>
+              <div role="status" style={{marginBottom:'1rem',padding:'0.7rem 1rem',borderRadius:10,border:`1px solid ${C.amber}`,background:'var(--cv-alt)',color:C.navy,fontSize: '1.01rem',display:'flex',gap:'0.8rem',alignItems:'center',flexWrap:'wrap'}}>
                 <span>{flashLocked}</span>
-                <button type="button" onClick={()=>setFlashLocked(null)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.25rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer'}}>Close</button>
+                <button type="button" onClick={()=>setFlashLocked(null)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.25rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer'}}>Close</button>
               </div>
             ):null}
             {shownTab==='cover'&&<>{mayRun?<WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/>:null}<CoverPanel slug={selClient.slug} canManage={canEdit(previewRoleId)}/><div style={{height:18}}/>
@@ -3405,7 +3437,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 the whole engagement: the method's room rules, and one list of
                 everything planned and everything recorded, so nothing is
                 missed and nothing has to be remembered. */}
-            {shownTab==='sessions'&&<><div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.7rem 0.95rem',marginBottom:'1rem',fontSize:'0.95rem',color:C.navy}}>Sessions are planned, invited, opened and deleted on the decision point they belong to. This page reads them all back in one view, and nothing on it is edited: print it or download it as a spreadsheet to share.</div><SessionWorkplan clientId={selClient.id} clientName={selClient.name}/><div style={{height:22}}/>
+            {shownTab==='sessions'&&<><div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.7rem 0.95rem',marginBottom:'1rem',fontSize: '1.01rem',color:C.navy}}>Sessions are planned, invited, opened and deleted on the decision point they belong to. This page reads them all back in one view, and nothing on it is edited: print it or download it as a spreadsheet to share.</div><SessionWorkplan clientId={selClient.id} clientName={selClient.name}/><div style={{height:22}}/>
               {/* WHAT HAS BEEN RECORDED, WHERE THE SESSIONS ARE. 10 September
                   2026. Habib: there is no list anywhere to show what has been
                   recorded and who was on it. A recording could only be found by
@@ -3485,7 +3517,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const prog=selProgId?programmes.find(p=>p.id===selProgId):null
     if(prog)return(
       <div>
-        <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',marginBottom:'1rem'}} onClick={()=>{setSelProgId(null);setEditingProg(false)}}>← All Programmes</button>
+        <button style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',marginBottom:'1rem'}} onClick={()=>{setSelProgId(null);setEditingProg(false)}}>← All Programmes</button>
         {editingProg&&progForm?(
           <div style={card}>
             <div style={{...secH,marginBottom:'1rem'}}>Edit Programme</div>
@@ -3515,8 +3547,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div>
             <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                <div><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{prog.funder} · {prog.country}</div></div>
-                <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.3rem 0.8rem',border:'1px solid var(--cv-wa-30)',borderRadius:4,background:'transparent',color:'var(--cv-wa-80)',cursor:'pointer'}} onClick={()=>{setProgForm({...prog});setEditingProg(true)}}>Edit</button>
+                <div><div style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{prog.funder} · {prog.country}</div></div>
+                <button style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.3rem 0.8rem',border:'1px solid var(--cv-wa-30)',borderRadius:4,background:'transparent',color:'var(--cv-wa-80)',cursor:'pointer'}} onClick={()=>{setProgForm({...prog});setEditingProg(true)}}>Edit</button>
               </div>
             </div>
             <div style={card}>
@@ -3526,7 +3558,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 ?<InviteLoginButton email={prog.funder_email} fullName={prog.funder||'Funder'} role="funder" coImplementerId={null} funderProgrammeId={prog.id}/>
                 :<div style={{...hint,color:C.amber}}>Add a funder email via Edit before you can invite them.</div>}
             </div>
-            <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{c.name}</div><div style={{fontSize:'0.93rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} · {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>Open →</button></div>)}</div>
+            <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{c.name}</div><div style={{fontSize: '1.01rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} · {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>Open →</button></div>)}</div>
             <ServicesSection payerType="programme" payerId={prog.id} clients={clients}/>
             {prog.notes&&<div style={card}><div style={secH}>Notes</div><div style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>{prog.notes}</div></div>}
           </div>
@@ -3538,7 +3570,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}><div style={secH}>Programmes</div><button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ New Programme</button></div>
         {showNew&&<NewProgrammeForm onSave={async p=>{const {data,error}=await supabase.from('programmes').insert([p]).select().single();if(!error&&data){setPrograms(prev=>[...prev,data]);setShowNew(false)}}} onCancel={()=>setShowNew(false)}/>}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'1.25rem'}}>
-          {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer',marginBottom:0}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} · {p.country} · {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-cyan)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
+          {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer',marginBottom:0}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} · {p.country} · {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-cyan)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
         </div>
       </div>
     )
@@ -3587,7 +3619,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           organisation.
         </p>
         <select aria-label="Which engagement to show" value={showId} onChange={e=>setShowId(e.target.value)}
-          style={{padding:'0.42rem 0.6rem',borderRadius:7,border:`1px solid ${C.border}`,background:C.white,color:C.navy,fontSize:'0.95rem',minWidth:260}}>
+          style={{padding:'0.42rem 0.6rem',borderRadius:7,border:`1px solid ${C.border}`,background:C.white,color:C.navy,fontSize: '1.01rem',minWidth:260}}>
           <option value="">Choose an engagement...</option>
           {canvases.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
@@ -3702,17 +3734,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div role="alert" aria-live="assertive" style={{position:'fixed',top:8,left:'50%',transform:'translateX(-50%)',zIndex:10000,maxWidth:640,
           display:'flex',alignItems:'center',gap:'0.6rem',padding:'0.6rem 0.95rem',borderRadius:8,
           background:'#FDF0EE',border:'1px solid #C0392B',borderLeft:'4px solid #C0392B',
-          fontSize:'0.9rem',color:'#C0392B',boxShadow:'0 2px 12px rgba(0,0,0,0.14)'}}>
+          fontSize: '1.01rem',color:'#C0392B',boxShadow:'0 2px 12px rgba(0,0,0,0.14)'}}>
           <span style={{fontWeight:700}}>Not saved</span>
           <span>{saveError}</span>
           <button type="button" onClick={()=>setSaveError(null)} aria-label="Dismiss"
-            style={{marginLeft:'0.4rem',border:'none',background:'transparent',color:'#C0392B',fontWeight:700,cursor:'pointer',fontSize:'1rem'}}>×</button>
+            style={{marginLeft:'0.4rem',border:'none',background:'transparent',color:'#C0392B',fontWeight:700,cursor:'pointer',fontSize: '1.01rem'}}>×</button>
         </div>
       )}
       <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1320,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>{isClient?'CANVAS COACH — YOUR ENGAGEMENT':'CANVAS COACH — COACH DASHBOARD'}</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>{isClient?'CANVAS COACH — YOUR ENGAGEMENT':'CANVAS COACH — COACH DASHBOARD'}</div>
             <h1 style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{isClient?(clientOrgName||userName):userName}</h1>
             {isClient?(
               <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>Signed in as {userName}</div>
@@ -3721,10 +3753,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             )}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
-            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
-            <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
+            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
+            <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
             <ActiveSessionsButton fontSize="0.93rem" />
-            <button onClick={onSignOut} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
+            <button onClick={onSignOut} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
             {/* Global sign-out: revokes EVERY session for this login (all devices),
                 so a session left open on another computer is ended. Supabase
                 scope:'global' invalidates all refresh tokens for the user. */}
@@ -3734,7 +3766,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               try { const { error } = await supabase.auth.signOut({ scope: 'global' }); signOutError = error } catch(e) { signOutError = e }
               if(signOutError){ window.alert('We could not confirm sign-out on all devices — other sessions may still be active. Please check your connection and try again.'); return }
               window.location.href='/'
-            }} title="Log out of every device where you are signed in" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',background:'transparent',border:'1px solid rgba(192,57,43,0.45)',borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
+            }} title="Log out of every device where you are signed in" style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',background:'transparent',border:'1px solid rgba(192,57,43,0.45)',borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
           </div>
         </div>
       </header>
@@ -3745,7 +3777,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <button key={id} style={{...navBtn(view===id||(view==='client'&&id==='clients')),display:'inline-flex',alignItems:'center',gap:'0.4rem'}}
               onClick={()=>{if(id!=='client')setSelClientId(null);setView(id)}}>
               <span>{label}</span>
-              {count!==null&&count!==undefined&&<span style={{fontSize:'0.85rem',opacity:0.8}}>{count}</span>}
+              {count!==null&&count!==undefined&&<span style={{fontSize: '1.01rem',opacity:0.8}}>{count}</span>}
               {alert&&<span title="Something here is waiting" style={{width:7,height:7,borderRadius:'50%',background:C.red,flexShrink:0}}/>}
             </button>
           ))}
@@ -3763,7 +3795,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='portfolio'&&<PortfolioIntelligenceHub clients={clients} programmes={programmes}/>}
         </ErrorBoundary>
       </main>
-      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach · {isClient?'Your engagement':'Coach Dashboard'} · habibonifade.com · Confidential</footer>
+      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach · {isClient?'Your engagement':'Coach Dashboard'} · habibonifade.com · Confidential</footer>
     </div>
   )
 }
@@ -3983,7 +4015,7 @@ function NewAssignmentForm({clients,onSave,onCancel}){
           <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
             {Object.entries(SERVICE_TYPE_LABELS).map(([k,l])=>{
               const on=f.service_types.includes(k)
-              return <button key={k} onClick={()=>setF(x=>({...x,service_types:flip(x.service_types,k)}))} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',border:`1px solid ${on?C.teal:C.border}`,background:on?C.teal:'transparent',color:on?'var(--cv-on-cyan)':C.slate,borderRadius:999,padding:'0.25rem 0.7rem',cursor:'pointer'}}>{l}</button>
+              return <button key={k} onClick={()=>setF(x=>({...x,service_types:flip(x.service_types,k)}))} style={{fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem',border:`1px solid ${on?C.teal:C.border}`,background:on?C.teal:'transparent',color:on?'var(--cv-on-cyan)':C.slate,borderRadius:999,padding:'0.25rem 0.7rem',cursor:'pointer'}}>{l}</button>
             })}
           </div>
         </div>
@@ -3991,7 +4023,7 @@ function NewAssignmentForm({clients,onSave,onCancel}){
           <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
             {clients.map(c=>{
               const on=f.client_ids.includes(c.id)
-              return <button key={c.id} onClick={()=>setF(x=>({...x,client_ids:flip(x.client_ids,c.id)}))} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',border:`1px solid ${on?C.purple:C.border}`,background:on?C.purple:'transparent',color:on?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.25rem 0.7rem',cursor:'pointer'}}>{c.name}</button>
+              return <button key={c.id} onClick={()=>setF(x=>({...x,client_ids:flip(x.client_ids,c.id)}))} style={{fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem',border:`1px solid ${on?C.purple:C.border}`,background:on?C.purple:'transparent',color:on?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.25rem 0.7rem',cursor:'pointer'}}>{c.name}</button>
             })}
           </div>
         </div>
@@ -4054,7 +4086,7 @@ function TabHowToStart({client}){
 function TabCoachRef(){
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only — not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only — not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`}}>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Delivery Rhythm</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
@@ -4097,8 +4129,8 @@ function TabIPFramework(){
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
           {[{n:'01',t:'Willingness',d:'The customer sees the problem as real and worth solving. They want a solution and are open to engaging with a provider.'},{n:'02',t:'Ability',d:'The customer has the financial means to pay for the solution at the price offered. Budget exists and can be accessed.'},{n:'03',t:'Prioritisation',d:'The customer ranks this problem high enough to spend budget on it now, not next quarter or next year.'}].map(s=>(
             <div key={s.n} style={{background:C.cream,padding:16,borderRadius:8,borderTop:`3px solid ${C.cyan}`}}>
-              <p style={{fontSize:'0.93rem',color:C.cyan,fontWeight:700,letterSpacing:1,margin:'0 0 4px',textTransform:'uppercase',fontFamily: 'var(--cv-font-mono)'}}>{s.n}</p>
-              <p style={{fontFamily:'var(--cv-font)',fontWeight:700,margin:'0 0 8px',fontSize:'1rem',color:C.navy}}>{s.t}</p>
+              <p style={{fontSize: '1.01rem',color:C.cyan,fontWeight:700,letterSpacing:1,margin:'0 0 4px',textTransform:'uppercase',fontFamily: 'var(--cv-font-mono)'}}>{s.n}</p>
+              <p style={{fontFamily:'var(--cv-font)',fontWeight:700,margin:'0 0 8px',fontSize: '1.01rem',color:C.navy}}>{s.t}</p>
               <p style={{margin:0,fontSize:'1.07rem',color:C.slate}}>{s.d}</p>
             </div>
           ))}
@@ -4109,7 +4141,7 @@ function TabIPFramework(){
           {[{t:'Poultry',sub:'ATM equivalent',d:'Easily converted to cash. Sold when small amounts are needed quickly.'},{t:'Small ruminants',sub:'Savings equivalent',d:'Converted for planned medium expenses. Goats and sheep are liquid but not instant.'},{t:'Large ruminants',sub:'Fixed asset equivalent',d:'Sold for major planned expenses only. Cattle represent significant stored value.'}].map(a=>(
             <div key={a.t} style={{background:C.cream,padding:16,borderRadius:8,borderTop:`3px solid ${C.teal}`}}>
               <p style={{fontFamily:'var(--cv-font)',fontWeight:700,margin:'0 0 2px',fontSize:'1.16rem',color:C.navy}}>{a.t}</p>
-              <p style={{fontSize:'0.93rem',color:C.teal,margin:'0 0 8px',fontWeight:600}}>{a.sub}</p>
+              <p style={{fontSize: '1.01rem',color:C.teal,margin:'0 0 8px',fontWeight:600}}>{a.sub}</p>
               <p style={{margin:0,fontSize:'1.07rem',color:C.slate}}>{a.d}</p>
             </div>
           ))}
@@ -4339,7 +4371,7 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
       <div style={{background:'var(--cv-header)',borderRadius:8,padding:'1.5rem',marginBottom:'1.5rem',color:'var(--cv-on-accent)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <p style={{margin:'0 0 4px',fontSize:'0.93rem',color:C.cyan,fontFamily: 'var(--cv-font-mono)',letterSpacing:'0.08em'}}>{dp.label?.split('—')[0]?.trim()}</p>
+            <p style={{margin:'0 0 4px',fontSize: '1.01rem',color:C.cyan,fontFamily: 'var(--cv-font-mono)',letterSpacing:'0.08em'}}>{dp.label?.split('—')[0]?.trim()}</p>
             <h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',margin:'0 0 0.5rem',color:'var(--cv-on-accent)'}}>{dp.core_question}</h2>
             <p style={{margin:0,fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>Session time: {dp.session_time}</p>
           </div>
@@ -4375,10 +4407,10 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
                 <div style={{display:'flex',gap:'0.4rem',alignItems:'center',flexShrink:0}}>
                   {comp.ceo_signed_off&&<Badge text="CEO ✓" color={C.green}/>}
                   {comp.evidence_recorded&&<Badge text="Evidence" color={C.teal}/>}
-                  {canEdit(userRole)&&<select value={comp.status} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();onUpdateComp(comp.component_number,{status:e.target.value})}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.2rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',cursor:'pointer'}}>
+                  {canEdit(userRole)&&<select value={comp.status} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();onUpdateComp(comp.component_number,{status:e.target.value})}} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.2rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',cursor:'pointer'}}>
                     {['○','◐','✓','⚠'].map(s=><option key={s} value={s}>{s}</option>)}
                   </select>}
-                  <span style={{fontSize:'0.93rem',color:C.slate}}>{expanded?'▲':'▼'}</span>
+                  <span style={{fontSize: '1.01rem',color:C.slate}}>{expanded?'▲':'▼'}</span>
                 </div>
               </div>
               {expanded&&(

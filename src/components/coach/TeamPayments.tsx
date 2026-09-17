@@ -50,8 +50,8 @@ function addBtn(sm=false,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fo
 // them went white on cyan again.
 
 function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:onSolid(col),cursor:'pointer'}}
-function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
-function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
+function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
+function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
 function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.13rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
 
 // ─── helpers ─────────────────────────────────────────────────
@@ -133,7 +133,7 @@ function CostOfDeliveryChart({coImplementers,entries,expenses}){
           })}
         </svg>
       </div>
-      <div style={{display:'flex',gap:'1.1rem',fontSize:'0.93rem',fontFamily: 'var(--cv-font-mono)',color:C.slate,marginTop:'0.4rem',flexWrap:'wrap'}}>
+      <div style={{display:'flex',gap:'1.1rem',fontSize: '1.01rem',fontFamily: 'var(--cv-font-mono)',color:C.slate,marginTop:'0.4rem',flexWrap:'wrap'}}>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.navy,marginRight:5,verticalAlign:'middle'}}/>Time cost ({cur})</span>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.cyan,marginRight:5,verticalAlign:'middle'}}/>Approved expenses</span>
       </div>
@@ -166,7 +166,7 @@ function ReceiptUpload({coImplementerId,path,onUploaded}){
         {busy?'Uploading…':path?'Replace':'+ Upload'}
         <input type="file" accept="image/*,.pdf" style={{display:'none'}} onChange={handleFile} disabled={busy}/>
       </label>
-      {err&&<span style={{fontSize:'0.93rem',color:C.red}}>{err}</span>}
+      {err&&<span style={{fontSize: '1.01rem',color:C.red}}>{err}</span>}
     </div>
   )
 }
@@ -209,7 +209,7 @@ function AccessSection({coImplementers,setCoImplementers,clients,setMsg}){
               <div>
                 <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
                 <div style={{fontSize:'1.01rem',color:C.slate}}>{ci.country||'Co-implementer'}</div>
-                {rateOf(ci)>0&&<div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.99rem',color:C.teal,marginTop:'0.2rem',fontWeight:700}}>{fmtMoney(rateOf(ci),curOf(ci))}/day</div>}
+                {rateOf(ci)>0&&<div style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.teal,marginTop:'0.2rem',fontWeight:700}}>{fmtMoney(rateOf(ci),curOf(ci))}/day</div>}
               </div>
               <div style={{border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden'}}>
                 {assigned.length===0&&<div style={{padding:'0.5rem 0.8rem',fontSize:'1.07rem',color:C.slate}}>No clients assigned</div>}
@@ -441,10 +441,10 @@ function CiRosterCard({ci,period,entries,expenses,advances,clients,onOpen}){
       aria-label={`Open ${ci.name||'this co-implementer'}`}
       style={{...card,marginBottom:0,padding:'1rem 1.1rem',cursor:'pointer',borderLeft:`4px solid ${active?C.green:C.border}`}}>
       <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.6rem'}}>
-        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--cv-font-mono)',fontSize:'0.99rem',fontWeight:700,flexShrink:0}}>{initials}</div>
+        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,flexShrink:0}}>{initials}</div>
         <div style={{minWidth:0,flex:1}}>
           <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ci.name}</div>
-          <div style={{fontSize:'0.93rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{[ci.country,ci.specialisation].filter(Boolean).join(' · ')||ci.email}</div>
+          <div style={{fontSize: '1.01rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{[ci.country,ci.specialisation].filter(Boolean).join(' · ')||ci.email}</div>
         </div>
       </div>
       <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginBottom:'0.55rem'}}>
@@ -453,10 +453,10 @@ function CiRosterCard({ci,period,entries,expenses,advances,clients,onOpen}){
         {awaiting>0&&<Badge text={`${awaiting} awaiting approval`} color={C.amber}/>}
         {d.openAdvanceTotal>0&&<Badge text="Advance open" color={C.red}/>}
       </div>
-      <div style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.4,minHeight:'1.2rem'}}>
+      <div style={{fontSize: '1.01rem',color:C.slate,lineHeight:1.4,minHeight:'1.2rem'}}>
         {served.length===0?'No clients assigned yet.':served.map(c=>c.name).join(', ')}
       </div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'0.7rem',fontSize:'0.85rem',color:C.slate}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'0.7rem',fontSize: '1.01rem',color:C.slate}}>
         <span>{fmtDays(d.days)} approved · {fmtMoney(d.net,curOf(ci))} draft</span>
         <span style={{fontFamily:'var(--cv-font-mono)',color:C.teal,fontWeight:700}}>Open page →</span>
       </div>
@@ -543,7 +543,7 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
           corner stays tidy; only the rate chip shows here. */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'1rem',flexWrap:'wrap',paddingBottom:'0.85rem',borderBottom:'1px solid var(--cv-border-soft)',marginBottom:'0.9rem'}}>
         <div style={{display:'flex',alignItems:'center',gap:'0.7rem',minWidth:0}}>
-          <div style={{width:42,height:42,borderRadius:12,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontWeight:700,fontSize:'0.95rem',flexShrink:0}}>{initials}</div>
+          <div style={{width:42,height:42,borderRadius:12,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontWeight:700,fontSize: '1.01rem',flexShrink:0}}>{initials}</div>
           <div style={{minWidth:0}}>
             <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
               <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
@@ -551,11 +551,11 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
                 ?<button onClick={toggleActive} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:ci.active!==false?C.green:C.red,background:'transparent',border:`1px solid ${ci.active!==false?C.green:C.red}`,borderRadius:4,padding:'0.02rem 0.4rem',cursor:'pointer'}}>{ci.active!==false?'Active':'Inactive'}</button>
                 :<Badge text={ci.active!==false?'Active':'Inactive'} color={ci.active!==false?C.green:C.red}/>}
             </div>
-            <div style={{fontSize:'0.95rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
+            <div style={{fontSize: '1.01rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
           </div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
-          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',background:d.rate>0?'var(--cv-tint-cyan)':'var(--cv-tint-amber)',color:d.rate>0?C.cyan:C.amber,borderRadius:999,padding:'0.25rem 0.7rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))} / day`:'no day rate set'}</span>
+          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',background:d.rate>0?'var(--cv-tint-cyan)':'var(--cv-tint-amber)',color:d.rate>0?C.cyan:C.amber,borderRadius:999,padding:'0.25rem 0.7rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))} / day`:'no day rate set'}</span>
           {canManage&&<button style={addBtn(true)} onClick={()=>editingProfile?setEditingProfile(false):startEditProfile()}>{editingProfile?'Cancel':'Edit profile'}</button>}
           {renderWelcome&&renderWelcome(ci)}
           {canManage&&removeCI&&<button style={addBtn(true,C.red)} disabled={busy} title="Remove this team member from the system"
@@ -581,9 +581,9 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
       <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',alignItems:'center',marginBottom:'0.85rem',fontSize:'1.01rem',color:C.slate}}>
         <span>Clients:</span>
         {assignedClients.length===0&&<strong style={{color:C.slate}}>none assigned</strong>}
-        {assignedClients.map(c=><span key={c.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{c.name}{canManage&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(c.id)} title="Remove">×</span>}</span>)}
+        {assignedClients.map(c=><span key={c.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{c.name}{canManage&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(c.id)} title="Remove">×</span>}</span>)}
         {canManage&&(addingClient?(
-          <select autoFocus style={{...inp,width:'auto',fontSize:'0.93rem',padding:'0.15rem 0.4rem'}} value="" onChange={e=>assignClient(e.target.value)} onBlur={()=>setAddingClient(false)}>
+          <select autoFocus style={{...inp,width:'auto',fontSize: '1.01rem',padding:'0.15rem 0.4rem'}} value="" onChange={e=>assignClient(e.target.value)} onBlur={()=>setAddingClient(false)}>
             <option value="">Select a client…</option>
             {clients.filter(c=>!(ci.client_ids||[]).includes(c.id)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
           </select>

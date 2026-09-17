@@ -52,9 +52,9 @@ const C = {
   red: 'var(--cv-red)', green: 'var(--cv-green)', amber: 'var(--cv-amber)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.45 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.86rem', fontWeight: 600, padding: '0.4rem 0.9rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.4rem 0.9rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col,
@@ -174,7 +174,7 @@ export default function AssistPanel({
             style={{
               width: '100%', minHeight: 200, padding: '0.6rem 0.7rem',
               border: `1px solid ${C.border}`, borderRadius: 8, background: C.white,
-              color: C.navy, fontSize: '0.92rem', fontFamily: 'inherit', lineHeight: 1.55,
+              color: C.navy, fontSize: '1.01rem', fontFamily: 'inherit', lineHeight: 1.55,
               boxSizing: 'border-box', resize: 'vertical',
             }}
             value={draft}

@@ -33,17 +33,17 @@ const C = {
   amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.45 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
 const field = {
   width: '100%', padding: '0.42rem 0.55rem', borderRadius: 7,
   // An explicit background, so a box reads as a box. On a transparent fill the
   // border alone was faint enough that the placeholder looked like body text
   // and the field looked like a caption rather than something to type in.
   border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit',
-  fontFamily: "var(--cv-font)", fontSize: '0.92rem',
+  fontFamily: "var(--cv-font)", fontSize: '1.01rem',
 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.84rem', fontWeight: 600, padding: '0.36rem 0.8rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.36rem 0.8rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -300,13 +300,13 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
         ) : null}
       </div>
 
-      {err ? <div style={{ color: C.red, fontSize: '0.95rem', margin: '0.7rem 0' }}>{err}</div> : null}
+      {err ? <div style={{ color: C.red, fontSize: '1.01rem', margin: '0.7rem 0' }}>{err}</div> : null}
       {note ? <p style={{ ...hint, color: C.green, margin: '0 0 0.6rem' }}>{note}</p> : null}
 
       {unlinked.length > 0 ? (
         <div style={{
           marginTop: '0.8rem', border: `1px solid ${C.amber}`, borderRadius: 9,
-          padding: '0.55rem 0.8rem', fontSize: '0.88rem', color: C.slate,
+          padding: '0.55rem 0.8rem', fontSize: '1.01rem', color: C.slate,
         }}>
           {unlinked.length === 1 ? `${unlinked[0].name} signs` : `${unlinked.length} signatories sign`} but
           {unlinked.length === 1 ? ' has ' : ' have '}no account here yet. They can still sign: the lead
@@ -352,7 +352,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
               border: `1px solid ${C.border}`, borderRadius: 9, padding: '0.55rem 0.8rem',
             }}>
               <div>
-                <div style={{ fontSize: '1rem', color: C.navy, fontWeight: 600 }}>
+                <div style={{ fontSize: '1.01rem', color: C.navy, fontWeight: 600 }}>
                   {r.name}{r.title ? ` (${r.title})` : ''}
                 </div>
                 <div style={{ ...mono, fontSize: '0.8rem', color: C.slate }}>

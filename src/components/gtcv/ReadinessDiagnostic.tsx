@@ -47,18 +47,18 @@ const panel = { background: C.card, border: `1px solid ${C.borderSoft}`, borderR
 const panelHead = { background: C.header, color: 'var(--cv-on-accent)', padding: '0.85rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }
 const panelBody = { padding: '1.1rem 1.2rem 1.3rem' }
 const tableWrap = { overflowX: 'auto' }
-const table = { width: '100%', borderCollapse: 'collapse', fontSize: '0.93rem', minWidth: 900 }
+const table = { width: '100%', borderCollapse: 'collapse', fontSize: '1.01rem', minWidth: 900 }
 const th = { padding: '0.5rem 0.55rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { padding: '0.5rem 0.5rem', verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
-const inputBase = { width: '100%', padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
+const inputBase = { width: '100%', padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
 const roBox = { ...inputBase, background: C.disabled, minHeight: 32, whiteSpace: 'pre-wrap' }
-const emptyNote = { fontSize: '0.93rem', color: C.faint, padding: '0.7rem 0' }
+const emptyNote = { fontSize: '1.01rem', color: C.faint, padding: '0.7rem 0' }
 
 function pill(bg, fg) {
   return { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.22rem 0.6rem', borderRadius: 999, background: bg, color: fg, display: 'inline-block', whiteSpace: 'nowrap' }
 }
 function noteBox(border, bg) {
-  return { border: `1px solid ${border}`, background: bg, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: C.navy, lineHeight: 1.45 }
+  return { border: `1px solid ${border}`, background: bg, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '1.01rem', color: C.navy, lineHeight: 1.45 }
 }
 
 // ─── Method content (fixed IP, identical for every engagement) ───
@@ -178,7 +178,7 @@ function CheckpointCard({ checkpoint, total, scored }) {
     <div style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderTop: `3px solid ${b.color}`, borderRadius: 12, padding: '0.9rem 1rem', flex: '1 1 200px', minWidth: 200 }}>
       <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>{checkpoint.label}</div>
       <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, marginTop: '0.2rem' }}>
-        {total}<span style={{ fontSize: '1rem', color: C.faint }}> of {MAX_TOTAL}</span>
+        {total}<span style={{ fontSize: '1.01rem', color: C.faint }}> of {MAX_TOTAL}</span>
       </div>
       <div style={{ marginTop: '0.4rem' }}><span style={pill(b.color, 'var(--cv-on-accent)')}>{b.label}</span></div>
       <div style={{ fontSize: '0.82rem', color: C.slate, marginTop: '0.4rem', lineHeight: 1.35 }}>{b.detail}</div>
@@ -315,7 +315,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
         <div>
           <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>Decision Point 9</div>
           <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.45rem', fontWeight: 700 }}>Commercial Readiness Diagnostic</div>
-          <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '92ch', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '1.01rem', color: C.slate, maxWidth: '92ch', marginTop: '0.25rem' }}>
             Six fit tests, each scored 0 to 3, maximum {MAX_TOTAL}. The same six are taken three times, at
             baseline, at the mid point and at close. A score above 1 has to point at evidence, and the movement
             between the three sittings is the real result.
@@ -345,7 +345,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
           <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, marginTop: '0.2rem', color: movement > 0 ? C.green : movement < 0 ? C.red : C.navy }}>
             {movement > 0 ? `+${movement}` : movement}
           </div>
-          <div style={{ fontSize: '0.85rem', color: C.slate, marginTop: '0.4rem', lineHeight: 1.35 }}>
+          <div style={{ fontSize: '1.01rem', color: C.slate, marginTop: '0.4rem', lineHeight: 1.35 }}>
             {anyBaseline || anyClose
               ? <>Baseline {totals.baseline.total} to close {totals.close.total}, out of {MAX_TOTAL}.</>
               : <>Score the baseline first, so there is something to move from.</>}
@@ -400,8 +400,8 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
                   return (
                     <tr key={ft.id}>
                       <td style={td}>
-                        <div style={{ fontWeight: 700, fontSize: '0.98rem' }}>{ft.label}</div>
-                        <div style={{ fontSize: '0.83rem', color: C.slate, marginTop: '0.2rem', lineHeight: 1.35 }}>{ft.question}</div>
+                        <div style={{ fontWeight: 700, fontSize: '1.01rem' }}>{ft.label}</div>
+                        <div style={{ fontSize: '1.01rem', color: C.slate, marginTop: '0.2rem', lineHeight: 1.35 }}>{ft.question}</div>
                         {isGateTest && (
                           <div style={{ marginTop: '0.4rem' }}><span style={pill(C.tintCyan, C.navy)}>Pilot entry gate test</span></div>
                         )}
@@ -437,7 +437,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
                     const b = band(t)
                     return (
                       <td key={cp.id} style={td}>
-                        <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.35rem', fontWeight: 700 }}>{t}<span style={{ fontSize: '0.9rem', color: C.faint }}> of {MAX_TOTAL}</span></div>
+                        <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.35rem', fontWeight: 700 }}>{t}<span style={{ fontSize: '1.01rem', color: C.faint }}> of {MAX_TOTAL}</span></div>
                         <div style={{ marginTop: '0.3rem' }}><span style={pill(b.color, 'var(--cv-on-accent)')}>{b.label}</span></div>
                       </td>
                     )
@@ -452,13 +452,13 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
             </table>
           </div>
 
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.85rem', color: C.slate }}>
+          <div style={{ marginTop: '1rem', display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '1.01rem', color: C.slate }}>
             <span><strong style={{ color: C.navy }}>0</strong> no evidence at all</span>
             <span><strong style={{ color: C.navy }}>1</strong> asserted, nothing observed</span>
             <span><strong style={{ color: C.navy }}>2</strong> evidenced by something observed</span>
             <span><strong style={{ color: C.navy }}>3</strong> proven, repeatedly and independently</span>
           </div>
-          <div style={{ marginTop: '0.6rem', fontSize: '0.85rem', color: C.slate }}>
+          <div style={{ marginTop: '0.6rem', fontSize: '1.01rem', color: C.slate }}>
             Bands on a checkpoint total: 0 to 11 not ready, 12 to 14 ready to scale, 15 to 18 comprehensively
             validated. A total of exactly 15 is read as the upper band.
           </div>

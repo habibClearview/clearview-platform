@@ -74,7 +74,7 @@ export default function CoachQuickReference({ showGuidance = true }) {
                 >
                   <span style={{
                     fontFamily: 'var(--cv-font-mono)', fontSize: 12.5, fontWeight: 700,
-                    letterSpacing: '.06em', color: '#fff', background: C.teal,
+                    letterSpacing: '.06em', color: 'var(--cv-on-cyan)', background: C.teal,
                     borderRadius: 4, padding: '3px 8px',
                   }}>{dp.number || String(dp.id).toUpperCase()}</span>
                   <span style={{ fontFamily: 'var(--cv-font)', fontSize: 17, fontWeight: 600 }}>

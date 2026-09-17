@@ -106,7 +106,7 @@ export default function LinkProblem() {
               onClick={send}
               style={{
                 width: '100%', padding: '0.8rem', border: 0, borderRadius: 8, background: C.teal,
-                color: '#fff', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                color: 'var(--cv-on-cyan)', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
               }}
             >Send me a new link</button>
           </>

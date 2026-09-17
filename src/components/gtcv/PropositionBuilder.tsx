@@ -66,12 +66,12 @@ const LABEL = {
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle = {
-  fontFamily: 'inherit', fontSize: '0.85rem', padding: '0.4rem 0.55rem',
+  fontFamily: 'inherit', fontSize: '1.01rem', padding: '0.4rem 0.55rem',
   border: `1px solid ${C.border}`, borderRadius: 7, background: C.card,
   color: C.navy, width: '100%', boxSizing: 'border-box',
 }
 const th = { ...LABEL, textAlign: 'left', padding: '0.45rem 0.6rem', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
-const td = { padding: '0.45rem 0.6rem', fontSize: '0.85rem', color: C.navy, verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
+const td = { padding: '0.45rem 0.6rem', fontSize: '1.01rem', color: C.navy, verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
 function btn(color, solid = false) {
   return solid
     ? { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
@@ -316,7 +316,7 @@ export default function PropositionBuilder({ clientId, canManage }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <div style={H('1.2rem')}>Proposition builder</div>
-          <div style={{ color: C.slate, fontSize: '0.85rem', marginTop: 3, maxWidth: '92ch', lineHeight: 1.5 }}>
+          <div style={{ color: C.slate, fontSize: '1.01rem', marginTop: 3, maxWidth: '92ch', lineHeight: 1.5 }}>
             One proposition per priority segment, built from four parts: capability, problem,
             outcome, reason to choose. Differentiation is capability, context or access, and nothing
             else. The paragraph is assembled from the parts and stays editable. A proposition counts
@@ -347,9 +347,9 @@ export default function PropositionBuilder({ clientId, canManage }) {
       )}
 
       {loading ? (
-        <div style={{ color: C.slate, fontSize: '0.85rem', fontStyle: 'italic', marginTop: '0.9rem' }}>Loading propositions...</div>
+        <div style={{ color: C.slate, fontSize: '1.01rem', fontStyle: 'italic', marginTop: '0.9rem' }}>Loading propositions...</div>
       ) : rows.length === 0 ? (
-        <div style={{ color: C.slate, fontSize: '0.85rem', fontStyle: 'italic', marginTop: '0.9rem' }}>
+        <div style={{ color: C.slate, fontSize: '1.01rem', fontStyle: 'italic', marginTop: '0.9rem' }}>
           No propositions yet. {canManage ? 'Add one for each segment that came through the scoring as a priority.' : 'Nothing has been recorded yet.'}
         </div>
       ) : (
@@ -445,7 +445,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
               <textarea aria-label={p.label} style={{ ...inputStyle, minHeight: 62, resize: 'vertical' }} value={r[p.key] || ''}
                 placeholder={p.placeholder} onChange={(e) => patch(r.id, { [p.key]: e.target.value })} />
             ) : (
-              <div style={{ fontSize: '0.85rem', color: C.navy, lineHeight: 1.45 }}>{r[p.key] || '-'}</div>
+              <div style={{ fontSize: '1.01rem', color: C.navy, lineHeight: 1.45 }}>{r[p.key] || '-'}</div>
             )}
             <div style={{ fontSize: '0.78rem', color: C.slate, marginTop: 3, lineHeight: 1.35 }}>{p.help}</div>
           </label>
@@ -469,7 +469,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
               {DIFF_TYPES.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
             </select>
           ) : (
-            <div style={{ fontSize: '0.85rem' }}>{(DIFF_TYPES.find((d) => d.key === r.differentiation_type) || {}).label || '-'}</div>
+            <div style={{ fontSize: '1.01rem' }}>{(DIFF_TYPES.find((d) => d.key === r.differentiation_type) || {}).label || '-'}</div>
           )}
           <div style={{ fontSize: '0.78rem', color: C.slate, marginTop: 3, lineHeight: 1.35 }}>
             {(DIFF_TYPES.find((d) => d.key === r.differentiation_type) || {}).help
@@ -482,7 +482,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
             <textarea aria-label="Say the difference in one line" style={{ ...inputStyle, minHeight: 62, resize: 'vertical' }} value={r.differentiation_statement || ''}
               placeholder="Say the difference in one line" onChange={(e) => patch(r.id, { differentiation_statement: e.target.value })} />
           ) : (
-            <div style={{ fontSize: '0.85rem', lineHeight: 1.45 }}>{r.differentiation_statement || '-'}</div>
+            <div style={{ fontSize: '1.01rem', lineHeight: 1.45 }}>{r.differentiation_statement || '-'}</div>
           )}
         </label>
         <label style={{ display: 'block' }}>
@@ -491,7 +491,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
             <textarea aria-label="The proof that makes the claim believable" style={{ ...inputStyle, minHeight: 62, resize: 'vertical' }} value={r.credibility_signal || ''}
               placeholder="The proof that makes the claim believable" onChange={(e) => patch(r.id, { credibility_signal: e.target.value })} />
           ) : (
-            <div style={{ fontSize: '0.85rem', lineHeight: 1.45 }}>{r.credibility_signal || '-'}</div>
+            <div style={{ fontSize: '1.01rem', lineHeight: 1.45 }}>{r.credibility_signal || '-'}</div>
           )}
         </label>
       </div>
@@ -514,13 +514,13 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
         {canManage ? (
           <textarea
             aria-label="The proposition written as one thing you could say out loud"
-            style={{ ...inputStyle, minHeight: 92, resize: 'vertical', fontSize: '0.92rem', lineHeight: 1.5 }}
+            style={{ ...inputStyle, minHeight: 92, resize: 'vertical', fontSize: '1.01rem', lineHeight: 1.5 }}
             value={shown}
             placeholder="Fill the four parts above and this writes itself. Then edit it into their language."
             onChange={(e) => editAssembled(e.target.value)}
           />
         ) : (
-          <div style={{ fontSize: '0.92rem', color: C.navy, lineHeight: 1.55 }}>{shown || 'Not written yet.'}</div>
+          <div style={{ fontSize: '1.01rem', color: C.navy, lineHeight: 1.55 }}>{shown || 'Not written yet.'}</div>
         )}
         {stale && (
           <div style={{ ...LABEL, color: C.amber, marginTop: 6 }}>
@@ -543,7 +543,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
         </div>
 
         {tests.length === 0 ? (
-          <div style={{ color: C.slate, fontSize: '0.83rem', fontStyle: 'italic', marginTop: 8 }}>
+          <div style={{ color: C.slate, fontSize: '1.01rem', fontStyle: 'italic', marginTop: 8 }}>
             Not tested with anyone yet.
           </div>
         ) : (
@@ -619,7 +619,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
             placeholder="Anything the next person needs to know"
             onChange={(e) => patch(r.id, { notes: e.target.value })} />
         ) : (
-          r.notes ? <div style={{ fontSize: '0.83rem', color: C.slate, marginTop: 8 }}>{r.notes}</div> : null
+          r.notes ? <div style={{ fontSize: '1.01rem', color: C.slate, marginTop: 8 }}>{r.notes}</div> : null
         )}
       </div>
     </div>

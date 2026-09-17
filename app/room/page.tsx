@@ -454,8 +454,8 @@ export default function RoomPage() {
               disabled={joining}
               style={{
                 width: '100%', marginTop: '1rem', padding: '0.75rem',
-                fontSize: '1rem', fontWeight: 700, border: 'none', borderRadius: 10,
-                background: C.teal, color: 'var(--cv-on-accent, #FFFFFF)',
+                fontSize: '1.01rem', fontWeight: 700, border: 'none', borderRadius: 10,
+                background: C.teal, color: 'var(--cv-on-cyan, #062230)',
                 cursor: joining ? 'default' : 'pointer',
               }}
             >{joining ? 'Opening...' : 'Join'}</button>
@@ -508,7 +508,7 @@ export default function RoomPage() {
                   value={f.value}
                   onChange={(e) => f.set(e.target.value)}
                   style={{
-                    width: '100%', boxSizing: 'border-box', fontSize: '1rem',
+                    width: '100%', boxSizing: 'border-box', fontSize: '1.01rem',
                     padding: '0.6rem', borderRadius: 8, border: `1px solid ${C.border}`,
                     background: 'var(--cv-bg-2, #FAFAF7)', color: C.navy,
                   }}
@@ -519,10 +519,10 @@ export default function RoomPage() {
               type="submit"
               disabled={!whoName.trim()}
               style={{
-                width: '100%', marginTop: '0.4rem', padding: '0.75rem', fontSize: '1rem',
+                width: '100%', marginTop: '0.4rem', padding: '0.75rem', fontSize: '1.01rem',
                 fontWeight: 700, border: 'none', borderRadius: 10,
                 background: whoName.trim() ? C.teal : C.border,
-                color: whoName.trim() ? 'var(--cv-on-accent, #FFFFFF)' : C.slate,
+                color: whoName.trim() ? 'var(--cv-on-cyan, #062230)' : C.slate,
                 cursor: whoName.trim() ? 'pointer' : 'default',
               }}
             >Continue</button>
@@ -540,11 +540,11 @@ export default function RoomPage() {
           {/* A personal link knows who is holding it, so it says so. R34's own
               test is that the name is recognised without any code. */}
           {myName ? (
-            <p style={{ color: C.slate, margin: '0 0 0.6rem', fontSize: '0.9rem' }}>{myName}</p>
+            <p style={{ color: C.slate, margin: '0 0 0.6rem', fontSize: '1.01rem' }}>{myName}</p>
           ) : null}
           <p style={{ margin: 0, fontSize: '1.1rem', lineHeight: 1.5 }}>{NOTHING_OPEN}</p>
           {queued > 0 ? (
-            <p style={{ color: C.slate, margin: '0.8rem 0 0', fontSize: '0.9rem' }}>
+            <p style={{ color: C.slate, margin: '0.8rem 0 0', fontSize: '1.01rem' }}>
               {queued === 1 ? '1 answer waiting to send.' : `${queued} answers waiting to send.`}
             </p>
           ) : null}
@@ -584,7 +584,7 @@ export default function RoomPage() {
             somebody else halfway through a session. */}
         {meLine ? (
           <div style={{
-            fontSize: '0.85rem', color: C.slate, marginBottom: '0.8rem',
+            fontSize: '1.01rem', color: C.slate, marginBottom: '0.8rem',
             paddingBottom: '0.5rem', borderBottom: `1px solid ${C.border}`,
           }}>{meLine}</div>
         ) : null}
@@ -602,7 +602,7 @@ export default function RoomPage() {
           <p style={{
             margin: '0 0 1.1rem', padding: '0.7rem 0.8rem', borderRadius: 8,
             background: 'var(--cv-bg-2, #FAFAF7)', border: `1px solid ${C.border}`,
-            color: C.slate, fontSize: '0.92rem', lineHeight: 1.5,
+            color: C.slate, fontSize: '1.01rem', lineHeight: 1.5,
           }}>{ANONYMOUS_NOTICE}</p>
         ) : null}
 
@@ -659,9 +659,9 @@ export default function RoomPage() {
             border: `1px solid ${C.teal}`, background: 'var(--cv-bg-2, #FAFAF7)',
           }}>
             <div style={{ fontSize: '0.8rem', color: C.teal, fontWeight: 700 }}>Sent</div>
-            <div style={{ fontSize: '0.95rem', color: C.navy, marginTop: 2 }}>{confirmed}</div>
+            <div style={{ fontSize: '1.01rem', color: C.navy, marginTop: 2 }}>{confirmed}</div>
             {question.question_type === 'collect' ? (
-              <div style={{ fontSize: '0.85rem', color: C.slate, marginTop: 4 }}>
+              <div style={{ fontSize: '1.01rem', color: C.slate, marginTop: 4 }}>
                 You can add another below.
               </div>
             ) : null}
@@ -671,7 +671,7 @@ export default function RoomPage() {
         {note ? <p role="alert" style={{ color: C.red, margin: '0.9rem 0 0' }}>{note}</p> : null}
 
         {queued > 0 ? (
-          <p style={{ color: C.slate, margin: '0.9rem 0 0', fontSize: '0.9rem' }}>
+          <p style={{ color: C.slate, margin: '0.9rem 0 0', fontSize: '1.01rem' }}>
             {queued === 1 ? '1 answer waiting to send.' : `${queued} answers waiting to send.`}
           </p>
         ) : null}
@@ -683,7 +683,7 @@ export default function RoomPage() {
           <div style={{ marginTop: '1.2rem', borderTop: `1px solid ${C.border}`, paddingTop: '0.8rem' }}>
             {everyones.map((row, i) => (
               <div key={i} style={{
-                fontSize: '0.95rem', color: C.navy, padding: '0.35rem 0',
+                fontSize: '1.01rem', color: C.navy, padding: '0.35rem 0',
                 borderBottom: i === everyones.length - 1 ? 'none' : `1px solid ${C.border}`,
               }}>
                 {(question.target_fields || [])
@@ -725,7 +725,7 @@ function CollectInput({
             value={draft[f.column] || ''}
             onChange={(e) => setDraft({ ...draft, [f.column]: e.target.value })}
             style={{
-              width: '100%', boxSizing: 'border-box', fontSize: '1rem',
+              width: '100%', boxSizing: 'border-box', fontSize: '1.01rem',
               padding: '0.6rem', borderRadius: 8, border: `1px solid ${C.border}`,
               background: 'var(--cv-bg-2, #FAFAF7)', color: C.navy,
             }}
@@ -736,10 +736,10 @@ function CollectInput({
         type="submit"
         disabled={!ready}
         style={{
-          width: '100%', marginTop: '0.4rem', padding: '0.75rem', fontSize: '1rem',
+          width: '100%', marginTop: '0.4rem', padding: '0.75rem', fontSize: '1.01rem',
           fontWeight: 700, border: 'none', borderRadius: 10,
           background: ready ? C.teal : C.border,
-          color: ready ? 'var(--cv-on-accent, #FFFFFF)' : C.slate,
+          color: ready ? 'var(--cv-on-cyan, #062230)' : C.slate,
           cursor: ready ? 'pointer' : 'default',
         }}
       >Submit</button>
@@ -772,7 +772,7 @@ function ScoreInput({
             fontSize: '1.3rem', fontWeight: 700, borderRadius: 10,
             border: `1px solid ${chosen === v ? C.teal : C.border}`,
             background: chosen === v ? C.teal : C.card,
-            color: chosen === v ? 'var(--cv-on-accent, #FFFFFF)' : C.navy,
+            color: chosen === v ? 'var(--cv-on-cyan, #062230)' : C.navy,
             cursor: locked ? 'default' : 'pointer',
           }}
         >{v}</button>
@@ -800,7 +800,7 @@ function ClassifyInput({
             padding: '0.9rem', fontSize: '1.1rem', fontWeight: 600, borderRadius: 10,
             border: `1px solid ${chosen === o ? C.teal : C.border}`,
             background: chosen === o ? C.teal : C.card,
-            color: chosen === o ? 'var(--cv-on-accent, #FFFFFF)' : C.navy,
+            color: chosen === o ? 'var(--cv-on-cyan, #062230)' : C.navy,
             cursor: locked ? 'default' : 'pointer',
           }}
         >{o}</button>

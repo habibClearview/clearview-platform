@@ -76,7 +76,7 @@ const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const label = { ...mono, fontSize: '0.82rem', color: C.slate }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.95rem', fontWeight: 700, padding: '0.4rem 0.85rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 700, padding: '0.4rem 0.85rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -698,7 +698,7 @@ export default function SessionsStrip({
                     background: 'var(--cv-alt)', borderRadius: 6,
                     display: 'flex', gap: '0.55rem', alignItems: 'baseline', flexWrap: 'wrap',
                   }}>
-                    <span style={{ fontWeight: 600, color: C.navy, fontSize: '0.9rem' }}>Recorded {recWhen(rec.started_at)}</span>
+                    <span style={{ fontWeight: 600, color: C.navy, fontSize: '1.01rem' }}>Recorded {recWhen(rec.started_at)}</span>
                     {rec.merged_seconds ? <span style={hint}>{recLength(rec.merged_seconds)}</span> : null}
                     <span style={{ ...hint, color: rec.transcript?.status === 'signed' ? C.green : C.amber }}>
                       {rec.transcript
@@ -742,7 +742,7 @@ export default function SessionsStrip({
                             {canManage && (
                               <button type="button" aria-label={`Take ${name} off the session`}
                                 disabled={busy === a.id} onClick={() => removeParticipant(a)}
-                                style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '0.95rem', lineHeight: 1, padding: 0 }}>
+                                style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1.01rem', lineHeight: 1, padding: 0 }}>
                                 {'×'}
                               </button>
                             )}

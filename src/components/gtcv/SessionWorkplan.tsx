@@ -59,7 +59,7 @@ const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.32rem', fontWeight: 70
 const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.95rem', fontWeight: 700, padding: '0.42rem 0.9rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 700, padding: '0.42rem 0.9rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -261,20 +261,35 @@ export default function SessionWorkplan({ clientId, clientName = '' }) {
         ))}
       </div>
 
-      {/* The rooms the method uses, counted across the whole engagement. This
-          is the one thing that only makes sense over all the decision points
-          at once, which is why it stayed here when the planning left. */}
-      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
-        {KINDS.map(k => (
-          <div key={k.v} style={{ borderLeft: `3px solid ${k.color}`, background: 'var(--cv-alt)', borderRadius: 8, padding: '0.4rem 0.7rem', minWidth: 150 }}>
-            <div style={{ ...mono, fontSize: '0.74rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: k.color }}>{k.l}</div>
-            <div style={{ ...hint, fontSize: '0.84rem' }}>
-              {sessions.filter(s => s.session_kind === k.v).length} session{sessions.filter(s => s.session_kind === k.v).length === 1 ? '' : 's'}
-            </div>
-            <div style={{ ...hint, fontSize: '0.82rem' }}>{k.blurb}</div>
-          </div>
-        ))}
-      </div>
+      {/* THE KEY IS A KEY, NOT A WALL. 17 September 2026. Habib: "why does the
+          key to the different types of rooms stacked like that, makes the whole
+          thing cluttered. It is either you point to guidance note or you hide
+          it to be expanded, it looks terrible."
+          Six cards, each with a heading, a count and a sentence, sat above the
+          workplan every time it was opened. It is reference material: needed
+          once, by somebody who does not already know the six rooms, and in the
+          way for everybody else. */}
+      <details style={{ marginBottom: '1.2rem' }} className="cv-no-print">
+        <summary style={{
+          ...mono, fontSize: '0.8rem', letterSpacing: '0.06em', textTransform: 'uppercase',
+          color: C.teal, cursor: 'pointer',
+        }}>
+          The six rooms, and who the method puts in each
+        </summary>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.6rem' }}>
+          {KINDS.map(k => {
+            const n = sessions.filter(x => x.session_kind === k.v).length
+            return (
+              <div key={k.v} style={{ borderLeft: `3px solid ${k.color}`, background: 'var(--cv-alt)', borderRadius: 8, padding: '0.4rem 0.7rem', flex: '1 1 220px' }}>
+                <div style={{ ...mono, fontSize: '0.8rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: k.color }}>
+                  {k.l} &middot; {n}
+                </div>
+                <div style={hint}>{k.blurb}</div>
+              </div>
+            )
+          })}
+        </div>
+      </details>
 
       {loading ? (
         <div style={hint}>Loading the workplan...</div>
@@ -345,12 +360,27 @@ export default function SessionWorkplan({ clientId, clientName = '' }) {
                               ) : (
                                 <span style={{ fontWeight: 600 }}>{s.title || 'Untitled session'}</span>
                               )}
-                              {s.purpose && <div style={{ ...hint, fontSize: '0.84rem', marginTop: '0.15rem' }}>{s.purpose}</div>}
+                              {s.purpose && <div style={{ ...hint, fontSize: '1.01rem', marginTop: '0.15rem' }}>{s.purpose}</div>}
                             </td>
                             <td style={{ ...td, color: room ? room.color : C.slate, whiteSpace: 'nowrap' }}>
                               {s.session_kind ? (KIND_LABEL[s.session_kind] || s.session_kind) : 'Not set'}
                             </td>
-                            <td style={{ ...td, whiteSpace: 'nowrap' }}>{readable(s)}</td>
+                            {/* WHERE DID THAT COME FROM. 17 September 2026.
+                                Habib, on three sessions he did not recognise:
+                                "I did not set up anything, why is that showing
+                                that." Nothing on the platform creates a session
+                                by itself, so every row here was added by
+                                somebody pressing Add on a decision point. Saying
+                                when makes that answerable, and the name beside
+                                it is the way to where it can be deleted. */}
+                            <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                              {readable(s)}
+                              {s.created_at && (
+                                <div style={{ ...hint, fontSize: '0.82rem' }}>
+                                  added {new Date(s.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </div>
+                              )}
+                            </td>
                             <td style={{ ...td, whiteSpace: 'nowrap' }}>{heldReadable(s)}</td>
                             <td style={{ ...td, whiteSpace: 'nowrap' }}>{durationLabel(s.duration_minutes)}</td>
                             <td style={{ ...td, color: statusColor(s.status), whiteSpace: 'nowrap' }}>{statusLabel(s.status)}</td>
