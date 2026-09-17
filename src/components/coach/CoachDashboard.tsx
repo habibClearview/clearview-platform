@@ -4244,7 +4244,7 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
           <div key={a.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.65rem 0',borderBottom:`1px solid ${C.border}`,fontSize:'1.07rem'}}>
             <div style={{display:'flex',gap:'0.4rem',flexShrink:0}}>
               {[true,false,null].map((v,vi)=>(
-                <button key={vi} onClick={()=>{if(!locked){const newAnswers=[...answers];newAnswers[i]={...newAnswers[i],answer:v};onUpdate({readiness_answers:newAnswers})}}} style={{padding:'3px 10px',borderRadius:4,fontSize:'1.01rem',cursor:locked?'default':'pointer',background:a.answer===v?(v===true?C.green:v===false?C.red:C.slate):C.white,color:a.answer===v?'var(--cv-on-accent)':C.slate,border:`1px solid ${C.border}`}}>
+                <button key={vi} onClick={()=>{if(!locked){const newAnswers=[...answers];newAnswers[i]={...newAnswers[i],answer:v};onUpdate({readiness_answers:newAnswers})}}} style={{padding:'3px 10px',borderRadius:4,fontSize:'1.01rem',cursor:locked?'default':'pointer',background:a.answer===v?(v===true?C.green:v===false?C.red:C.slate):C.white,color:a.answer===v?onSolid(v===true?C.green:v===false?C.red:C.slate):C.slate,border:`1px solid ${C.border}`}}>
                   {v===true?'Yes':v===false?'No':'?'}
                 </button>
               ))}

@@ -27,6 +27,7 @@
 // baked in. Table: gtcv_pilot_sessions (2026_08_09_gtcv_dp_tables_c.sql).
 // ============================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 
 const TABLE = 'gtcv_pilot_sessions'
@@ -214,7 +215,7 @@ export default function PilotCapture({ clientId, canManage }) {
             style={{ ...mono, border: 'none', background: 'transparent', color: C.navy, cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' }}>
             {expanded ? 'v' : '>'}
           </button>
-          <span style={{ ...mono, fontSize: '0.78rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: 4, background: Number(r.iteration) === 2 ? C.purple : C.cyan, color: 'var(--cv-on-accent)' }}>
+          <span style={{ ...mono, fontSize: '0.78rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: 4, background: Number(r.iteration) === 2 ? C.purple : C.cyan, color: onSolid(Number(r.iteration) === 2 ? C.purple : C.cyan) }}>
             ITERATION {r.iteration} / CLIENT {r.client_number}
           </span>
           <span style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy }}>

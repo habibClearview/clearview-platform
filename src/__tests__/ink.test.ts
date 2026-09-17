@@ -63,20 +63,69 @@ describe('the rule stays in one place', () => {
     expect(definers).toEqual(['src/lib/ink.ts'])
   })
 
+  // The value of one style property, read properly rather than by taking the
+  // next eighty characters. From the review on #280: a window that wide runs
+  // past the background and into whatever follows it, so `background:
+  // 'var(--cv-header)', borderBottom: '3px solid ' + C.cyan` read as a cyan
+  // background, and two honest screens were accused.
+  function backgroundValue(src: string, from: number): string | null {
+    const key = src.lastIndexOf('background', from)
+    if (key < 0) return null
+    let i = src.indexOf(':', key)
+    if (i < 0) return null
+    i += 1
+    let depth = 0
+    let quote: string | null = null
+    const out: string[] = []
+    for (; i < src.length; i++) {
+      const ch = src[i]
+      if (quote) {
+        out.push(ch)
+        if (ch === quote && src[i - 1] !== '\\') quote = null
+        continue
+      }
+      if (ch === "'" || ch === '"' || ch === '`') { quote = ch; out.push(ch); continue }
+      if ('([{'.includes(ch)) depth++
+      if (')]}'.includes(ch)) { if (depth === 0) break; depth-- }
+      if (ch === ',' && depth === 0) break
+      out.push(ch)
+    }
+    return out.join('')
+  }
+
+  // A SCANNER THAT FINDS NOTHING MIGHT BE BROKEN RATHER THAN SATISFIED. These
+  // two run it over samples with a known answer, so the clean result below
+  // means the source is clean and not that the scanner stopped working.
+  it('reads the background itself, and not the property after it', () => {
+    const ok = "style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`,color:'var(--cv-on-accent)'}}"
+    expect(backgroundValue(ok, ok.indexOf('--cv-on-accent'))).toBe("'var(--cv-header)'")
+  })
+
+  it('catches a light colour hiding in one branch of a background', () => {
+    const bad = "style={{background:two?C.purple:C.cyan,color:'var(--cv-on-accent)'}}"
+    const value = backgroundValue(bad, bad.indexOf('--cv-on-accent'))
+    expect(value).toBe('two?C.purple:C.cyan')
+    expect(/(C\.cyan|C\.teal|C\.amber|C\.green)/.test(value!)).toBe(true)
+  })
+
   it('no screen writes white onto a cyan or teal fill by hand', () => {
     // The pairing this whole file exists to prevent: a background of one of
     // the light accents with --cv-on-accent, which is white, written on it.
+    //
+    // A BACKGROUND THAT SWITCHES IS TWO BACKGROUNDS. From the review on #280.
+    // This first asked "does the background mention a light colour and no dark
+    // one", so `background: two ? C.purple : C.cyan` was read as dark and
+    // waved through, while the cyan half of it was white on cyan exactly as
+    // before. Every colour the background itself can take is now judged, and
+    // one light branch is enough to fail.
     const LIGHT = /(C\.cyan|C\.teal|C\.amber|C\.green|cv-cyan|cv-teal|cv-amber|cv-green)/
-    const DARK = /(C\.navy|C\.red|C\.purple|C\.slate|cv-navy|cv-red|cv-purple|cv-slate|cv-header|C\.white|C\.cream)/
     const offenders: string[] = []
     for (const f of files) {
       const s = fs.readFileSync(f, 'utf8')
       for (const m of s.matchAll(/var\(--cv-on-accent\)/g)) {
-        const before = s.slice(Math.max(0, m.index! - 700), m.index!)
-        const b = before.lastIndexOf('background')
-        if (b < 0) continue
-        const seg = before.slice(b, b + 80)
-        if (LIGHT.test(seg) && !DARK.test(seg)) offenders.push(`${f}: ${seg.trim().slice(0, 60)}`)
+        const value = backgroundValue(s, m.index!)
+        if (!value) continue
+        if (LIGHT.test(value)) offenders.push(`${f}: background:${value.trim().slice(0, 70)}`)
       }
     }
     expect(offenders).toEqual([])
