@@ -18,7 +18,8 @@ import { mount, type Controller } from '@/lib/walkthrough/engine'
 import { speakerNotes } from '@/lib/walkthrough/notes'
 import type { WalkthroughContext } from '@/lib/walkthrough/context'
 import {
-  joinAsScreen, presenterCode, CONNECT_TIMEOUT_MS, type RemoteMessage,
+  joinAsScreen, presenterPairing, CONNECT_TIMEOUT_MS,
+  type RemoteMessage, type Pairing,
 } from '@/lib/walkthrough/channel'
 
 export default function Walkthrough({
@@ -34,7 +35,7 @@ export default function Walkthrough({
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const ctrlRef = useRef<Controller | null>(null)
-  const [code, setCode] = useState('')
+  const [pairing, setPairing] = useState<Pairing | null>(null)
   const [ready, setReady] = useState(0)
   /** Set once the phone is connected, so the square is not put back again. */
   const pairedRef = useRef<(() => void) | null>(null)
@@ -66,8 +67,8 @@ export default function Walkthrough({
     const ctrl = ctrlRef.current
     if (!root || !ctrl || !remotePath) return
 
-    const myCode = presenterCode(slug)
-    setCode(myCode)
+    const mine = presenterPairing(slug)
+    setPairing(mine)
     let connected = false
 
     const status = (text: string, isReady: boolean) => {
@@ -84,7 +85,7 @@ export default function Walkthrough({
     const notes = speakerNotes(ctx)
     const names = ctrl.steps().map((s) => s.name)
 
-    const link = joinAsScreen(slug, myCode, {
+    const link = joinAsScreen(slug, mine, {
       onMessage: (m: RemoteMessage) => {
         if (!connected) { connected = true; status('Ready', true); hidePairing() }
         if (m.type === 'goto') ctrl.go(m.index)
@@ -120,7 +121,7 @@ export default function Walkthrough({
   useEffect(() => {
     const root = rootRef.current
     const ctrl = ctrlRef.current
-    if (!root || !ctrl || !code || !remotePath) return
+    if (!root || !ctrl || !pairing || !pairing.key || !remotePath) return
     let cancelled = false
     let corner: HTMLElement | null = null
     let paired = false
@@ -133,7 +134,11 @@ export default function Walkthrough({
       holder.removeAttribute('hidden')
     }
 
-    const url = new URL(`${remotePath}?s=${code}`, window.location.origin).toString()
+    // The four digits are printed under the square. The key is only inside it.
+    const url = new URL(
+      `${remotePath}?s=${pairing.code}&k=${encodeURIComponent(pairing.key)}`,
+      window.location.origin,
+    ).toString()
     // Loaded only when a walkthrough actually draws one, so the code that turns
     // a web address into a square is not shipped to every other page.
     import('qrcode').then((QR) => {
@@ -148,7 +153,7 @@ export default function Walkthrough({
         corner.appendChild(canvas)
         const lab = document.createElement('div')
         lab.className = 'code'
-        lab.textContent = `Presenter code ${code}`
+        lab.textContent = `Presenter code ${pairing.code}`
         corner.appendChild(lab)
         attach()
       })
@@ -157,7 +162,7 @@ export default function Walkthrough({
     const off = ctrl.onState((s) => { if (s.index === 0) attach() })
     pairedRef.current = () => { paired = true }
     return () => { cancelled = true; off(); pairedRef.current = null }
-  }, [code, remotePath, ready])
+  }, [pairing, remotePath, ready])
 
   return (
     <>

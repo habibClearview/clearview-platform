@@ -31,18 +31,42 @@ select id, name, slug, start_date, expected_close
 from engagement_clients
 where name ilike '%ikore%';
 
--- Then fill it in. Only blank fields are written; anything already recorded is
--- left exactly as it is.
-update engagement_clients set
-  commercialised_service    = coalesce(nullif(commercialised_service, ''),    'gender and nutrition service'),
-  walkthrough_slug          = coalesce(walkthrough_slug,                      'tanager'),
-  organisation_display_name = coalesce(nullif(organisation_display_name, ''), 'Ikore'),
-  paying_customer_segment   = coalesce(nullif(paying_customer_segment, ''),   'African agricultural institutions'),
-  close_phrase              = coalesce(nullif(close_phrase, ''),              'In March 2027'),
-  portfolio_phrase          = coalesce(nullif(portfolio_phrase, ''),          'the other organisations in IGNITE+'),
-  walkthrough_enabled       = true,
-  updated_at                = now()
-where name ilike '%ikore%';
+-- IT STOPS IF IT IS NOT SURE WHICH ONE. If more than one engagement has Ikore
+-- in its name, or none does, this writes nothing and tells you. Matching by
+-- name is convenient and it is also the way a script quietly overwrites the
+-- wrong record, so it refuses rather than guesses.
+do $$
+declare
+  hits int;
+  target text;
+begin
+  select count(*) into hits from engagement_clients where name ilike '%ikore%';
+
+  if hits = 0 then
+    raise exception 'No engagement has Ikore in its name. Nothing was changed.';
+  elsif hits > 1 then
+    raise exception
+      'More than one engagement has Ikore in its name (%). Nothing was changed. '
+      'Run the select above, then change the last line of this block to the exact id.',
+      hits;
+  end if;
+
+  select id into target from engagement_clients where name ilike '%ikore%';
+
+  -- Only blank fields are written. Anything already recorded is left as it is.
+  update engagement_clients set
+    commercialised_service    = coalesce(nullif(commercialised_service, ''),    'gender and nutrition service'),
+    walkthrough_slug          = coalesce(walkthrough_slug,                      'tanager'),
+    organisation_display_name = coalesce(nullif(organisation_display_name, ''), 'Ikore'),
+    paying_customer_segment   = coalesce(nullif(paying_customer_segment, ''),   'African agricultural institutions'),
+    close_phrase              = coalesce(nullif(close_phrase, ''),              'In March 2027'),
+    portfolio_phrase          = coalesce(nullif(portfolio_phrase, ''),          'the other organisations in IGNITE+'),
+    walkthrough_enabled       = true,
+    updated_at                = now()
+  where id = target;
+
+  raise notice 'Filled in the walkthrough settings for engagement %.', target;
+end $$;
 
 -- Check what it now says.
 select name, walkthrough_slug, walkthrough_enabled, organisation_display_name,

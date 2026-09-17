@@ -24,6 +24,14 @@
 -- with an allowlist of what may leave (src/lib/walkthrough/loader.ts).
 -- ============================================================
 
+-- WHY THIS DEFAULTS TO TRUE AND IS STILL SHUT. Two things have to be true for
+-- a public link to resolve: the engagement must have a walkthrough_slug, and
+-- this must be true. The slug defaults to nothing, and is only ever set by
+-- somebody typing it into the engagement's settings, so adding this column
+-- makes no existing engagement reachable. The switch exists to take a link
+-- away again after it has been handed out, which is the thing that actually
+-- happens, and it starts in the position where a link that was just created
+-- works.
 alter table engagement_clients add column if not exists walkthrough_enabled boolean not null default true;
 alter table engagement_clients add column if not exists walkthrough_slug text;
 alter table engagement_clients add column if not exists organisation_display_name text;

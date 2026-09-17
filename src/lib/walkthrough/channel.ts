@@ -6,11 +6,21 @@
 // stored anywhere. The screen listens, the phone sends, and after every change
 // the screen says back what it is now showing so the phone is never guessing.
 //
-// WHY A CODE AND NOT JUST THE SLUG. The channel name carries a four digit code
-// that the screen invents when it loads and shows on the holding screen. Anyone
-// who knows the client link alone cannot reach the channel, because they do not
-// have the code, and the code is only readable by someone in the room looking
-// at the screen. The remote page requires a signed-in coach on top of that.
+// TWO THINGS GUARD IT, AND ONE OF THEM IS NOT THE FOUR DIGIT CODE.
+//
+// The code on the holding screen is four digits because it is there to be read
+// across a meeting room. Four digits is ten thousand guesses, which is nothing,
+// and the channel it names is reachable by anyone who can open the public page.
+// On its own it would mean a stranger could drive a live presentation.
+//
+// So the square code on the screen carries a second value that is never
+// printed: a long random key, generated with the browser's own cryptography.
+// Every instruction the phone sends carries it, and the screen ignores anything
+// that does not. Scanning the code in the room is the only way to have it.
+//
+// On top of that the remote page itself opens only for a signed-in coach.
+// The code is the convenience, the key is the lock, and the sign in is the
+// answer to who is holding the phone.
 //
 // WHAT HAPPENS WHEN IT FAILS. Nothing that matters. The walkthrough is driven
 // by the keyboard, a clicker and the buttons on the screen whether the channel
@@ -19,6 +29,9 @@
 // arrow keys.
 // ============================================================
 import { supabase } from '@/lib/supabase'
+import { accepts, channelName, type Pairing, type Sealed } from './pairing'
+
+export { channelName, presenterPairing, pairingFromLink, type Pairing } from './pairing'
 
 /** Everything the phone can ask the screen to do. */
 export type RemoteMessage =
@@ -49,23 +62,6 @@ export interface ScreenState {
 /** How long the holding screen waits before it stops saying "waiting". */
 export const CONNECT_TIMEOUT_MS = 8000
 
-/** The name both ends must agree on. */
-export function channelName(slug: string, code: string): string {
-  return `walkthrough:${slug}:${code}`
-}
-
-/** A fresh four digit code. Kept for the session so a refresh does not change it. */
-export function presenterCode(slug: string): string {
-  const key = `gtcv-presenter-${slug}`
-  try {
-    const kept = sessionStorage.getItem(key)
-    if (kept && /^\d{4}$/.test(kept)) return kept
-  } catch {}
-  const made = String(Math.floor(1000 + Math.random() * 9000))
-  try { sessionStorage.setItem(key, made) } catch {}
-  return made
-}
-
 type Unsub = () => void
 
 /**
@@ -75,16 +71,20 @@ type Unsub = () => void
  */
 export function joinAsScreen(
   slug: string,
-  code: string,
+  pairing: Pairing,
   handlers: {
     onMessage: (m: RemoteMessage) => void
     onReady: () => void
     onLost: () => void
   },
 ): { publish: (s: ScreenState) => void; leave: Unsub } {
-  const ch = supabase.channel(channelName(slug, code), { config: { broadcast: { self: false } } })
+  const ch = supabase.channel(channelName(slug, pairing.code), { config: { broadcast: { self: false } } })
   ch.on('broadcast', { event: 'remote' }, ({ payload }) => {
-    handlers.onMessage(payload as RemoteMessage)
+    // Anything without the key from the square code is somebody else on a
+    // channel whose name they guessed. It is dropped without a word: telling
+    // them the key was wrong tells them there is a key to get right.
+    if (!accepts(pairing, payload)) return
+    handlers.onMessage((payload as Sealed<RemoteMessage>).message)
   })
   ch.subscribe((status) => {
     if (status === 'SUBSCRIBED') handlers.onReady()
@@ -102,13 +102,13 @@ export function joinAsScreen(
  */
 export function joinAsRemote(
   slug: string,
-  code: string,
+  pairing: Pairing,
   handlers: {
     onState: (s: ScreenState) => void
     onStatus: (status: 'connecting' | 'connected' | 'lost') => void
   },
 ): { send: (m: RemoteMessage) => void; leave: Unsub } {
-  const ch = supabase.channel(channelName(slug, code), { config: { broadcast: { self: false } } })
+  const ch = supabase.channel(channelName(slug, pairing.code), { config: { broadcast: { self: false } } })
   ch.on('broadcast', { event: 'screen' }, ({ payload }) => {
     handlers.onState(payload as ScreenState)
   })
@@ -116,12 +116,14 @@ export function joinAsRemote(
   ch.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
       handlers.onStatus('connected')
-      ch.send({ type: 'broadcast', event: 'remote', payload: { type: 'hello' } }).catch(() => {})
+      ch.send({ type: 'broadcast', event: 'remote', payload: { key: pairing.key, message: { type: 'hello' } } }).catch(() => {})
     }
     if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') handlers.onStatus('lost')
   })
   return {
-    send: (m) => { ch.send({ type: 'broadcast', event: 'remote', payload: m }).catch(() => {}) },
+    send: (m) => {
+      ch.send({ type: 'broadcast', event: 'remote', payload: { key: pairing.key, message: m } }).catch(() => {})
+    },
     leave: () => { supabase.removeChannel(ch) },
   }
 }

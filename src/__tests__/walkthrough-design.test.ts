@@ -24,7 +24,7 @@ const REFERENCE = join(ROOT, 'docs/walkthrough-reference/reference.html')
 function selectors(css: string): string[] {
   const out: string[] = []
   const body = css.replace(/@media[^{]+\{/g, '').replace(/@keyframes[^{]+\{[\s\S]*?\}\s*\}/g, '')
-  for (const m of body.matchAll(/(^|\})\s*([^{}@]+)\{/g)) {
+  for (const m of Array.from(body.matchAll(/(^|\})\s*([^{}@]+)\{/g))) {
     const sel = m[2].trim()
     if (sel) out.push(sel)
   }

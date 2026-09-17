@@ -19,26 +19,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { WALKTHROUGH_CSS } from '@/lib/walkthrough/styles'
 import { REMOTE_CSS } from '@/lib/walkthrough/remote-styles'
-import { joinAsRemote, type ScreenState } from '@/lib/walkthrough/channel'
+import { joinAsRemote, type ScreenState, type Pairing } from '@/lib/walkthrough/channel'
 import { remoteHeading } from '@/lib/walkthrough/notes'
 
 type Status = 'connecting' | 'connected' | 'lost'
 
-export default function WalkthroughRemote({ slug, code }: { slug: string; code: string }) {
+export default function WalkthroughRemote({ slug, pairing }: { slug: string; pairing: Pairing | null }) {
   const [status, setStatus] = useState<Status>('connecting')
   const [state, setState] = useState<ScreenState | null>(null)
   const [menu, setMenu] = useState(false)
   const sender = useRef<((m: any) => void) | null>(null)
 
   useEffect(() => {
-    if (!code) return
-    const link = joinAsRemote(slug, code, {
+    if (!pairing) return
+    const link = joinAsRemote(slug, pairing, {
       onState: (s) => setState(s),
       onStatus: (st) => setStatus(st),
     })
     sender.current = link.send
     return () => { link.leave(); sender.current = null }
-  }, [slug, code])
+  }, [slug, pairing])
 
   const send = (m: any) => { sender.current?.(m) }
   const buzz = () => { try { navigator.vibrate?.(10) } catch {} }
@@ -51,7 +51,7 @@ export default function WalkthroughRemote({ slug, code }: { slug: string; code: 
     return state.notes[state.index] || ''
   }, [state])
 
-  if (!code) {
+  if (!pairing) {
     return (
       <div className="gtcvw gtcvw-remote" data-room="dark">
         <style dangerouslySetInnerHTML={{ __html: WALKTHROUGH_CSS + REMOTE_CSS }} />

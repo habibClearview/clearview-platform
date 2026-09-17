@@ -16,6 +16,7 @@ import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import RequireSignIn from '@/components/auth/RequireSignIn'
 import WalkthroughRemote from './WalkthroughRemote'
+import { pairingFromLink } from '@/lib/walkthrough/pairing'
 import { WALKTHROUGH_CSS } from '@/lib/walkthrough/styles'
 import { REMOTE_CSS } from '@/lib/walkthrough/remote-styles'
 
@@ -30,7 +31,10 @@ function Message({ children }: { children: React.ReactNode }) {
 
 function CoachOnly({ slug }: { slug: string }) {
   const params = useSearchParams()
-  const code = (params?.get('s') || '').trim()
+  // Both come from the square code on the screen. The four digits name the
+  // channel; the key is what the screen checks before it obeys anything. One
+  // rule, in one place, so the two ends cannot come to disagree about it.
+  const pairing = pairingFromLink((params?.get('s') || '').trim(), (params?.get('k') || '').trim())
   const [state, setState] = useState<'checking' | 'ok' | 'denied'>('checking')
 
   useEffect(() => {
@@ -50,7 +54,7 @@ function CoachOnly({ slug }: { slug: string }) {
   if (state === 'denied') {
     return <Message>This remote is for the coach presenting. Your sign in does not open it.</Message>
   }
-  return <WalkthroughRemote slug={slug} code={/^\d{4}$/.test(code) ? code : ''} />
+  return <WalkthroughRemote slug={slug} pairing={pairing} />
 }
 
 export default function RemotePage({ slug }: { slug: string }) {
