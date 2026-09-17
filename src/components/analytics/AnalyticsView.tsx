@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import { useState, useMemo } from 'react'
+import { onSolid } from '@/lib/ink'
 import {
   buildDebtSchedule,
   buildCreditRiskAssessment,
@@ -45,7 +46,7 @@ export default function AnalyticsView({ result, debtObligations, monthLabels, cc
         <div style={{display:'flex',alignItems:'center',gap:'1.5rem',flexWrap:'wrap'}}>
           <div>
             <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:CC.slate,marginBottom:'0.3rem'}}>CLASSIFICATION</div>
-            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:700,padding:'0.3rem 0.8rem',borderRadius:20,background:creditRisk.classification==='Stable'?CC.green:creditRisk.classification==='At Risk'?CC.amber:CC.red,color:'var(--cv-on-cyan)'}}>{creditRisk.classification}</span>
+            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:700,padding:'0.3rem 0.8rem',borderRadius:20,background:creditRisk.classification==='Stable'?CC.green:creditRisk.classification==='At Risk'?CC.amber:CC.red,color:onSolid(creditRisk.classification==='Stable'?CC.green:creditRisk.classification==='At Risk'?CC.amber:CC.red)}}>{creditRisk.classification}</span>
           </div>
           <div>
             <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:CC.slate,marginBottom:'0.3rem'}}>SCORE</div>

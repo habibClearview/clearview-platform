@@ -300,6 +300,10 @@ function btn(colour: string): React.CSSProperties {
   return {
     ...mono, fontSize: 13, fontWeight: 700, padding: '7px 14px', borderRadius: 8,
     border: `1px solid ${colour}`, background: colour === C.teal ? colour : 'transparent',
-    color: 'var(--cv-on-cyan)', cursor: 'pointer',
+    // A TRANSPARENT BUTTON SITS ON THE DARK BAR, NOT ON THE TEAL. From the
+    // review on #282, and it is a fault I introduced sweeping white off cyan:
+    // only the filled teal button needs the dark ink, and the rest are
+    // transparent over this bar's navy, where dark ink is invisible.
+    color: colour === C.teal ? 'var(--cv-on-cyan)' : C.ink, cursor: 'pointer',
   }
 }

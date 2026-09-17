@@ -422,23 +422,39 @@ const CUSTOMER_CLARITY: QuestionSeed[] = [
   // list. Three questions, because a segment can be any combination of them
   // and the interesting ones are willing but not able, and able but not
   // bothered.
+  // THESE THREE ARE YES, NO OR UNSURE, AND NOTHING ELSE. From the review on
+  // #282. The table has held them to those three words since August, and
+  // "unsure" is a real answer there rather than a missing one. I first wrote
+  // them as boxes to type into, which would have been refused by the database
+  // and the room's answer lost without anybody being told. So the room picks
+  // one of the three, and says why in the question after them, where there is
+  // no such rule.
   q({
     gate_id: 'dp02', sort_order: 6, suggested_minutes: 5,
-    question_text: 'Adoption test, one of three. Would they WANT this if it were offered tomorrow? Say what makes you think so.',
-    question_type: 'collect',
+    question_text: 'Adoption test, one of three. Would they WANT this if it were offered tomorrow?',
+    question_type: 'classify',
+    options: ['yes', 'no', 'unsure'],
     target_fields: [{ column: 'willing', heading: 'Would they want it' }],
   }),
   q({
     gate_id: 'dp02', sort_order: 7, suggested_minutes: 5,
     question_text: 'Adoption test, two of three. COULD they pay for it? Is there money, and can this person release it?',
-    question_type: 'collect',
+    question_type: 'classify',
+    options: ['yes', 'no', 'unsure'],
     target_fields: [{ column: 'able', heading: 'Could they pay' }],
   }),
   q({
     gate_id: 'dp02', sort_order: 8, suggested_minutes: 5,
     question_text: 'Adoption test, three of three. Is this near the top of their list, or something they would get to eventually?',
-    question_type: 'collect',
+    question_type: 'classify',
+    options: ['yes', 'no', 'unsure'],
     target_fields: [{ column: 'prioritised', heading: 'Is it a priority' }],
+  }),
+  q({
+    gate_id: 'dp02', sort_order: 9, suggested_minutes: 6,
+    question_text: 'Now say why. What makes you answer the three above the way you did? Evidence rather than opinion, if you have any.',
+    question_type: 'collect',
+    target_fields: [{ column: 'notes', heading: 'Why we say so' }],
   }),
 ]
 
@@ -492,9 +508,13 @@ const VIABILITY: QuestionSeed[] = [
   }),
   q({
     gate_id: 'dp04', sort_order: 2, suggested_minutes: 5,
+    // THE TABLE SPELLS THESE ITS OWN WAY and refuses anything else, so these
+    // are its words rather than prettier ones. From the review on #282, and
+    // the same fault in three places: an option the column will not accept is
+    // an answer the room gives and the database throws away.
     question_text: 'Which kind of cost is that? Direct labour, direct materials, travel and logistics, quality assurance, or overhead.',
     question_type: 'classify',
-    options: ['Direct labour', 'Direct materials', 'Travel and logistics', 'Quality assurance', 'Overhead'],
+    options: ['direct_labour', 'direct_materials', 'travel_logistics', 'quality_assurance', 'overhead'],
     target_fields: [{ column: 'category', heading: 'Kind of cost' }],
   }),
   q({
@@ -549,9 +569,9 @@ const MARKET_ENTRY: QuestionSeed[] = [
   // stage on each row is a list of names.
   q({
     gate_id: 'dp05', sort_order: 6, suggested_minutes: 5,
-    question_text: 'Where are we with them today? Be honest: a name we have never contacted is not a conversation.',
+    question_text: 'Where are we with them today? identified is a name on a list, contacted means we have written or called, met means we have spoken, proposal_sent means they have something to say yes to, closed means it is agreed. Be honest: a name we have never contacted is not a conversation.',
     question_type: 'classify',
-    options: ['Not contacted yet', 'Contacted, no reply', 'In conversation', 'They have asked for a proposal', 'Agreed'],
+    options: ['identified', 'contacted', 'met', 'proposal_sent', 'closed'],
     target_fields: [{ column: 'stage', heading: 'Where we are' }],
   }),
 ]
@@ -569,9 +589,9 @@ const IDENTITY_AND_PARTNERS: QuestionSeed[] = [
   }),
   q({
     gate_id: 'dp06', sort_order: 2, suggested_minutes: 5,
-    question_text: 'What kind of relationship is that? They send us work, we deliver together, they vouch for us, or they compete with us.',
+    question_text: 'What kind of relationship is that? referral means they send us work, co_delivery means we deliver together, endorsement means they vouch for us, conflict means they compete with us.',
     question_type: 'classify',
-    options: ['They send us work', 'We deliver together', 'They vouch for us', 'They compete with us'],
+    options: ['referral', 'co_delivery', 'endorsement', 'conflict'],
     target_fields: [{ column: 'partner_type', heading: 'Kind of relationship' }],
   }),
   q({
@@ -588,9 +608,16 @@ const IDENTITY_AND_PARTNERS: QuestionSeed[] = [
   }),
   q({
     gate_id: 'dp06', sort_order: 5, suggested_minutes: 8,
-    question_text: 'How does being seen with them change how a paying client sees us? Say it plainly, including when the answer is that it makes us look like a grant project.',
-    question_type: 'collect',
+    question_text: 'How does being seen with them change how a paying client sees us? strengthens, neutral, compromises, or unclear. Answer honestly, including when it makes us look like a grant project.',
+    question_type: 'classify',
+    options: ['strengthens', 'neutral', 'compromises', 'unclear'],
     target_fields: [{ column: 'positioning_effect', heading: 'How it makes us look' }],
+  }),
+  q({
+    gate_id: 'dp06', sort_order: 6, suggested_minutes: 8,
+    question_text: 'Now say why, in a sentence. The method wants the conflict partnerships named with a recommendation for each, and this is where that is written.',
+    question_type: 'collect',
+    target_fields: [{ column: 'notes', heading: 'Why, and what to do' }],
   }),
 ]
 
@@ -665,9 +692,9 @@ const SCALE: QuestionSeed[] = [
   }),
   q({
     gate_id: 'dp08', sort_order: 2, suggested_minutes: 5,
-    question_text: 'Is that where we start, or where we grow to?',
+    question_text: 'Is that where we start, where we grow to, or both? entry is where we start, scale is where we grow to.',
     question_type: 'classify',
-    options: ['Where we start', 'Where we grow to'],
+    options: ['entry', 'scale', 'both'],
     target_fields: [{ column: 'entry_or_scale', heading: 'Start or grow' }],
   }),
   q({

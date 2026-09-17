@@ -186,6 +186,21 @@ describe('the rule stays in one place', () => {
     }
   })
 
+  it('accepts a button whose colour changes with its fill', () => {
+    // The room control bar: filled teal takes the dark ink, transparent over
+    // the dark bar keeps white. Both are right, and neither is the fault.
+    const ok = "style={{ background: c === C.teal ? c : 'transparent', color: c === C.teal ? 'var(--cv-on-cyan)' : C.ink }}"
+    const cm = /\bcolor\s*:([^,]*(?:\([^)]*\))?[^,]*)/.exec(ok)!
+    expect(/cv-on-cyan/.test(cm[1])).toBe(true)
+  })
+
+  it('still catches one white for every fill', () => {
+    const bad = "style={{ background: on ? C.teal : 'transparent', color: '#fff' }}"
+    const cm = /\bcolor\s*:([^,]*(?:\([^)]*\))?[^,]*)/.exec(bad)!
+    expect(WHITE.test(cm[1])).toBe(true)
+    expect(/onSolid\s*\(|cv-on-cyan/.test(cm[1])).toBe(false)
+  })
+
   it('no screen writes white onto a cyan or teal fill by hand', () => {
     const offenders: string[] = []
     for (const f of screens) {
@@ -196,7 +211,14 @@ describe('the rule stays in one place', () => {
         const obj = enclosingObject(src, m.index!)
         if (obj === null) continue
         const cm = /\bcolor\s*:([^,]*(?:\([^)]*\))?[^,]*)/.exec(obj)
-        if (cm && WHITE.test(cm[1])) {
+        if (!cm) continue
+        // A FILL THAT CHANGES NEEDS A COLOUR THAT CHANGES WITH IT. The fault
+        // is one writing colour for every fill. A colour that asks onSolid, or
+        // that names the dark ink in one of its own branches, has been thought
+        // about: the room control bar is teal when filled and transparent over
+        // a dark navy bar otherwise, and needs opposite inks for the two.
+        const handled = /onSolid\s*\(/.test(cm[1]) || /cv-on-cyan/.test(cm[1])
+        if (WHITE.test(cm[1]) && !handled) {
           offenders.push(`${f}: background:${value.trim().slice(0, 44)} / color:${cm[1].trim().slice(0, 44)}`)
         }
       }
