@@ -19,6 +19,7 @@
 // client, and that is the organisation's disclosure to make, not yours.
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 import CopyLink from '@/components/common/CopyLink'
 
@@ -33,7 +34,7 @@ const btn = (col, solid) => ({
   ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.34rem 0.8rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 
 async function api(method, body, query) {

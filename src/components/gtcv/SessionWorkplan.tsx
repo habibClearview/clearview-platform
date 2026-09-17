@@ -34,6 +34,7 @@
 // CLIENT AGNOSTIC: no organisation, funder or person is named here.
 // ============================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 import {
   KINDS, KIND_LABEL, kindDef, durationLabel,
@@ -56,15 +57,15 @@ const card = {
 }
 const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.32rem', fontWeight: 700, color: C.navy, margin: 0 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.95rem', color: C.slate, lineHeight: 1.45 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.86rem', fontWeight: 700, padding: '0.38rem 0.85rem',
+  ...mono, fontSize: '0.95rem', fontWeight: 700, padding: '0.42rem 0.9rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 const th = { ...mono, fontSize: '0.74rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: C.slate, textAlign: 'left', padding: '0.35rem 0.5rem', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
-const td = { fontSize: '0.92rem', color: C.navy, padding: '0.45rem 0.5rem', borderBottom: '1px solid var(--cv-border-soft)', verticalAlign: 'top' }
+const td = { fontSize: '1.01rem', color: C.navy, padding: '0.45rem 0.5rem', borderBottom: '1px solid var(--cv-border-soft)', verticalAlign: 'top' }
 
 /**
  * Is this the database telling us the party_name column is not there yet,

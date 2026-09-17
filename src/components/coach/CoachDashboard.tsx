@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { onSolid } from '@/lib/ink'
 import {
   statusLabel, statusColor, canEdit, canViewCoachGuidance, canSignOff,
   canManageTeam, canApproveTimesheets, canSubmitTimesheets,
@@ -25,7 +26,6 @@ import CopyLink from '@/components/common/CopyLink'
 import { useNarrowScreen } from '@/lib/narrow-screen'
 import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
-import InterviewReporting from '@/components/gtcv/InterviewReporting'
 import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
 import ShowcaseSharing from '@/components/gtcv/ShowcaseSharing'
 import EngagementSettings from '@/components/gtcv/EngagementSettings'
@@ -33,8 +33,6 @@ import WelcomePack from '@/components/gtcv/WelcomePack'
 import TestEngagementPanel from '@/components/coach/TestEngagementPanel'
 import WhatNeedsYou from '@/components/gtcv/WhatNeedsYou'
 import EvidenceLibraryPanel from '@/components/gtcv/EvidenceLibraryPanel'
-import InterviewBriefing from '@/components/gtcv/InterviewBriefing'
-import InterviewCaptureForm from '@/components/gtcv/InterviewCaptureForm'
 import CoverPanel from '@/components/gtcv/CoverPanel'
 import CoachQuickReference from '@/components/gtcv/CoachQuickReference'
 import GuidanceLibrary from '@/components/gtcv/GuidanceLibrary'
@@ -89,14 +87,11 @@ const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1
 
 function navBtn(active){return{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.72rem 1rem',border:'none',background:'transparent',color:active?C.cyan:'var(--cv-wa-60)',cursor:'pointer',borderBottom:active?`3px solid ${C.cyan}`:'3px solid transparent',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 function addBtn(sm=false,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
-// White on a cyan or teal button is hard to read -- both are light enough that
-// the letters wash out. --cv-on-cyan is the dark ink that already existed for
-// this; the dark navy/slate/red buttons keep the white.
-function onSolid(col){
-  if(col===C.white||col===C.cream)return C.navy
-  if(col===C.cyan||col===C.teal||col===C.green||col===C.amber)return 'var(--cv-on-cyan)'
-  return 'var(--cv-on-accent)'
-}
+// The writing colour for a coloured button is onSolid in src/lib/ink.ts, so
+// every screen on the platform answers this the same way. This file used to
+// carry its own copy, and so did two others, which is why screens built after
+// them went white on cyan again.
+
 function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:onSolid(col),cursor:'pointer'}}
 // Pill toggle for mode / filter subtabs (new design language)
 function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
@@ -3123,7 +3118,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   Intelligence client has no financial model to open, and
                   offering one sends them into a service they are not paying
                   for and have no data in. */}
-              {selClient.engagement_mode==='financial'&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>}
+              {selClient.engagement_mode==='financial'&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-cyan)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>}
               {isSuperCoach&&<CopyIntakeLink client={selClient}/>}
               {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
               {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
@@ -3194,7 +3189,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
-              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview ↗</a>}
+              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-cyan)',textDecoration:'none'}}>Open Clearview ↗</a>}
               {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
@@ -3452,7 +3447,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                     how Decision Point 2 gets its evidence and observation is how Decision Point 7 gets
                     its, and both used to sit ten and seven places away in a flat
                     list where you had to know where to look. */}
-                {dpKey==='dp02'&&<div style={{marginTop:26}}><InterviewBriefing/><div style={{height:22}}/><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(previewRoleId)} clientName={selClient.name}/><div style={{height:22}}/><InterviewReporting clientId={selClient.id}/></div>}
+                {/* Decision Point 2's own block already carries the conversation
+                    rules, the capture form and what the conversations add up
+                    to. See BLOCK_SURFACES.dp02 in BlockWorkspace. This tab
+                    then drew all three a second time underneath, so the same
+                    form appeared twice on one page. Habib, 17 September 2026:
+                    "the interview captured appears twice in this tab, this
+                    should not be so, please remove the one at the bottom." */}
                 {dpKey==='dp07'&&<div style={{marginTop:26}}><TabPilotObservation client={selClient} pilots={pilots} onAdd={async(p)=>{const {data}=await supabase.from('pilot_observations').insert([{...p,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:[...pilots,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`pilots:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:pilots.map(p=>p.id!==id?p:{...p,...updates})}})),()=>supabase.from('pilot_observations').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></div>}
               </div>
             ))}
@@ -3524,7 +3525,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}><div style={secH}>Programmes</div><button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ New Programme</button></div>
         {showNew&&<NewProgrammeForm onSave={async p=>{const {data,error}=await supabase.from('programmes').insert([p]).select().single();if(!error&&data){setPrograms(prev=>[...prev,data]);setShowNew(false)}}} onCancel={()=>setShowNew(false)}/>}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'1.25rem'}}>
-          {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer',marginBottom:0}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} · {p.country} · {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-accent)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
+          {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer',marginBottom:0}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} · {p.country} · {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-cyan)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
         </div>
       </div>
     )
@@ -3906,7 +3907,7 @@ function ServicesSection({payerType,payerId,clients}){
                   <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.5rem'}}>
                     {Object.entries(SERVICE_TYPE_LABELS).map(([k,l])=>{
                       const on=servicesOf(r).includes(k)
-                      return <button key={k} onClick={()=>toggleService(r,k)} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.78rem',border:`1px solid ${on?C.teal:C.border}`,background:on?C.teal:'transparent',color:on?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.15rem 0.6rem',cursor:'pointer'}}>{l}</button>
+                      return <button key={k} onClick={()=>toggleService(r,k)} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.78rem',border:`1px solid ${on?C.teal:C.border}`,background:on?C.teal:'transparent',color:on?'var(--cv-on-cyan)':C.slate,borderRadius:999,padding:'0.15rem 0.6rem',cursor:'pointer'}}>{l}</button>
                     })}
                   </div>
                 </div>
@@ -3969,7 +3970,7 @@ function NewAssignmentForm({clients,onSave,onCancel}){
           <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
             {Object.entries(SERVICE_TYPE_LABELS).map(([k,l])=>{
               const on=f.service_types.includes(k)
-              return <button key={k} onClick={()=>setF(x=>({...x,service_types:flip(x.service_types,k)}))} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',border:`1px solid ${on?C.teal:C.border}`,background:on?C.teal:'transparent',color:on?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.25rem 0.7rem',cursor:'pointer'}}>{l}</button>
+              return <button key={k} onClick={()=>setF(x=>({...x,service_types:flip(x.service_types,k)}))} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',border:`1px solid ${on?C.teal:C.border}`,background:on?C.teal:'transparent',color:on?'var(--cv-on-cyan)':C.slate,borderRadius:999,padding:'0.25rem 0.7rem',cursor:'pointer'}}>{l}</button>
             })}
           </div>
         </div>
@@ -4243,7 +4244,7 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
           <div key={a.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.65rem 0',borderBottom:`1px solid ${C.border}`,fontSize:'1.07rem'}}>
             <div style={{display:'flex',gap:'0.4rem',flexShrink:0}}>
               {[true,false,null].map((v,vi)=>(
-                <button key={vi} onClick={()=>{if(!locked){const newAnswers=[...answers];newAnswers[i]={...newAnswers[i],answer:v};onUpdate({readiness_answers:newAnswers})}}} style={{padding:'3px 10px',borderRadius:4,fontSize:'1.01rem',cursor:locked?'default':'pointer',background:a.answer===v?(v===true?C.green:v===false?C.red:C.slate):C.white,color:a.answer===v?'var(--cv-on-accent)':C.slate,border:`1px solid ${C.border}`}}>
+                <button key={vi} onClick={()=>{if(!locked){const newAnswers=[...answers];newAnswers[i]={...newAnswers[i],answer:v};onUpdate({readiness_answers:newAnswers})}}} style={{padding:'3px 10px',borderRadius:4,fontSize:'1.01rem',cursor:locked?'default':'pointer',background:a.answer===v?(v===true?C.green:v===false?C.red:C.slate):C.white,color:a.answer===v?onSolid(v===true?C.green:v===false?C.red:C.slate):C.slate,border:`1px solid ${C.border}`}}>
                   {v===true?'Yes':v===false?'No':'?'}
                 </button>
               ))}

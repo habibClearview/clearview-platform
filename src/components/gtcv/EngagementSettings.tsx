@@ -15,6 +15,7 @@
 // list what the setting is not.
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 import { DEFAULT_VALIDATION_MIN_PER_SEGMENT } from '@/lib/engagement-types'
 import { CONVERGENCE_MINIMUM } from '@/lib/interview-report'
@@ -41,7 +42,7 @@ const smallBtn = (col, solid) => ({
   ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.36rem 0.85rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 
 const MOMENTUM = [

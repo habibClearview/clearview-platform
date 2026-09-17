@@ -40,6 +40,7 @@
 // people so it is asked once rather than every session.
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 import { consentSentence } from '@/lib/recording'
 import { DeviceRecorder, recordingSupport, listMicrophones, SILENCE_LEVEL, SILENCE_ALARM_SECONDS } from '@/lib/recorder-client'
@@ -55,7 +56,7 @@ const btn = (col, solid) => ({
   ...mono, fontSize: '0.86rem', fontWeight: 700, padding: '0.42rem 0.95rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 
 async function api(method, body, query) {

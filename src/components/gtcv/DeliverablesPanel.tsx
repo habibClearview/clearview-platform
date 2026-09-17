@@ -23,6 +23,7 @@
 // the hole before the funder does. Nothing is sent until it is approved.
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { formatMoney } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 
@@ -42,7 +43,7 @@ const btn = (col, solid) => ({
   ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.34rem 0.78rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 
 const DP_LABEL = {

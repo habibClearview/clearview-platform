@@ -23,6 +23,7 @@
 // elsewhere.
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 import { GUIDANCE_CATEGORIES, readableSize } from '@/lib/guidance'
 
@@ -41,7 +42,7 @@ const btn = (col, solid) => ({
   ...mono, fontSize: '0.86rem', fontWeight: 700, padding: '0.45rem 0.95rem', minHeight: 40,
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+  color: solid ? onSolid(col) : col, cursor: 'pointer',
 })
 
 const BLANK = { title: '', description: '', category: 'method', url: '' }

@@ -42,6 +42,7 @@
 //   disabled     read only surfaces pass true
 // ============================================================
 import { useCallback, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { supabase } from '@/lib/supabase'
 
 // ─── design tokens (mirror the coach dashboard) ──────────────
@@ -56,7 +57,7 @@ const btn = (col, solid) => ({
   ...mono, fontSize: '0.86rem', fontWeight: 600, padding: '0.4rem 0.9rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
-  color: solid ? 'var(--cv-on-accent)' : col,
+  color: solid ? onSolid(col) : col,
   cursor: 'pointer', opacity: 1,
 })
 

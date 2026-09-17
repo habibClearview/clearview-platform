@@ -201,7 +201,7 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
                 ...mono, fontSize: '0.86rem', fontWeight: 600, padding: '0.42rem 1rem',
                 borderRadius: 7, border: `1px solid ${dirty ? C.teal : C.border}`,
                 background: dirty ? C.teal : 'transparent',
-                color: dirty ? 'var(--cv-on-accent)' : C.slate,
+                color: dirty ? 'var(--cv-on-cyan)' : C.slate,
                 cursor: busy || !dirty ? 'default' : 'pointer',
               }}
             >

@@ -86,7 +86,22 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
       // recording made in a session now appears on that session. What is left
       // here is what has no session: a field interview, and the pre-engagement
       // conversation, which happens before there is a plan.
-      setRows((json.recordings || []).filter((r) => !r.session_id))
+      // EVERY RECORDING, BECAUSE ONE THAT CANNOT BE FOUND CANNOT BE DELETED.
+      // 17 September 2026. Habib: "I am not able to see the draft recording
+      // that has not been submitted, where is that listed so I can delete it -
+      // the ikore should be empty - but it has one draft I can't see
+      // anywhere."
+      //
+      // This showed only recordings with no session on them, because each
+      // session shows its own. That is tidy until you are hunting for one: a
+      // recording attached to a session could only be found by opening the
+      // right decision point and expanding the right session, and if you did
+      // not know which, there was nowhere that listed it at all.
+      //
+      // So this is now the full list for the engagement, with the ones on a
+      // session marked as such. It is the answer to "what is this platform
+      // holding for this client", which has to be answerable in one place.
+      setRows(json.recordings || [])
       setErr(null)
 
       // AUDIO NOTHING POINTS AT. 12 September 2026. Deleting a recording takes
@@ -166,8 +181,9 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
         What has been recorded
       </div>
       <div style={{ ...hint, marginTop: '0.2rem' }}>
-        Recordings that do not belong to a planned session: field interviews, and the pre-engagement
-        conversation. Everything recorded in a session is shown on that session in the plan above.
+        Every recording held for this engagement, whether or not it belongs to a planned session.
+        Each one can be deleted here. A recording made in a session is also shown on that session,
+        on its decision point.
       </div>
 
       {loading && <div style={{ ...hint, marginTop: '0.6rem' }}>Reading...</div>}
@@ -204,7 +220,7 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
 
       {!loading && !err && rows.length === 0 && (
         <div style={{ ...hint, marginTop: '0.6rem' }}>
-          Nothing here. Recordings made in a planned session are shown on that session above.
+          Nothing has been recorded for this engagement.
         </div>
       )}
 
@@ -231,10 +247,19 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
             </div>
 
             <div style={{ display: 'flex', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
-              {r.session_id && (
-                <a href={`/call/${r.session_id}`} style={{ ...mono, fontSize: '0.84rem', color: C.teal }}>
-                  Open the session room
-                </a>
+              {r.session_id ? (
+                <>
+                  <span style={{ ...mono, fontSize: '0.84rem', color: C.slate }}>
+                    On a planned session
+                  </span>
+                  <a href={`/call/${r.session_id}`} style={{ ...mono, fontSize: '0.84rem', color: C.teal }}>
+                    Open the session room
+                  </a>
+                </>
+              ) : (
+                <span style={{ ...mono, fontSize: '0.84rem', color: C.slate }}>
+                  Not on a planned session
+                </span>
               )}
               {t && <span style={{ ...mono, fontSize: '0.82rem', color: t.colour }}>{t.label}</span>}
               {!t && r.status !== 'opening' && (

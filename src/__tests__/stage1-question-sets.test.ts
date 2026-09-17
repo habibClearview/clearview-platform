@@ -25,8 +25,8 @@ describe('R4, which blocks have questions', () => {
     for (const gate of others) {
       expect(startingQuestionSet(gate.id), `${gate.id} should have no questions`).toEqual([])
     }
-    // Nine of the eleven, so the negative case is the majority of the platform.
-    expect(others.length).toBe(GATES.length - 2)
+    // The negative case is still the majority of the platform.
+    expect(others.length).toBe(GATES.length - BLOCKS_WITH_QUESTIONS.length)
   })
 
   it('returns nothing for a block identifier that does not exist', () => {
@@ -129,5 +129,56 @@ describe('R15, a classify question offers a fixed list', () => {
 describe('Q8, the wording for a block with no questions', () => {
   it('is exactly the sentence given, character for character', () => {
     expect(NO_QUESTIONS_YET).toBe('No questions have been set up for this block yet.')
+  })
+})
+
+// ============================================================
+// DECISION POINT 9 IS SIX QUESTIONS, NOT NONE
+//
+// Habib, 17 September 2026: "In decision point 9 the run in the room button
+// says there are no questions, but there are six questions that must be
+// answered by participants and scored."
+//
+// The block that exists entirely to score the six fit tests told the room it
+// had nothing to ask, so the session was run from paper.
+// ============================================================
+describe('the Commercial Readiness fit tests', () => {
+  const set = startingQuestionSet('dp09')
+
+  it('asks the room all six, and only six', () => {
+    expect(set.length).toBe(6)
+  })
+
+  it('asks them one at a time, so the spread of opinion is visible', () => {
+    // Six separate questions rather than one with six parts: the room's
+    // answers to each fit test have to arrive on their own to be discussed.
+    expect(set.map(s => s.sort_order)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(new Set(set.map(s => s.question_text)).size).toBe(6)
+  })
+
+  it('scores them on the diagnostic panel own scale, 0 to 3', () => {
+    // 0 no evidence, 1 asserted, 2 evidenced, 3 proven. A 1 to 5 scale here
+    // would produce a score the Commercial Readiness table cannot record.
+    for (const s of set) {
+      expect(s.question_type).toBe('score')
+      expect(s.scale_min).toBe(0)
+      expect(s.scale_max).toBe(3)
+    }
+  })
+
+  it('carries the six fit tests by name, word for word', () => {
+    const text = set.map(s => s.question_text).join(' | ')
+    for (const name of [
+      'Problem-Provider Fit', 'Problem-Solution Fit', 'Solution-Customer Fit',
+      'Solution-Pilot Fit', 'Solution-Market Fit', 'Solution-Scale Fit',
+    ]) {
+      expect(text, name).toContain(name)
+    }
+  })
+
+  it('is listed as a block that has questions, so the room offers them', () => {
+    // BLOCKS_WITH_QUESTIONS is what decides whether the block says
+    // "no questions have been set up for this block yet".
+    expect(BLOCKS_WITH_QUESTIONS).toContain('dp09')
   })
 })

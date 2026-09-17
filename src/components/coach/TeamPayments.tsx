@@ -21,6 +21,7 @@
 // the legacy `timesheets` table, or the co-implementer roster logic.
 // ============================================================
 import { useEffect, useState, useCallback } from 'react'
+import { onSolid } from '@/lib/ink'
 import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoney } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
@@ -43,14 +44,11 @@ const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1
 const th   = {padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}
 const td   = {padding:'0.4rem 0.6rem',verticalAlign:'top'}
 function addBtn(sm=false,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
-// White on a cyan or teal button is hard to read -- both are light enough that
-// the letters wash out. --cv-on-cyan is the dark ink that already existed for
-// this; the dark navy/slate/red buttons keep the white.
-function onSolid(col){
-  if(col===C.white||col===C.cream)return C.navy
-  if(col===C.cyan||col===C.teal||col===C.green||col===C.amber)return 'var(--cv-on-cyan)'
-  return 'var(--cv-on-accent)'
-}
+// The writing colour for a coloured button is onSolid in src/lib/ink.ts, so
+// every screen on the platform answers this the same way. This file used to
+// carry its own copy, and so did two others, which is why screens built after
+// them went white on cyan again.
+
 function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:onSolid(col),cursor:'pointer'}}
 function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}

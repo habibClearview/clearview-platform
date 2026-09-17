@@ -116,7 +116,7 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
               onClick={() => onChange(realRole)}
               style={{
                 ...mono, fontSize: '0.85rem', fontWeight: 700, padding: '0.35rem 0.9rem', border: 'none',
-                borderRadius: 7, background: C.amber, color: 'var(--cv-on-accent)', cursor: 'pointer',
+                borderRadius: 7, background: C.amber, color: 'var(--cv-on-cyan)', cursor: 'pointer',
               }}
             >Back to your own view</button>
           </>

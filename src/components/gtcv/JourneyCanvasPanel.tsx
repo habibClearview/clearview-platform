@@ -18,6 +18,7 @@
 // it, using the same remembered folding as the five tools.
 // ============================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import { authedFetch } from '@/lib/authed-fetch'
 import { fixedVersionStamp, NAME_WITHHELD, NOTHING_DECIDED_YET, type GateLine } from '@/lib/journey-canvas'
 import { useCollapse } from '@/components/gtcv/useCollapse'
@@ -37,7 +38,7 @@ function btn(colour: string, solid = false): React.CSSProperties {
     ...mono, fontSize: '0.78rem', fontWeight: 600, padding: '0.32rem 0.7rem',
     border: `1px solid ${colour}`, borderRadius: 7,
     background: solid ? colour : 'transparent',
-    color: solid ? 'var(--cv-on-accent)' : colour, cursor: 'pointer',
+    color: solid ? onSolid(colour) : colour, cursor: 'pointer',
   }
 }
 
