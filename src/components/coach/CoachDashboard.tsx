@@ -3454,7 +3454,20 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                     form appeared twice on one page. Habib, 17 September 2026:
                     "the interview captured appears twice in this tab, this
                     should not be so, please remove the one at the bottom." */}
-                {dpKey==='dp07'&&<div style={{marginTop:26}}><TabPilotObservation client={selClient} pilots={pilots} onAdd={async(p)=>{const {data}=await supabase.from('pilot_observations').insert([{...p,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:[...pilots,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`pilots:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:pilots.map(p=>p.id!==id?p:{...p,...updates})}})),()=>supabase.from('pilot_observations').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></div>}
+                {/* DECISION POINT 7 HAD TWO BOXES FOR THE SAME JOB. 17 September
+                    2026. Habib describes the block exactly: "two pilots, one
+                    where the coach leads the conversation with a potential
+                    customer and the other where the coach observes or is
+                    backstop when the team go pitching."
+                    That is what PilotCapture models, in the block itself: two
+                    iterations, who leads and who observes on each, the five
+                    observation dimensions, the price moment and the close.
+                    This second panel was an older, thinner version of the same
+                    idea, writing to pilot_observations instead. Two boxes for
+                    one job is the clutter he has objected to elsewhere, so the
+                    older one is off the screen. Nothing was deleted: the
+                    pilot_observations rows are still on the record and can be
+                    brought across if anything is missing. */}
               </div>
             ))}
             {shownTab==='hypothesis'&&<TabHypothesis client={selClient} hypotheses={hypotheses} onAdd={async(h)=>{const ref=`HYP-${String(hypotheses.length+1).padStart(3,'0')}`;const {data}=await supabase.from('hypotheses').insert([{...h,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:[...hypotheses,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`hypotheses:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:hypotheses.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('hypotheses').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}

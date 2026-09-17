@@ -62,6 +62,14 @@ export const PROBLEM_COLUMNS = [
 ] as const
 
 /**
+ * The tables the service to problem to activity chain is built out of.
+ *
+ * A block whose answers land anywhere else is not part of that chain, however
+ * its columns happen to be spelled.
+ */
+export const CHAIN_TABLES = ['gtcv_assumptions', 'gtcv_problem_owner_budget']
+
+/**
  * Column by column, what accepting an answer to it means.
  *
  * A column that is not here is not part of the chain, and the answer becomes a
@@ -123,6 +131,22 @@ export function isRefusal(d: AcceptDecision): d is AcceptRefusal {
  *                     overrides the anchor. This is how a second activity gets
  *                     its own "who pays" when the room named three of them.
  */
+/**
+ * WHAT TO DO WITH AN ANSWER THAT IS NOT FILED AS A ROW. 17 September 2026.
+ *
+ * Some blocks are scored and argued rather than listed: the pre-engagement
+ * questions, the six Commercial Readiness fit tests, the five independence
+ * tests at handover. The room still answers them, still sees the spread, and
+ * still agrees a number. What it does not do is create a row, because the
+ * number belongs on that block's own panel, where it is signed.
+ *
+ * This used to say "that block does not take answers yet", which reads as a
+ * thing somebody forgot to build and tells the facilitator nothing to do next.
+ */
+export const NOT_FILED_HERE =
+  'The room\'s answers stay on screen here to be read and discussed. '
+  + 'Record what the room agrees on the panel below, where it is signed.'
+
 export function planAccept(
   columns: string[],
   anchor: RoomAnchor,
@@ -132,11 +156,25 @@ export function planAccept(
   // ONE VARIABLE PER QUESTION, so a chain question has exactly one target
   // column. The first recognised one decides; a question with none of them
   // is not part of the chain at all.
-  const column = columns.find((c) => ACCEPT_TARGETS[c])
+  //
+  // AND THE CHAIN BELONGS TO PHASE 0, NOT TO EVERY BLOCK. 17 September 2026,
+  // from the review on #281. ACCEPT_TARGETS is keyed by column name alone, so
+  // it matched any block that happened to use one of those words. Decision
+  // Point 3 has a column genuinely called "problem" on gtcv_propositions, and
+  // the new prompt for it would have been filed as a Phase 0 problem, on
+  // gtcv_problem_owner_budget, in another block entirely. The room would have
+  // answered, the facilitator would have pressed Accept, and the proposition
+  // would have stayed empty while a row appeared somewhere nobody was looking.
+  //
+  // The chain is what links a service to its problems to its activities, and
+  // those live on Phase 0's own tables. So it is consulted only when this
+  // block is one of them.
+  const inChain = !blockTable || CHAIN_TABLES.includes(blockTable)
+  const column = inChain ? columns.find((c) => ACCEPT_TARGETS[c]) : undefined
   const target = column ? ACCEPT_TARGETS[column] : null
 
   if (!target) {
-    if (!blockTable) return { refusal: 'That block does not take answers yet' }
+    if (!blockTable) return { refusal: NOT_FILED_HERE }
     return { mode: 'createRow', table: blockTable }
   }
 
@@ -188,7 +226,7 @@ export function planAccept(
     }
 
     default:
-      return { refusal: 'That block does not take answers yet' }
+      return { refusal: NOT_FILED_HERE }
   }
 }
 
