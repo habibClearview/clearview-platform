@@ -43,6 +43,9 @@ export interface WalkthroughState {
   speed: number
   /** True while the sequence is held at the beat it has reached. */
   held: boolean
+  /** How many things this screen takes one at a time, and which one is up. */
+  beats: number
+  beat: number
   /** Whether there is text below the fold on the panel, and above it. */
   more: { down: boolean; up: boolean }
 }
@@ -553,6 +556,8 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
 
   // ── moving between screens ───────────────────────────────
   let cur = 0
+  /** Which of this screen's things is being spoken to. Minus one is none yet. */
+  let beat = -1
   let mode: Mode = 'walk'
   let playTimer: ReturnType<typeof setTimeout> | null = null
   const listeners = new Set<(s: WalkthroughState) => void>()
@@ -577,6 +582,21 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
     const num = $('#stepnum')
     if (num) num.textContent = `${pad(i + 1)} / ${pad(STEPS.length)}`
   }
+  /**
+   * The thing being spoken to on a screen that is taken one at a time. The
+   * screen is redrawn whenever it is returned to, so this is applied after
+   * every paint rather than once.
+   */
+  function applyBeat() {
+    const items = Array.from(scene.querySelectorAll('.card')) as HTMLElement[]
+    const list = scene.querySelector('.cards')
+    if (list) list.classList.toggle('stepping', beat >= 0)
+    items.forEach((el, i) => {
+      el.classList.toggle('now', beat >= 0 && i === beat)
+      el.classList.toggle('said', beat >= 0 && i < beat)
+    })
+  }
+
   function paint(i: number) {
     const s = STEPS[i]
     chrome(i)
@@ -584,6 +604,7 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
       app.dataset.kind = 'scene'
       scene.innerHTML = s.scene!()
       scene.scrollTop = 0
+      applyBeat()
       return
     }
     app.dataset.kind = 'canvas'
@@ -599,6 +620,7 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
       && S.kind === 'canvas' && prevS && prevS.kind === 'canvas' && !!ANIM[S.cs!]
     const my = ++run
     cur = i
+    beat = -1
     paint(i)
     tell()
     if (S.kind === 'canvas') {
@@ -612,8 +634,30 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
     }
     if (my === run && mode === 'play') schedule()
   }
-  function next() { SFX.step(); if (cur === STEPS.length - 1) go(0, false); else go(cur + 1) }
-  function prev() { go(cur - 1, false) }
+  function next() {
+    const beats = STEPS[cur]?.beats || 0
+    if (beats && beat < beats - 1) {
+      beat += 1
+      applyBeat()
+      SFX.step()
+      tell()
+      if (mode === 'play') schedule()
+      return
+    }
+    SFX.step()
+    beat = -1
+    if (cur === STEPS.length - 1) go(0, false); else go(cur + 1)
+  }
+  function prev() {
+    if ((STEPS[cur]?.beats || 0) && beat >= 0) {
+      beat -= 1
+      applyBeat()
+      tell()
+      return
+    }
+    beat = -1
+    go(cur - 1, false)
+  }
   function schedule() {
     if (playTimer) clearTimeout(playTimer)
     playTimer = setTimeout(
@@ -787,6 +831,7 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
       index: cur, total: STEPS.length, name: STEPS[cur]?.name || '',
       mode, sound: soundOn, room: (app.dataset.room === 'light' ? 'light' : 'dark'),
       speed: speedFactor, held, more: moreToRead(),
+      beats: STEPS[cur]?.beats || 0, beat,
     }
   }
   function tell() {

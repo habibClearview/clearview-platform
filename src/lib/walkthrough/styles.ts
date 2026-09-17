@@ -326,6 +326,24 @@ export const WALKTHROUGH_PAIRING_CSS = `
 // is untouched, which is the size it will be shown at in the room.
 // ============================================================
 
+/**
+ * TAKING A SCREEN ONE ITEM AT A TIME.
+ *
+ * 17 September 2026. Habib, on the screen that lists what the funder receives:
+ * "there are 6 boxes, I should be able to move in between those boxes as I
+ * explained each of the item." Until he starts walking them, all six are drawn
+ * exactly as approved; from the first press the one being spoken to is lifted
+ * and the rest step back. This applies at every width, including the
+ * projector, because it is how the screen is presented rather than how it is
+ * fitted onto a laptop.
+ */
+export const WALKTHROUGH_STEP_CSS = `
+.gtcvw .cards.stepping .card{transition:opacity .3s,border-color .3s,box-shadow .3s}
+.gtcvw .cards.stepping .card:not(.now){opacity:.4}
+.gtcvw .cards.stepping .card.said{opacity:.55}
+.gtcvw .card.now{opacity:1;border-color:var(--blue);box-shadow:0 0 0 2px var(--glow)}
+`
+
 /** Fitting the approved design onto a laptop. */
 export const WALKTHROUGH_ROOM_CSS = `
 @media (min-width: 721px){

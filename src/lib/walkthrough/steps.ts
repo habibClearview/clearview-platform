@@ -29,6 +29,15 @@ export interface Step {
   kind: StepKind
   /** The screen's name, on the remote and in the screen list. */
   name: string
+  /**
+   * How many things on this screen are taken one at a time.
+   *
+   * 17 September 2026. Habib, on the screen that lists what the funder
+   * receives: "there are 6 boxes, I should be able to move in between those
+   * boxes as I explained each of the item." So Next walks the six before it
+   * moves on, and Back walks them in reverse.
+   */
+  beats?: number
   /** Which canvas state this screen shows. Scenes have none. */
   cs?: number
   kicker?: string
@@ -72,7 +81,15 @@ export function setupHTML(ctx: WalkthroughContext): string {
   <div class="block"><h3>Engagement Charter</h3><p>Records what each party commits, including leadership time, how the work runs, and how decisions are made and recorded. ${C.Funder} reviews it first. It is signed at inception.</p></div>`
 }
 
-/** The engagement's words, escaped once, in the shapes the sentences need. */
+/**
+ * The engagement's words, escaped once, in the shapes the sentences need.
+ *
+ * TWO FORMS, AND THE DIFFERENCE MATTERS. A funder with a name is Tanager
+ * wherever it appears. A funder with no name is "the funder", which starts a
+ * sentence as "The funder" and sits inside one as "the funder". Using the
+ * capitalised form mid-sentence produced "What The funder receives" on the
+ * generic walkthrough, which is the version shown to prospects.
+ */
 function words(ctx: WalkthroughContext) {
   const funder = esc(ctx.funder)
   const org = esc(ctx.org)
@@ -187,9 +204,9 @@ export function buildSteps(ctx: WalkthroughContext): Step[] {
   <ul><li><strong>Financial model.</strong> The finance lead changes an input and explains the new break-even.</li><li><strong>Value proposition.</strong> Presented to a prospect without notes.</li><li><strong>Outreach.</strong> The pipeline run for four weeks without prompting.</li><li><strong>Client management.</strong> An engagement planned, delivered and debriefed by staff.</li><li><strong>Commercial identity.</strong> Described the same way by every leader.</li></ul><p>A one-page handover record closes the engagement.</p>`,
     },
     {
-      kind: 'scene', name: 'What you receive',
+      kind: 'scene', name: 'What you receive', beats: 6,
       scene: () => `<div class="reveal"><p class="eyebrow">What you receive</p>
-    <h1 class="s-h1 mid">What ${C.Funder} receives<em>at every decision point.</em></h1>
+    <h1 class="s-h1 mid">What ${C.funder} receives<em>at every decision point.</em></h1>
     <div class="cards">
       <div class="card hl"><b>01</b><p>A report of each signed decision point, sent to your inbox automatically.</p></div>
       <div class="card"><b>02</b><p>The same record online: what was decided, the evidence, who agreed, who dissented and who signed.</p></div>
@@ -228,8 +245,8 @@ export function buildSteps(ctx: WalkthroughContext): Step[] {
       scene: () => (ctx.named && ctx.workspaceUrl
         ? `<div class="reveal"><p class="eyebrow">ClearView</p>
     <h1 class="s-h1">You already have the keys.<em>Here is what they open.</em></h1>
-    <p class="s-body">${C.Funder}'s sign-in details are already in your inbox. This is the ${C.Org} workspace, where every signed decision point appears as it happens.</p>
-    <div><a class="cta" id="revealBtn" href="${esc(ctx.workspaceUrl)}" target="_blank" rel="noopener noreferrer">Open the ${C.Org} workspace →</a></div></div>`
+    <p class="s-body">${C.Funder}'s sign-in details are already in your inbox. This is the ${C.org} workspace, where every signed decision point appears as it happens.</p>
+    <div><a class="cta" id="revealBtn" href="${esc(ctx.workspaceUrl)}" target="_blank" rel="noopener noreferrer">Open the ${C.org} workspace →</a></div></div>`
         : `<div class="reveal"><p class="eyebrow">ClearView</p>
     <h1 class="s-h1">Every decision, on the record.<em>Open to the funder from day one.</em></h1>
     <p class="s-body">The funder signs in to the same record: each decision, the evidence behind it, who agreed and who signed.</p></div>`),
