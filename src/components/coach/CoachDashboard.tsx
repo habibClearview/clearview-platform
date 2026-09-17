@@ -28,6 +28,8 @@ import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
 import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
 import SetupChecklist from '@/components/gtcv/SetupChecklist'
+import WalkthroughLink from '@/components/walkthrough/WalkthroughLink'
+import { genericWalkthroughUrl, clientWalkthroughUrl, remoteWalkthroughUrl, slugify } from '@/lib/walkthrough/links'
 import { servicePhrase, funderWord, threeQuestions, QUESTION_FIELDS,
   THREE_QUESTIONS_INTRO, VERBATIM_HELPER, ANSWER_PLACEHOLDER,
   SERVICE_SETTING_LABEL, SERVICE_SETTING_HELPER } from '@/lib/engagement-words'
@@ -2531,6 +2533,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'0.75rem'}}>
           <button style={addBtn(true,C.teal)} onClick={refreshOverview} disabled={refreshingOv}>{refreshingOv?'Refreshing...':'↻ Refresh client list'}</button>
         </div>
+        {/* THE LINK TO SEND ANYBODY ASKING WHAT THIS IS. 17 September 2026.
+            The walkthrough with nobody's name on it. It carries no client data
+            at all, which is why it sits on the coach's own first screen with no
+            engagement chosen. Each engagement's own link is on its settings. */}
+        <div style={card}>
+          <div style={secH}>How I work</div>
+          <WalkthroughLink
+            url={genericWalkthroughUrl()}
+            label="The walkthrough to share"
+            note="The walkthrough to share with anyone considering this work."/>
+        </div>
         {noticeError&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{noticeError}</div>}
         {newSubmissions.length>0&&submissionsAside&&(
           <SetAsideLine busy={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]} label={`${newSubmissions.length} data capture submission${newSubmissions.length>1?'s':''} set aside`} onBringBack={()=>setNoticeAside(NOTICE_NEW_SUBMISSIONS,[])}/>
@@ -3433,7 +3446,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   login can also be on one list. It repeated every name purely
                   to carry whether they had a login and a button to give them
                   one. Both are now on the person's own line above. */}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
-            {shownTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
+            {shownTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} funderName={funderWord(selClient,programmes)} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {shownTab==='diagnostic'&&<TabDiagnostic client={selClient} programmes={programmes} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
             {/* SESSIONS AND ROOMS IS THE DIARY NOW. 16 September 2026. The
                 sessions themselves are run from the decision point they belong
@@ -4167,7 +4180,11 @@ function TabIPFramework(){
   )
 }
 
-function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFileLinks,onUpdateNotifications}){
+function TabEngagementSetup({client,fileLinks,notifications,funderName,onUpdate,onUpdateFileLinks,onUpdateNotifications}){
+  // The funder is recorded on the programme, not on the engagement, and this
+  // panel is not given the programme list, so the name is handed in.
+  const programmeFunder=funderName||''
+  const walkSlug=client.walkthrough_slug||''
   const [links,setLinks]=useState(fileLinks||[])
   const [notif,setNotif]=useState(notifications||{enabled:false,recipients:[]})
   const [saving,setSaving]=useState(false)
@@ -4208,6 +4225,70 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
         <p style={{fontSize:'1.01rem',color:C.slate,margin:0}}>
           Leave it empty and the questions and the Charter say &ldquo;this service&rdquo; instead.
         </p>
+      </div>
+
+      {/* THE ENGAGEMENT'S OWN WALKTHROUGH LINK. 17 September 2026.
+          One link per engagement, generated from what the engagement already
+          records. The address is chosen here rather than taken from the
+          engagement's own slug, because this one is handed to a funder and can
+          be changed or switched off without moving any of the engagement's
+          pages. Switched off, the link is not found at all: a page saying the
+          link is disabled tells a stranger the engagement exists. */}
+      <div style={card}>
+        <div style={secH}>Walkthrough link</div>
+        <WalkthroughLink
+          url={clientWalkthroughUrl(walkSlug||slugify(programmeFunder||client.name))}
+          label="The walkthrough for this engagement"
+          note="Opens with no sign in. Send it to the funder, or open it on the laptop in the room."
+          extra={<a href={remoteWalkthroughUrl(walkSlug||slugify(programmeFunder||client.name))} target="_blank" rel="noopener noreferrer" style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.95rem',fontWeight:600,padding:'0.4rem 0.9rem',borderRadius:6,border:'1px solid var(--cv-border)',color:'var(--cv-navy)',textDecoration:'none'}}>Open remote</a>}/>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:'0.75rem',alignItems:'end'}}>
+          <div>
+            <label style={lbl} htmlFor="walkthrough-slug">The end of the address</label>
+            <p style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.4rem'}}>Lower case letters, numbers and hyphens. Leave it empty and the funder&rsquo;s name is used.</p>
+            <input id="walkthrough-slug" style={inp}
+              value={client.walkthrough_slug||''}
+              onChange={e=>onUpdate({walkthrough_slug:slugify(e.target.value)})}
+              placeholder={slugify(programmeFunder||client.name)||'tanager'}/>
+          </div>
+          <label style={{display:'flex',alignItems:'center',gap:'0.5rem',fontSize:'1.01rem',paddingBottom:'0.55rem'}}>
+            <input type="checkbox"
+              checked={client.walkthrough_enabled!==false}
+              onChange={e=>onUpdate({walkthrough_enabled:e.target.checked})}/>
+            The link works
+          </label>
+        </div>
+        <div style={{marginTop:'0.9rem'}}>
+          <label style={lbl} htmlFor="org-display-name">Short name for this organisation</label>
+          <p style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.4rem'}}>How it is said in a sentence. The legal name stays where it is.</p>
+          <input id="org-display-name" style={inp}
+            value={client.organisation_display_name||''}
+            onChange={e=>onUpdate({organisation_display_name:e.target.value})}
+            placeholder={client.name}/>
+        </div>
+        <div style={{marginTop:'0.9rem'}}>
+          <label style={lbl} htmlFor="paying-customer">Who pays for this service</label>
+          <p style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.4rem'}}>Said in a sentence, for example: African agricultural institutions. Leave it empty and the sentence is left out.</p>
+          <input id="paying-customer" style={inp}
+            value={client.paying_customer_segment||''}
+            onChange={e=>onUpdate({paying_customer_segment:e.target.value})}
+            placeholder="African agricultural institutions"/>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:'0.75rem',marginTop:'0.9rem'}}>
+          <div>
+            <label style={lbl} htmlFor="close-phrase">How the last screen says &ldquo;at the end&rdquo;</label>
+            <input id="close-phrase" style={inp}
+              value={client.close_phrase||''}
+              onChange={e=>onUpdate({close_phrase:e.target.value})}
+              placeholder="At close"/>
+          </div>
+          <div>
+            <label style={lbl} htmlFor="portfolio-phrase">How it refers to the funder&rsquo;s other organisations</label>
+            <input id="portfolio-phrase" style={inp}
+              value={client.portfolio_phrase||''}
+              onChange={e=>onUpdate({portfolio_phrase:e.target.value})}
+              placeholder="your portfolio"/>
+          </div>
+        </div>
       </div>
 
       <div style={card}>

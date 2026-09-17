@@ -57,6 +57,14 @@ const ALLOWED = [
   'clearview_field_token',
   'clearview_field_auth',
   'gtcv_room_queue',
+  // The walkthrough's two. Neither is engagement content: one is which room
+  // the presenter chose, dark or light, the same kind of thing as cv-theme,
+  // and the other is the four digit code shown on the holding screen, kept for
+  // the session so that refreshing the page does not change the code the phone
+  // in the presenter's hand has already scanned. Both are read back only by
+  // the machine that wrote them and neither says anything about a client.
+  'gtcv-room',
+  'gtcv-presenter-',
 ]
 
 describe('no engagement content is kept in the browser', () => {
