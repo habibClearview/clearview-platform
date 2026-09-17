@@ -63,25 +63,50 @@ describe('the rule stays in one place', () => {
     expect(definers).toEqual(['src/lib/ink.ts'])
   })
 
-  // The value of one style property, read properly rather than by taking the
-  // next eighty characters. From the review on #280: a window that wide runs
-  // past the background and into whatever follows it, so `background:
-  // 'var(--cv-header)', borderBottom: '3px solid ' + C.cyan` read as a cyan
-  // background, and two honest screens were accused.
-  function backgroundValue(src: string, from: number): string | null {
-    const key = src.lastIndexOf('background', from)
+  // The background of the style object this colour sits in.
+  //
+  // From the review on #280, twice over. First it took the next eighty
+  // characters after the word background, which runs off the end of the value
+  // and into whatever property follows, so a cyan BORDER read as a cyan
+  // background. Then it searched backwards from the colour, so
+  // `{color:'var(--cv-on-accent)', background:C.cyan}` was missed entirely
+  // because the background came second.
+  //
+  // So it now finds the braces this colour actually sits between, and looks
+  // for the background anywhere inside them, in either order.
+  function enclosingObject(src: string, at: number): string | null {
+    let depth = 0
+    let open = -1
+    for (let i = at; i >= 0; i--) {
+      const ch = src[i]
+      if (ch === '}') depth++
+      else if (ch === '{') { if (depth === 0) { open = i; break } depth-- }
+    }
+    if (open < 0) return null
+    depth = 0
+    for (let i = at; i < src.length; i++) {
+      const ch = src[i]
+      if (ch === '{') depth++
+      else if (ch === '}') { if (depth === 0) return src.slice(open + 1, i) ; depth-- }
+    }
+    return null
+  }
+
+  /** The value of the background property, stopping where the value stops. */
+  function backgroundValue(src: string, at: number): string | null {
+    const obj = enclosingObject(src, at)
+    if (obj === null) return null
+    const key = obj.search(/\bbackground\s*:/)
     if (key < 0) return null
-    let i = src.indexOf(':', key)
-    if (i < 0) return null
-    i += 1
+    let i = obj.indexOf(':', key) + 1
     let depth = 0
     let quote: string | null = null
     const out: string[] = []
-    for (; i < src.length; i++) {
-      const ch = src[i]
+    for (; i < obj.length; i++) {
+      const ch = obj[i]
       if (quote) {
         out.push(ch)
-        if (ch === quote && src[i - 1] !== '\\') quote = null
+        if (ch === quote && obj[i - 1] !== '\\') quote = null
         continue
       }
       if (ch === "'" || ch === '"' || ch === '`') { quote = ch; out.push(ch); continue }
@@ -94,8 +119,8 @@ describe('the rule stays in one place', () => {
   }
 
   // A SCANNER THAT FINDS NOTHING MIGHT BE BROKEN RATHER THAN SATISFIED. These
-  // two run it over samples with a known answer, so the clean result below
-  // means the source is clean and not that the scanner stopped working.
+  // run it over samples with a known answer, so the clean result below means
+  // the source is clean and not that the scanner stopped working.
   it('reads the background itself, and not the property after it', () => {
     const ok = "style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`,color:'var(--cv-on-accent)'}}"
     expect(backgroundValue(ok, ok.indexOf('--cv-on-accent'))).toBe("'var(--cv-header)'")
@@ -103,9 +128,17 @@ describe('the rule stays in one place', () => {
 
   it('catches a light colour hiding in one branch of a background', () => {
     const bad = "style={{background:two?C.purple:C.cyan,color:'var(--cv-on-accent)'}}"
-    const value = backgroundValue(bad, bad.indexOf('--cv-on-accent'))
-    expect(value).toBe('two?C.purple:C.cyan')
-    expect(/(C\.cyan|C\.teal|C\.amber|C\.green)/.test(value!)).toBe(true)
+    expect(backgroundValue(bad, bad.indexOf('--cv-on-accent'))).toBe('two?C.purple:C.cyan')
+  })
+
+  it('finds the background when it is written after the colour', () => {
+    const bad = "style={{color:'var(--cv-on-accent)',background:C.cyan}}"
+    expect(backgroundValue(bad, bad.indexOf('--cv-on-accent'))).toBe('C.cyan')
+  })
+
+  it('does not reach into a different style object for a background', () => {
+    const src = "a={{background:C.cyan}} b={{color:'var(--cv-on-accent)'}}"
+    expect(backgroundValue(src, src.indexOf('--cv-on-accent'))).toBeNull()
   })
 
   it('no screen writes white onto a cyan or teal fill by hand', () => {
