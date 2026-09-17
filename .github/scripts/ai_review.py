@@ -68,6 +68,41 @@ def fail_closed(reason: str) -> None:
     sys.exit(0)
 
 
+# ─── Reading the model's verdict ─────────────────────────────
+# The model is asked to lead with APPROVED or BLOCKED, but it writes for people
+# as well as for this parser: a markdown heading, bold, or a label in front of
+# the word.
+#
+# AND THE MODEL LABELS ITS OWN VERDICT. 17 September 2026. A review that said,
+# in full, "## Verdict: **APPROVED**" blocked the pull request. The letters-only
+# form of that line is VERDICTAPPROVED, which does not start with APPROVED, so
+# the gate could not read a verdict it had been handed in plain English and
+# failed closed on its own heading. Failing closed is right; failing closed on a
+# clear approval is a gate that blocks everything, which is the same as no gate
+# at all.
+#
+# BLOCKED still wins if it comes first, and a line that merely mentions the word
+# in a sentence is still not a verdict.
+VERDICT_LABELS = ("VERDICT", "RESULT", "CONCLUSION", "DECISION", "REVIEW")
+
+
+def read_verdict(review):
+    """"success", "failure", or None when the review says neither."""
+    for line in (review or "").splitlines()[:20]:
+        letters = re.sub(r"[^A-Za-z]", "", line).upper()
+        if not letters:
+            continue
+        for label in VERDICT_LABELS:
+            if letters.startswith(label) and len(letters) > len(label):
+                letters = letters[len(label):]
+                break
+        if letters.startswith("APPROVED"):
+            return "success"
+        if letters.startswith("BLOCKED"):
+            return "failure"
+    return None
+
+
 def main() -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -141,17 +176,7 @@ def main() -> None:
     # than only inspecting the first 40 characters — otherwise a genuinely
     # APPROVED review that happens to sit under a heading is misread as a failure
     # and needlessly blocks the PR. BLOCKED still wins if it appears first.
-    conclusion = None
-    for line in review.splitlines()[:20]:
-        letters = re.sub(r"[^A-Za-z]", "", line).upper()
-        if not letters:
-            continue
-        if letters.startswith("APPROVED"):
-            conclusion = "success"
-            break
-        if letters.startswith("BLOCKED"):
-            conclusion = "failure"
-            break
+    conclusion = read_verdict(review)
     if conclusion is None:
         # Genuinely can't tell what the model decided — fail closed.
         fail_closed(f"could not read an APPROVED/BLOCKED verdict from the review: {review[:120]!r}")
