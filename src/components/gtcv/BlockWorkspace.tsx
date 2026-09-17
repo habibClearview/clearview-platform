@@ -20,6 +20,7 @@
 // for the pilot capture or the costing model they are not looking at.
 // ============================================================
 import { useState } from 'react'
+import { onSolid } from '@/lib/ink'
 import dynamic from 'next/dynamic'
 import { zoneBrief } from '@/lib/gtcv-zone-brief'
 // R20. What the room sent, waiting to become rows, drawn under the block's own
@@ -62,10 +63,18 @@ function RunThisWithTheRoom({ dpId, clientId }) {
       'noopener',
     )
   }
+  // THE SAME SHAPE AS EVERY OTHER BUTTON ON THE PLATFORM. 17 September 2026.
+  // Habib: "the add item buttons and run this with the room are different in
+  // colour and size, it is jarring." This was 13 pixels of mono in a raw teal
+  // with an 8 pixel radius, sitting directly above add buttons at 1.01rem in
+  // cyan with a 6 pixel radius. Matched to the platform's solid button, taking
+  // its writing colour from the one rule rather than a guess, and using the
+  // token rather than a raw hex so it follows the theme.
+  const fill = 'var(--cv-teal)'
   const base = {
     fontFamily: 'var(--cv-font-mono)',
-    fontSize: 13, fontWeight: 700, padding: '8px 14px', borderRadius: 8,
-    border: '1px solid #2A9D8F', background: '#2A9D8F', color: 'var(--cv-on-cyan)',
+    fontSize: '1.01rem', fontWeight: 700, padding: '0.38rem 0.9rem', borderRadius: 6,
+    border: 'none', background: fill, color: onSolid(fill),
   }
   return (
     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -181,22 +190,22 @@ function ZoneBriefPanel({ dpId }) {
   const sans = "var(--cv-font)"
   const cap = {
     fontFamily: 'var(--cv-font-mono)',
-    fontSize: 12.5, letterSpacing: '.1em', textTransform: 'uppercase', color: '#6B7A8C',
+    fontSize: 12.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--cv-slate)',
   }
   return (
     <section style={{
-      border: '1px solid rgba(27,42,65,.16)', borderLeft: '3px solid #2A9D8F',
-      borderRadius: 12, padding: '14px 16px', background: '#FBF7EE',
+      border: '1px solid var(--cv-border)', borderLeft: '3px solid #2A9D8F',
+      borderRadius: 12, padding: '14px 16px', background: 'var(--cv-alt)',
     }}>
       <div style={cap}>What this zone settles</div>
       <p style={{
-        fontFamily: 'var(--cv-font)', fontSize: 17, lineHeight: 1.45, color: '#1B2A41',
+        fontFamily: 'var(--cv-font)', fontSize: 17, lineHeight: 1.45, color: 'var(--cv-navy)',
         margin: '6px 0 0', maxWidth: '78ch',
       }}>{brief.question}</p>
 
       <div style={{ ...cap, marginTop: 14 }}>What has to exist before it closes</div>
       <ul style={{
-        fontFamily: sans, fontSize: 14, lineHeight: 1.55, color: '#33414F',
+        fontFamily: sans, fontSize: 14, lineHeight: 1.55, color: 'var(--cv-slate)',
         margin: '6px 0 0', paddingLeft: 18, maxWidth: '78ch',
       }}>
         {brief.outputs.map((o) => <li key={o} style={{ marginTop: 3 }}>{o}</li>)}
@@ -204,7 +213,7 @@ function ZoneBriefPanel({ dpId }) {
 
       <div style={{ ...cap, marginTop: 14 }}>How you know it is real</div>
       <p style={{
-        fontFamily: sans, fontSize: 14, lineHeight: 1.55, color: '#33414F',
+        fontFamily: sans, fontSize: 14, lineHeight: 1.55, color: 'var(--cv-slate)',
         margin: '6px 0 0', maxWidth: '78ch',
       }}>{brief.signal}</p>
     </section>
@@ -212,7 +221,7 @@ function ZoneBriefPanel({ dpId }) {
 }
 
 const loading = () => (
-  <p style={{ fontFamily: "var(--cv-font)", fontSize: 13.5, color: '#8B8272', padding: '10px 0' }}>
+  <p style={{ fontFamily: "var(--cv-font)", fontSize: 13.5, color: 'var(--cv-slate)', padding: '10px 0' }}>
     Loading...
   </p>
 )
@@ -320,7 +329,7 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
 
   if (!clientId || !dpId) {
     return (
-      <p style={{ fontFamily: "var(--cv-font)", fontSize: 13.5, color: '#8B8272' }}>
+      <p style={{ fontFamily: "var(--cv-font)", fontSize: 13.5, color: 'var(--cv-slate)' }}>
         Select a client to open this block.
       </p>
     )
@@ -349,8 +358,8 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
 
       {own.length === 0 ? (
         <div style={{
-          fontFamily: "var(--cv-font)", fontSize: 13.5, color: '#4C5A6B',
-          background: '#FBF7EE', border: '1px dashed rgba(27,42,65,.18)', borderRadius: 12,
+          fontFamily: "var(--cv-font)", fontSize: 13.5, color: 'var(--cv-slate)',
+          background: 'var(--cv-alt)', border: '1px dashed rgba(27,42,65,.18)', borderRadius: 12,
           padding: '14px 16px',
         }}>
           This block is worked through its nine components above. The evidence and the signature
@@ -362,7 +371,7 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
         <section key={key}>
           <h3 style={{
             fontFamily: 'var(--cv-font)', fontSize: 17, fontWeight: 600, margin: '0 0 10px',
-            color: '#1B2A41',
+            color: 'var(--cv-navy)',
           }}>{title}</h3>
           {/* C44, C49 as amended, 14 August 2026.
               THE QR AND THE CODE ARE NOT REPEATED IN EVERY BLOCK. A participant

@@ -101,6 +101,43 @@ function readBody(body: any) {
   return patch
 }
 
+/**
+ * Fill in the account link for anybody who has signed in since they were added.
+ *
+ * Habib, 17 September 2026: "People have logged in but it doesn't show on the
+ * who is in this tab."
+ *
+ * The link was looked up once, at the moment the person was added to the
+ * engagement, and never again. Almost nobody has an account at that moment:
+ * they are added, then invited, then they sign in a day later. By then the row
+ * had been written with no account against it and nothing ever went back to
+ * check, so the panel said "No login yet" about people who were signed in at
+ * the time of reading.
+ *
+ * This matches on email, which is the same rule the original lookup used, and
+ * only ever fills a blank. It never moves a link that is already there, so it
+ * cannot quietly repoint somebody's row at a different account.
+ */
+async function relinkAccounts(admin: Admin, clientId: string): Promise<number> {
+  const { data: rows } = await admin.from('engagement_parties')
+    .select('id, email, user_id').eq('client_id', clientId)
+  const waiting = (rows || []).filter((r) => !r.user_id && (r.email || '').trim())
+  if (!waiting.length) return 0
+
+  let linked = 0
+  for (const row of waiting) {
+    const userId = await findUserIdByEmail(admin, row.email as string)
+    if (!userId) continue
+    // Still blank at the moment of writing, so two managers opening the page
+    // together cannot fight over it.
+    const { data } = await admin.from('engagement_parties')
+      .update({ user_id: userId, updated_at: new Date().toISOString() })
+      .eq('id', row.id).is('user_id', null).select('id')
+    if (data && data.length) linked += 1
+  }
+  return linked
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -110,6 +147,12 @@ export async function POST(req: NextRequest) {
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
     if (!auth.ok) return refuseAccess(auth)
+
+    // Asked for by the panel when it loads, before it draws who has a login.
+    if ((body as { action?: string }).action === 'relink') {
+      const linked = await relinkAccounts(admin, clientId)
+      return NextResponse.json({ ok: true, linked })
+    }
 
     const patch = readBody(body)
     if (!patch.name) return NextResponse.json({ error: 'A party needs a name' }, { status: 400 })

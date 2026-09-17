@@ -68,7 +68,7 @@ function Dist({ label, summary, unit, decimals = 0, note, roadmap, roadmapNote }
   )
 }
 
-const thStyle = (left: boolean): React.CSSProperties => ({ background: C.navy, color: C.navyOn, fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 9px', textAlign: left ? 'left' : 'right', whiteSpace: 'nowrap' })
+const thStyle = (left: boolean): React.CSSProperties => ({ background:'var(--cv-header)', color: C.navyOn, fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 9px', textAlign: left ? 'left' : 'right', whiteSpace: 'nowrap' })
 const tdStyle = (left: boolean, bold = false): React.CSSProperties => ({ padding: '7px 9px', textAlign: left ? 'left' : 'right', color: bold ? C.navy : C.slate, fontWeight: bold ? 700 : 400 })
 
 export default function MarketIntelligenceReport({ data, scopeDescription }: { data: any; scopeDescription?: string }) {

@@ -134,7 +134,7 @@ function CostOfDeliveryChart({coImplementers,entries,expenses}){
         </svg>
       </div>
       <div style={{display:'flex',gap:'1.1rem',fontSize: '1.01rem',fontFamily: 'var(--cv-font-mono)',color:C.slate,marginTop:'0.4rem',flexWrap:'wrap'}}>
-        <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.navy,marginRight:5,verticalAlign:'middle'}}/>Time cost ({cur})</span>
+        <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--cv-header)',marginRight:5,verticalAlign:'middle'}}/>Time cost ({cur})</span>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.cyan,marginRight:5,verticalAlign:'middle'}}/>Approved expenses</span>
       </div>
     </div>
@@ -441,7 +441,7 @@ function CiRosterCard({ci,period,entries,expenses,advances,clients,onOpen}){
       aria-label={`Open ${ci.name||'this co-implementer'}`}
       style={{...card,marginBottom:0,padding:'1rem 1.1rem',cursor:'pointer',borderLeft:`4px solid ${active?C.green:C.border}`}}>
       <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.6rem'}}>
-        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,flexShrink:0}}>{initials}</div>
+        <div style={{width:38,height:38,borderRadius:10,background:'var(--cv-header)',color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,flexShrink:0}}>{initials}</div>
         <div style={{minWidth:0,flex:1}}>
           <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ci.name}</div>
           <div style={{fontSize: '1.01rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{[ci.country,ci.specialisation].filter(Boolean).join(' · ')||ci.email}</div>
@@ -543,7 +543,7 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
           corner stays tidy; only the rate chip shows here. */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'1rem',flexWrap:'wrap',paddingBottom:'0.85rem',borderBottom:'1px solid var(--cv-border-soft)',marginBottom:'0.9rem'}}>
         <div style={{display:'flex',alignItems:'center',gap:'0.7rem',minWidth:0}}>
-          <div style={{width:42,height:42,borderRadius:12,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontWeight:700,fontSize: '1.01rem',flexShrink:0}}>{initials}</div>
+          <div style={{width:42,height:42,borderRadius:12,background:'var(--cv-header)',color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontWeight:700,fontSize: '1.01rem',flexShrink:0}}>{initials}</div>
           <div style={{minWidth:0}}>
             <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
               <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>

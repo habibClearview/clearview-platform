@@ -283,7 +283,7 @@ export default function FiguresTab({ config, months, cc, P, onSave, onGoToOverTi
       {/* Colour key so the reader learns the code once. */}
       <div style={{ ...CARD, display: 'flex', gap: '1.2rem', flexWrap: 'wrap', alignItems: 'center', padding: '0.7rem 1.1rem', fontSize: '0.86rem', color: C.navy }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 13, height: 13, borderRadius: 4, background: PLAN_TINT, border: `1.5px solid ${C.cyan}`, display: 'inline-block' }} /> 🎯 <strong>Planned</strong> is your target</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 13, height: 13, borderRadius: 4, background: C.navy, display: 'inline-block' }} /> ✅ <strong>Actual</strong> is what happened</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 13, height: 13, borderRadius: 4, background:'var(--cv-header)', display: 'inline-block' }} /> ✅ <strong>Actual</strong> is what happened</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ color: C.green, fontWeight: 700 }}>👍 Green</span> means better than planned, <span style={{ color: C.red, fontWeight: 700 }}>👎 red</span> means worse</span>
       </div>
 

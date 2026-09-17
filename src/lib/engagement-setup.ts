@@ -1,0 +1,152 @@
+// ============================================================
+// IS THIS ENGAGEMENT SET UP, AND IF NOT, WHAT IS MISSING
+//
+// Habib, 17 September 2026: "why is the engagement set up not showing that
+// ikore has been setup - what more does it need to be set up - contract was
+// uploaded, invitations has been sent to people, what else does it need for
+// the status to show that the engagement has been set up?"
+//
+// A fair question with no answer on the screen. The stage an engagement shows
+// is a field somebody sets by hand, so the platform knew perfectly well what
+// was outstanding and never said. He was left guessing at a checklist that
+// exists, in writing, in the method: the pre-engagement zone brief names three
+// things that must exist before Decision Point 1 opens.
+//
+//   The parties named, with whoever signs each gate identified
+//   The Charter issued and signed by every signatory
+//   The deliverables and their payment milestones recorded against the contract
+//
+// Those three, checked against the record rather than remembered. Uploading the
+// contract and sending invitations are real work and neither of them is on this
+// list, which is exactly why it needed writing down.
+//
+// This file does the arithmetic and nothing else: no database, no browser, so
+// every rule below can be run in a test rather than clicked through.
+// ============================================================
+
+export interface SetupParty {
+  id: string
+  name?: string | null
+  email?: string | null
+  is_signatory?: boolean | null
+}
+
+export interface SetupCharter {
+  id: string
+  status?: string | null
+  issued_at?: string | null
+}
+
+export interface SetupSignature {
+  charter_id?: string | null
+  party_id?: string | null
+  signed_at?: string | null
+}
+
+export interface SetupDeliverable {
+  milestone_no?: number | null
+  payment_amount?: number | string | null
+}
+
+export interface SetupStep {
+  /** A short name for the step, as it reads on the screen. */
+  title: string
+  done: boolean
+  /** What is true now, in one sentence, whether or not it is done. */
+  detail: string
+  /** Where to go to finish it, as a tab id. Null when it is done. */
+  goTo: string | null
+}
+
+export interface SetupState {
+  steps: SetupStep[]
+  done: boolean
+  /** How many of the steps are finished, for the line at the top. */
+  finished: number
+}
+
+/** A person counts as named once they have a name to be called by. */
+function named(parties: SetupParty[]): SetupParty[] {
+  return (parties || []).filter((p) => (p.name || '').trim())
+}
+
+/**
+ * Where the engagement has got to in being set up.
+ *
+ * Every step answers from the record. A step that cannot be checked because
+ * something earlier is missing says so rather than claiming to be incomplete
+ * for its own reasons: there is no point telling somebody the Charter is
+ * unsigned when nobody has been named to sign it.
+ */
+export function setupState(input: {
+  parties?: SetupParty[] | null
+  charter?: SetupCharter | null
+  signatures?: SetupSignature[] | null
+  deliverables?: SetupDeliverable[] | null
+}): SetupState {
+  const parties = named(input.parties || [])
+  const signatories = parties.filter((p) => p.is_signatory)
+  const charter = input.charter || null
+  const signatures = (input.signatures || []).filter((s) => s.signed_at)
+  const deliverables = input.deliverables || []
+
+  // ─── 1. The people ───────────────────────────────────────
+  const peopleDone = parties.length > 0 && signatories.length > 0
+  const people: SetupStep = {
+    title: 'The people are named, and so is whoever signs',
+    done: peopleDone,
+    detail: parties.length === 0
+      ? 'Nobody has been added to this engagement yet.'
+      : signatories.length === 0
+        ? `${parties.length} ${parties.length === 1 ? 'person is' : 'people are'} named, but nobody is marked as signing.`
+        : `${parties.length} named, ${signatories.length} of them signing.`,
+    goTo: peopleDone ? null : 'eng_setup',
+  }
+
+  // ─── 2. The Charter ──────────────────────────────────────
+  // Signed by EVERY signatory, which is the point of naming them first. A
+  // charter signed by two of three people is not a signed charter.
+  const signedBy = new Set(signatures.map((s) => s.party_id).filter(Boolean))
+  const outstanding = signatories.filter((p) => !signedBy.has(p.id))
+  const issued = !!charter && (!!charter.issued_at || charter.status === 'issued' || charter.status === 'signed')
+  const charterDone = issued && signatories.length > 0 && outstanding.length === 0
+  const charterStep: SetupStep = {
+    title: 'The Charter is issued and signed by everyone who signs it',
+    done: charterDone,
+    detail: !charter
+      ? 'No Charter has been drawn up yet.'
+      : !issued
+        ? 'The Charter is still a draft. It has not been issued for signature.'
+        : signatories.length === 0
+          ? 'The Charter is issued, but nobody is marked as signing it, so there is nothing to wait for.'
+          : outstanding.length === 0
+            ? `Signed by all ${signatories.length}.`
+            : `Waiting on ${outstanding.map((p) => p.name).join(', ')}.`,
+    goTo: charterDone ? null : 'charter',
+  }
+
+  // ─── 3. The deliverables ─────────────────────────────────
+  // A deliverable with no payment milestone on it cannot be invoiced, so the
+  // contract is not actually recorded against the work.
+  const withMilestone = deliverables.filter(
+    (d) => d.milestone_no != null && Number(d.payment_amount) > 0,
+  )
+  const deliverablesDone = deliverables.length > 0 && withMilestone.length === deliverables.length
+  const deliverablesStep: SetupStep = {
+    title: 'The deliverables and their payment milestones are recorded',
+    done: deliverablesDone,
+    detail: deliverables.length === 0
+      ? 'No deliverables have been recorded from the contract yet.'
+      : withMilestone.length === deliverables.length
+        ? `${deliverables.length} recorded, each with a payment milestone.`
+        : `${deliverables.length} recorded, ${deliverables.length - withMilestone.length} without a payment milestone.`,
+    goTo: deliverablesDone ? null : 'eng_setup',
+  }
+
+  const steps = [people, charterStep, deliverablesStep]
+  return {
+    steps,
+    done: steps.every((s) => s.done),
+    finished: steps.filter((s) => s.done).length,
+  }
+}
