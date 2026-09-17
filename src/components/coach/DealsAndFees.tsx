@@ -159,7 +159,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
 
   return(
     <div>
-      <div style={{background:C.navy,color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
+      <div style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
         <div style={{fontFamily:'var(--cv-font)',fontWeight:700,fontSize:'1.05rem'}}>Pipeline</div>
         <button onClick={()=>setShowNew(!showNew)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,background:'var(--cv-cyan)',border:'none',color:'var(--cv-on-cyan)',borderRadius:6,padding:'0.4rem 0.9rem',cursor:'pointer'}}>+ New Prospect</button>
       </div>

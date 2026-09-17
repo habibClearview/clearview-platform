@@ -75,8 +75,16 @@ describe('where the welcome pack lives', () => {
     // Sending somebody a letter meant holding two screens in your head. It is
     // one job, so it is one place.
     expect(DASH).toContain("import WelcomePack from '@/components/gtcv/WelcomePack'")
-    const setup = DASH.slice(DASH.indexOf("shownTab==='eng_setup'"))
-    expect(setup.slice(0, 900)).toContain('<WelcomePack')
+    // WHAT MATTERS IS THE TAB IT IS ON, NOT HOW FAR DOWN THE LINE IT SITS.
+    // This read the 900 characters after the first mention of the settings tab
+    // and broke the moment anything else was added to that tab ahead of it,
+    // which says nothing about where the welcome pack lives. It now checks that
+    // the pack is inside a block belonging to that tab.
+    const packAt = DASH.indexOf('<WelcomePack')
+    expect(packAt, 'the welcome pack is not on the dashboard at all').toBeGreaterThan(-1)
+    const before = DASH.slice(0, packAt)
+    const tabAt = before.lastIndexOf("shownTab==='")
+    expect(before.slice(tabAt, tabAt + 24)).toContain("shownTab==='eng_setup'")
     expect(DASH).not.toContain("shownTab==='cover'&&<>{mayRun?<WelcomePack")
   })
 

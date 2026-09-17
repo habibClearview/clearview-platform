@@ -318,7 +318,7 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
             Real data, still updating (live)
           </span>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem',color:C.navy}}>
-            <span style={{width:10,height:10,borderRadius:2,background:'var(--cv-header)',display:'inline-block'}}></span>
+            <span style={{width:10,height:10,borderRadius:2,background:C.navy,display:'inline-block'}}></span>
             Closed -- final, locked at month-end
           </span>
         </div>
@@ -1323,7 +1323,7 @@ function MonthlyTrendChart({months,rev,ebitda,selStart,selEnd,cc}:{
       </svg>
       <div style={{display:'flex',gap:'1.1rem',flexWrap:'wrap',marginTop:'0.4rem',fontSize:'0.8rem',color:C.slate}}>
         <span><span style={{display:'inline-block',width:14,height:3,background:C.cyan,verticalAlign:'middle',marginRight:5}}/>Revenue</span>
-        <span><span style={{display:'inline-block',width:14,height:3,background:C.navy,verticalAlign:'middle',marginRight:5}}/>EBITDA (profit before interest, tax, depreciation)</span>
+        <span><span style={{display:'inline-block',width:14,height:3,background:'var(--cv-header)',verticalAlign:'middle',marginRight:5}}/>EBITDA (profit before interest, tax, depreciation)</span>
         <span><span style={{display:'inline-block',width:9,height:9,borderRadius:9,background:C.red,verticalAlign:'middle',marginRight:5}}/>Loss month</span>
       </div>
     </div>

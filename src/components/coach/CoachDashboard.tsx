@@ -27,6 +27,7 @@ import { useNarrowScreen } from '@/lib/narrow-screen'
 import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
 import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
+import SetupChecklist from '@/components/gtcv/SetupChecklist'
 import ShowcaseSharing from '@/components/gtcv/ShowcaseSharing'
 import EngagementSettings from '@/components/gtcv/EngagementSettings'
 import WelcomePack from '@/components/gtcv/WelcomePack'
@@ -134,7 +135,7 @@ function GlanceBar({frac,color}){return<div style={{height:6,borderRadius:3,back
 // Numbered LEVEL badge + "drilled from" connector -- matches the approved
 // Portfolio Intelligence mockup's Level 1 -> 2 -> 3 drill-down structure
 // (portfolio overview -> filtered segment -> one anonymised business).
-function LevelMarker({n,label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.7rem 0 0.9rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.15rem 0.7rem'}}>LEVEL {n}</span><span style={{fontFamily:'var(--cv-font)',fontSize:'1.08rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize: '1.01rem'}}>{sub}</span>}</div>)}
+function LevelMarker({n,label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.7rem 0 0.9rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:'var(--cv-header)',borderRadius:20,padding:'0.15rem 0.7rem'}}>LEVEL {n}</span><span style={{fontFamily:'var(--cv-font)',fontSize:'1.08rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize: '1.01rem'}}>{sub}</span>}</div>)}
 function DrillConnector({children}){return<div style={{display:'flex',justifyContent:'center',textAlign:'center',padding:'0.25rem 0',color:C.teal,fontSize: '1.01rem',fontFamily: 'var(--cv-font-mono)'}}>{children}</div>}
 // Navy header + bordered body + bordered/sunk KPI cards -- the exact colour
 // tokens and card chrome from the approved Portfolio Intelligence mockup
@@ -142,7 +143,7 @@ function DrillConnector({children}){return<div style={{display:'flex',justifyCon
 // every "glance" screen in the coach dashboard shares one visual language
 // instead of each inventing its own card style.
 function PiHeaderBar({title,chips}){return(
-  <div style={{background:C.navy,color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
+  <div style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
     <div style={{fontFamily:'var(--cv-font)',fontWeight:700,fontSize:'1.05rem'}}>{title}</div>
     <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap'}}>{chips}</div>
   </div>
@@ -190,7 +191,7 @@ function CoImplementerPerfCard({ci,clients,canvasByClient}){
   return(
     <div style={{...card,padding:'1rem 1.1rem',marginBottom:0}}>
       <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.8rem'}}>
-        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700}}>{initials}</div>
+        <div style={{width:38,height:38,borderRadius:10,background:'var(--cv-header)',color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700}}>{initials}</div>
         <div><div style={{fontWeight:700,fontSize:'1.19rem'}}>{ci.name}</div><div style={{fontSize: '1.01rem',color:C.slate}}>{ci.country||''}{ci.country&&' · '}Serving {served.length} client{served.length===1?'':'s'}</div></div>
       </div>
       {served.length===0?(
@@ -856,7 +857,7 @@ function ClientCard({client,programmes,onClick,onEdit}){
       </div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.35rem',gap:'0.5rem'}}>
         <div style={{fontSize: '1.01rem',color:prog?C.slate:C.amber}}>{CLIENT_TYPE_LABELS[client.type]} · {prog?prog.name:'No programme -- self-paying'}</div>
-        {onEdit&&<button onClick={e=>{e.stopPropagation();onEdit()}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',padding:'0.12rem 0.5rem',borderRadius:4,background:C.navy,color:'var(--cv-on-accent)',border:'none',cursor:'pointer',flexShrink:0}}>Edit</button>}
+        {onEdit&&<button onClick={e=>{e.stopPropagation();onEdit()}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',padding:'0.12rem 0.5rem',borderRadius:4,background:'var(--cv-header)',color:'var(--cv-on-accent)',border:'none',cursor:'pointer',flexShrink:0}}>Edit</button>}
       </div>
       {client.contact_name&&<div style={{fontSize: '1.01rem',color:C.navy,marginBottom:'0.3rem'}}>{client.contact_name}</div>}
       <Badge text={statusLabel(client.status)} color={statusColor(client.status)}/>
@@ -1605,7 +1606,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:680}}>
                   <thead>
                     <tr>{['Sector','Biz','Rule of 40','Gross','EBITDA','Net','Burn','LTV:CAC','Churn','NRR'].map((h,i)=>(
-                      <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                      <th key={h} style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                     ))}</tr>
                   </thead>
                   <tbody>
@@ -1654,7 +1655,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
             <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:640}}>
               <thead>
                 <tr>{['Sector','Biz','Ready','LRS','Growth','Cost','Cover','EBITDA','Weakest'].map((h,i)=>(
-                  <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                  <th key={h} style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                 ))}</tr>
               </thead>
               <tbody>
@@ -1715,7 +1716,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
                 <div style={{width:150,fontSize: '1.01rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
                 <div style={{flex:1,background:'var(--cv-tint-cyan)',borderRadius:4,height:14,position:'relative'}}>
                   <div style={{width:`${Math.max(2,avg)}%`,background:C.teal,height:'100%',borderRadius:4}}/>
-                  {hasFilter&&<div style={{position:'absolute',left:`${Math.max(0,portfolioAvg-0.5)}%`,top:-2,width:2,height:18,background:C.navy}} title={`Portfolio average: ${Math.round(portfolioAvg)}`}/>}
+                  {hasFilter&&<div style={{position:'absolute',left:`${Math.max(0,portfolioAvg-0.5)}%`,top:-2,width:2,height:18,background:'var(--cv-header)'}} title={`Portfolio average: ${Math.round(portfolioAvg)}`}/>}
                 </div>
                 <div style={{width:40,fontSize: '1.01rem',color:C.slate,textAlign:'right'}}>{Math.round(avg)}</div>
               </div>
@@ -1792,7 +1793,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:720}}>
                     <thead>
                       <tr>{['Business','Sector','Size','Ready','LRS','Growth','Cost','Cover','EBITDA','Conf.'].map((h,i)=>(
-                        <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 9px',textAlign:i<=2?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                        <th key={h} style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 9px',textAlign:i<=2?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                       ))}</tr>
                     </thead>
                     <tbody>
@@ -1869,7 +1870,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
           <div style={{...card,maxWidth:640,width:'100%',maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.9rem'}}>
               <div>
-                <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.1rem 0.6rem',marginBottom:'0.4rem',display:'inline-block'}}>LEVEL 3</span>
+                <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:'var(--cv-header)',borderRadius:20,padding:'0.1rem 0.6rem',marginBottom:'0.4rem',display:'inline-block'}}>LEVEL 3</span>
                 <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{openProfile.displayName}{openProfile.isNamed&&<span style={{marginLeft:'0.5rem'}}><Badge text="Verified" color={C.green}/></span>}</div>
                 <div style={{fontSize: '1.01rem',color:C.slate,marginTop:'0.2rem'}}>{openProfile.sector||'Sector n/a'} · {openProfile.country||'Country n/a'} · {openProfile.sizeBracket}</div>
               </div>
@@ -3009,7 +3010,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div style={{...card,padding:0,overflow:'hidden'}}>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
-                <thead><tr style={{background:C.navy}}>{['Client','Level','Paid Up To','Term','Status'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:400,fontSize: '1.01rem',color:'var(--cv-on-accent)',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:'var(--cv-header)'}}>{['Client','Level','Paid Up To','Term','Status'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:400,fontSize: '1.01rem',color:'var(--cv-on-accent)',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
                 <tbody>
                   {subscriptionRows.map(({se,client:c})=>{
                     const dueSoon=se.paid_through_date&&new Date(se.paid_through_date)<new Date(Date.now()+14*86400000)
@@ -3152,7 +3153,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   for and have no data in. */}
               {selClient.engagement_mode==='financial'&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-cyan)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>}
               {isSuperCoach&&<CopyIntakeLink client={selClient}/>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:'var(--cv-header)',border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
               {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
             </div>
           </div>
@@ -3222,7 +3223,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-cyan)',textDecoration:'none'}}>Open Clearview ↗</a>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:'var(--cv-header)',border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
           </div>
@@ -3415,6 +3416,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 can appear on it. A programme's assignments are on the
                 programme's own page. */}
             {shownTab==='eng_setup'&&!selClient.programme_id&&canViewCoachGuidance(previewRoleId)&&<><ServicesSection payerType="client" payerId={selClient.id} clients={[selClient]}/><div style={{height:22}}/></>}
+            {shownTab==='eng_setup'&&<SetupChecklist clientId={selClient.id} onGoTo={setActiveTab}/>}
             {shownTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>
               {/* THE WELCOME PACK SITS WITH THE PEOPLE IT IS SENT TO.
                   9 September 2026. It was on the Cover, which is the reading of

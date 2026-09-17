@@ -101,6 +101,55 @@ function readBody(body: any) {
   return patch
 }
 
+/**
+ * Fill in the account link for anybody who has signed in since they were added.
+ *
+ * Habib, 17 September 2026: "People have logged in but it doesn't show on the
+ * who is in this tab."
+ *
+ * The link was looked up once, at the moment the person was added to the
+ * engagement, and never again. Almost nobody has an account at that moment:
+ * they are added, then invited, then they sign in a day later. By then the row
+ * had been written with no account against it and nothing ever went back to
+ * check, so the panel said "No login yet" about people who were signed in at
+ * the time of reading.
+ *
+ * This matches on email, which is the same rule the original lookup used, and
+ * only ever fills a blank. It never moves a link that is already there, so it
+ * cannot quietly repoint somebody's row at a different account.
+ */
+async function relinkAccounts(admin: Admin, clientId: string): Promise<number> {
+  const { data: rows, error } = await admin.from('engagement_parties')
+    .select('id, email, user_id').eq('client_id', clientId)
+  // A READ THAT FAILED IS NOT AN ENGAGEMENT WITH NOBODY WAITING. From the
+  // review on #283: this returned 0 either way, so a failure reported success
+  // and the panel went on saying "No login yet" with nothing to suggest a
+  // retry would help.
+  if (error) {
+    console.error('engagement-party: could not read the parties to relink', error)
+    throw new Error('relink read failed')
+  }
+  const waiting = (rows || []).filter((r) => !r.user_id && (r.email || '').trim())
+  if (!waiting.length) return 0
+
+  let linked = 0
+  for (const row of waiting) {
+    const userId = await findUserIdByEmail(admin, row.email as string)
+    if (!userId) continue
+    // Still blank at the moment of writing, so two managers opening the page
+    // together cannot fight over it.
+    const { data, error: writeErr } = await admin.from('engagement_parties')
+      .update({ user_id: userId, updated_at: new Date().toISOString() })
+      .eq('id', row.id).is('user_id', null).select('id')
+    if (writeErr) {
+      console.error('engagement-party: could not link an account', writeErr)
+      throw new Error('relink write failed')
+    }
+    if (data && data.length) linked += 1
+  }
+  return linked
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -110,6 +159,18 @@ export async function POST(req: NextRequest) {
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
     if (!auth.ok) return refuseAccess(auth)
+
+    // Asked for by the panel when it loads, before it draws who has a login.
+    if ((body as { action?: string }).action === 'relink') {
+      try {
+        const linked = await relinkAccounts(admin, clientId)
+        return NextResponse.json({ ok: true, linked })
+      } catch {
+        // Logged above with the real reason. The caller is told it did not
+        // happen, rather than being told nobody was waiting.
+        return NextResponse.json({ error: 'Could not check who has signed in' }, { status: 500 })
+      }
+    }
 
     const patch = readBody(body)
     if (!patch.name) return NextResponse.json({ error: 'A party needs a name' }, { status: 400 })

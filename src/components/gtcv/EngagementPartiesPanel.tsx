@@ -214,6 +214,27 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
   const load = useCallback(async () => {
     if (!clientId) { setRows([]); setLoading(false); return }
     setLoading(true)
+
+    // WHO HAS SIGNED IN IS ASKED NOW, NOT REMEMBERED FROM WHEN THEY WERE ADDED.
+    // 17 September 2026. Habib: "People have logged in but it doesn't show on
+    // the who is in this tab." The link to somebody's account was looked up
+    // once, at the moment they were added, and almost nobody has an account at
+    // that moment: they are added, then invited, then they sign in a day later.
+    // Nothing ever went back to check, so this panel said "No login yet" about
+    // people who were signed in while it said it.
+    //
+    // It fills blanks only, and a failure here changes nothing on screen: the
+    // list below is the list either way.
+    try {
+      const { data: auth } = await supabase.auth.getSession()
+      const token = auth.session?.access_token
+      await fetch('/api/engagement-party', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ clientId, action: 'relink' }),
+      })
+    } catch { /* the people are still the people */ }
+
     const { data, error } = await supabase
       .from('engagement_parties')
       .select('id, party_role, name, email, mobile, organisation, title, is_signatory, user_id, sort_order, letter, letter_sent_at')
