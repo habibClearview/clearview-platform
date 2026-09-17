@@ -296,3 +296,59 @@ export const WALKTHROUGH_PAIRING_CSS = `
 .gtcvw .pairing{position:static;margin-top:28px;align-items:flex-start}
 }
 `
+
+// ============================================================
+// WHAT HABIB ASKED FOR AFTER SEEING IT ON HIS OWN LAPTOP.
+// 17 September 2026.
+//
+// The approved design was drawn at 1600 by 900. On a thirteen inch laptop the
+// browser is about 1000 points wide, and at that width three things went wrong,
+// all of them the same thing: the design had been given less room than it was
+// drawn for, and it spent the shortfall in the worst places.
+//
+//   1. The header wrapped onto two lines, so Walkthrough, Explore and Play sat
+//      under the logo instead of beside it. Habib: "should be at the same level
+//      as the bar that has logo and name of the canvas so the entire screen can
+//      be seen." Two rows of header is eighty points of height taken off the
+//      canvas, which is the thing the room is looking at.
+//
+//   2. The canvas was therefore too small to read, with empty space either side
+//      of it. That empty space is not spare room: the drawing keeps its shape,
+//      so when it runs out of height it stops growing sideways too. Giving the
+//      height back is what makes it bigger.
+//
+//   3. On the last screen each question wrapped onto three lines, which pushed
+//      the heading off the top of the screen.
+//
+// So between a phone and a projector the header is made smaller rather than
+// taller, the space around the canvas is tightened, and the questions are set
+// to fit a line. Above 1400 points nothing here applies and the approved design
+// is untouched, which is the size it will be shown at in the room.
+// ============================================================
+
+/** Fitting the approved design onto a laptop. */
+export const WALKTHROUGH_ROOM_CSS = `
+@media (min-width: 721px){
+.gtcvw .top{flex-wrap:nowrap}
+.gtcvw .brand{flex:1 1 auto;min-width:0}
+.gtcvw .brand .name{min-width:0}
+.gtcvw .brand .name b,.gtcvw .brand .name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gtcvw .tools{flex:0 0 auto;flex-wrap:nowrap}
+.gtcvw .qlist{max-width:none}
+.gtcvw .qlist li{font-size:clamp(15px,1.7vw,28px);margin-bottom:.55em}
+}
+@media (min-width: 721px) and (max-width: 1400px){
+.gtcvw .top{padding:10px 20px;gap:8px 16px}
+.gtcvw .logo{height:46px}
+.gtcvw .brand{gap:16px}
+.gtcvw .brand .name b{font-size:19px}
+.gtcvw .brand .name span{font-size:10.5px;letter-spacing:.12em;margin-top:2px}
+.gtcvw .modes button,.gtcvw .tbtn{font-size:12.5px;padding:8px 11px}
+.gtcvw .tbtn svg{width:15px;height:15px}
+.gtcvw .stage{padding:10px 16px;gap:16px;grid-template-columns:minmax(0,1fr) 340px}
+.gtcvw .narr{padding:18px 20px}
+.gtcvw .narr h2{font-size:25px}
+.gtcvw .ctrl{padding:8px 16px 10px}
+.gtcvw .scene{padding:clamp(16px,2.6vw,40px) clamp(16px,3vw,48px)}
+}
+`

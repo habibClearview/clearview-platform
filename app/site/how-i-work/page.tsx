@@ -10,6 +10,7 @@
 import type { Metadata } from 'next'
 import Walkthrough from '@/components/walkthrough/Walkthrough'
 import { GENERIC_CONTEXT } from '@/lib/walkthrough/context'
+import { remoteWalkthroughUrl } from '@/lib/walkthrough/links'
 
 export const metadata: Metadata = {
   title: 'How the work runs — Grant-to-Commercial Viability Canvas',
@@ -18,5 +19,5 @@ export const metadata: Metadata = {
 }
 
 export default function Page() {
-  return <Walkthrough ctx={GENERIC_CONTEXT} slug="generic" remotePath="/how-i-work/remote" />
+  return <Walkthrough ctx={GENERIC_CONTEXT} slug="generic" remoteUrl={remoteWalkthroughUrl()} />
 }

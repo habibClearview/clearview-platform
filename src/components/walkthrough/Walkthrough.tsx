@@ -13,7 +13,7 @@
 // connects or not, which is why the pairing code below can fail quietly.
 // ============================================================
 import { useEffect, useRef, useState } from 'react'
-import { WALKTHROUGH_CSS, WALKTHROUGH_PAIRING_CSS } from '@/lib/walkthrough/styles'
+import { WALKTHROUGH_CSS, WALKTHROUGH_PAIRING_CSS, WALKTHROUGH_ROOM_CSS } from '@/lib/walkthrough/styles'
 import { mount, type Controller } from '@/lib/walkthrough/engine'
 import { speakerNotes } from '@/lib/walkthrough/notes'
 import type { WalkthroughContext } from '@/lib/walkthrough/context'
@@ -25,13 +25,15 @@ import {
 export default function Walkthrough({
   ctx,
   slug,
-  remotePath,
+  remoteUrl,
 }: {
   ctx: WalkthroughContext
   /** Which walkthrough this is, for the pairing channel. */
   slug: string
-  /** The address the square code sends the phone to. Empty turns pairing off. */
-  remotePath: string
+  /** The whole address the square code sends the phone to, on the platform
+   *  rather than the public site, because that is where a coach is signed in.
+   *  Empty turns pairing off. */
+  remoteUrl: string
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const ctrlRef = useRef<Controller | null>(null)
@@ -65,7 +67,7 @@ export default function Walkthrough({
   useEffect(() => {
     const root = rootRef.current
     const ctrl = ctrlRef.current
-    if (!root || !ctrl || !remotePath) return
+    if (!root || !ctrl || !remoteUrl) return
 
     const mine = presenterPairing(slug)
     setPairing(mine)
@@ -109,7 +111,7 @@ export default function Walkthrough({
     const off = ctrl.onState((s) => { link.publish({ type: 'state', ...s, notes, names }) })
     const timer = setTimeout(() => { if (!connected) status('Use the arrow keys', false) }, CONNECT_TIMEOUT_MS)
     return () => { off(); link.leave(); clearTimeout(timer) }
-  }, [ctx, slug, remotePath, ready])
+  }, [ctx, slug, remoteUrl, ready])
 
   // ── the square code itself ───────────────────────────────
   //
@@ -121,7 +123,7 @@ export default function Walkthrough({
   useEffect(() => {
     const root = rootRef.current
     const ctrl = ctrlRef.current
-    if (!root || !ctrl || !pairing || !pairing.key || !remotePath) return
+    if (!root || !ctrl || !pairing || !pairing.key || !remoteUrl) return
     let cancelled = false
     let corner: HTMLElement | null = null
     let paired = false
@@ -135,10 +137,7 @@ export default function Walkthrough({
     }
 
     // The four digits are printed under the square. The key is only inside it.
-    const url = new URL(
-      `${remotePath}?s=${pairing.code}&k=${encodeURIComponent(pairing.key)}`,
-      window.location.origin,
-    ).toString()
+    const url = `${remoteUrl}?s=${pairing.code}&k=${encodeURIComponent(pairing.key)}`
     // Loaded only when a walkthrough actually draws one, so the code that turns
     // a web address into a square is not shipped to every other page.
     import('qrcode').then((QR) => {
@@ -162,11 +161,11 @@ export default function Walkthrough({
     const off = ctrl.onState((s) => { if (s.index === 0) attach() })
     pairedRef.current = () => { paired = true }
     return () => { cancelled = true; off(); pairedRef.current = null }
-  }, [pairing, remotePath, ready])
+  }, [pairing, remoteUrl, ready])
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: WALKTHROUGH_CSS + WALKTHROUGH_PAIRING_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: WALKTHROUGH_CSS + WALKTHROUGH_PAIRING_CSS + WALKTHROUGH_ROOM_CSS }} />
       <div className="gtcvw" ref={rootRef} data-room="dark" data-kind="scene">
         <header className="top">
           <div className="brand">
