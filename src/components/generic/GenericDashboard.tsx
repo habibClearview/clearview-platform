@@ -318,7 +318,7 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
             Real data, still updating (live)
           </span>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem',color:C.navy}}>
-            <span style={{width:10,height:10,borderRadius:2,background:'var(--cv-header)',display:'inline-block'}}></span>
+            <span style={{width:10,height:10,borderRadius:2,background:C.navy,display:'inline-block'}}></span>
             Closed -- final, locked at month-end
           </span>
         </div>

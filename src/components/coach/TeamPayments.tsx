@@ -134,7 +134,7 @@ function CostOfDeliveryChart({coImplementers,entries,expenses}){
         </svg>
       </div>
       <div style={{display:'flex',gap:'1.1rem',fontSize: '1.01rem',fontFamily: 'var(--cv-font-mono)',color:C.slate,marginTop:'0.4rem',flexWrap:'wrap'}}>
-        <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--cv-header)',marginRight:5,verticalAlign:'middle'}}/>Time cost ({cur})</span>
+        <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.navy,marginRight:5,verticalAlign:'middle'}}/>Time cost ({cur})</span>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.cyan,marginRight:5,verticalAlign:'middle'}}/>Approved expenses</span>
       </div>
     </div>

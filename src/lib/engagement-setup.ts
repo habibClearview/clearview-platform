@@ -52,6 +52,12 @@ export interface SetupStep {
   /** A short name for the step, as it reads on the screen. */
   title: string
   done: boolean
+  /**
+   * True when this step could not be checked at all, rather than checked and
+   * found wanting. A read that failed is not a thing somebody has not done,
+   * and saying it is sends them off to redo work that is already there.
+   */
+  unknown?: boolean
   /** What is true now, in one sentence, whether or not it is done. */
   detail: string
   /** Where to go to finish it, as a tab id. Null when it is done. */
@@ -83,6 +89,9 @@ export function setupState(input: {
   charter?: SetupCharter | null
   signatures?: SetupSignature[] | null
   deliverables?: SetupDeliverable[] | null
+  /** Set when a read failed, so the step says so instead of saying not done. */
+  signaturesUnavailable?: boolean
+  deliverablesUnavailable?: boolean
 }): SetupState {
   const parties = named(input.parties || [])
   const signatories = parties.filter((p) => p.is_signatory)
@@ -109,11 +118,15 @@ export function setupState(input: {
   const signedBy = new Set(signatures.map((s) => s.party_id).filter(Boolean))
   const outstanding = signatories.filter((p) => !signedBy.has(p.id))
   const issued = !!charter && (!!charter.issued_at || charter.status === 'issued' || charter.status === 'signed')
-  const charterDone = issued && signatories.length > 0 && outstanding.length === 0
+  const charterUnknown = !!input.signaturesUnavailable
+  const charterDone = !charterUnknown && issued && signatories.length > 0 && outstanding.length === 0
   const charterStep: SetupStep = {
     title: 'The Charter is issued and signed by everyone who signs it',
     done: charterDone,
-    detail: !charter
+    unknown: charterUnknown,
+    detail: charterUnknown
+      ? 'The signatures could not be read just now, so this one is not known either way.'
+      : !charter
       ? 'No Charter has been drawn up yet.'
       : !issued
         ? 'The Charter is still a draft. It has not been issued for signature.'
@@ -122,7 +135,7 @@ export function setupState(input: {
           : outstanding.length === 0
             ? `Signed by all ${signatories.length}.`
             : `Waiting on ${outstanding.map((p) => p.name).join(', ')}.`,
-    goTo: charterDone ? null : 'charter',
+    goTo: charterDone || charterUnknown ? null : 'charter',
   }
 
   // ─── 3. The deliverables ─────────────────────────────────
@@ -131,21 +144,28 @@ export function setupState(input: {
   const withMilestone = deliverables.filter(
     (d) => d.milestone_no != null && Number(d.payment_amount) > 0,
   )
-  const deliverablesDone = deliverables.length > 0 && withMilestone.length === deliverables.length
+  const deliverablesUnknown = !!input.deliverablesUnavailable
+  const deliverablesDone = !deliverablesUnknown
+    && deliverables.length > 0 && withMilestone.length === deliverables.length
   const deliverablesStep: SetupStep = {
     title: 'The deliverables and their payment milestones are recorded',
     done: deliverablesDone,
-    detail: deliverables.length === 0
+    unknown: deliverablesUnknown,
+    detail: deliverablesUnknown
+      ? 'The deliverables could not be read just now, so this one is not known either way.'
+      : deliverables.length === 0
       ? 'No deliverables have been recorded from the contract yet.'
       : withMilestone.length === deliverables.length
         ? `${deliverables.length} recorded, each with a payment milestone.`
         : `${deliverables.length} recorded, ${deliverables.length - withMilestone.length} without a payment milestone.`,
-    goTo: deliverablesDone ? null : 'eng_setup',
+    goTo: deliverablesDone || deliverablesUnknown ? null : 'eng_setup',
   }
 
   const steps = [people, charterStep, deliverablesStep]
   return {
     steps,
+    // Not done, and not claiming to be: a step nobody could read is not a step
+    // that passed.
     done: steps.every((s) => s.done),
     finished: steps.filter((s) => s.done).length,
   }

@@ -139,3 +139,57 @@ describe('an engagement that is genuinely ready', () => {
     expect(s.steps.every((x) => x.goTo === null)).toBe(true)
   })
 })
+
+// ============================================================
+// A READ THAT FAILED IS NOT A THING NOBODY HAS DONE
+//
+// From the review on #283, and it is the same fault this checklist exists to
+// prevent, one level up. An unreadable signature list made every signatory
+// look outstanding, so the checklist would have sent somebody to chase
+// signatures that had already been given.
+// ============================================================
+describe('when something could not be read', () => {
+  it('says the Charter is not known, rather than not signed', () => {
+    const s = setupState({
+      parties: [ed, funder],
+      charter: issued,
+      signatures: [],
+      signaturesUnavailable: true,
+    })
+    expect(s.steps[1].done).toBe(false)
+    expect(s.steps[1].unknown).toBe(true)
+    expect(s.steps[1].detail).toContain('not known either way')
+  })
+
+  it('offers nowhere to go, because there may be nothing to do', () => {
+    const s = setupState({ parties: [ed], charter: issued, signaturesUnavailable: true })
+    expect(s.steps[1].goTo).toBeNull()
+  })
+
+  it('says the same about deliverables it could not read', () => {
+    const s = setupState({ deliverablesUnavailable: true })
+    expect(s.steps[2].unknown).toBe(true)
+    expect(s.steps[2].goTo).toBeNull()
+    expect(s.steps[2].detail).toContain('not known either way')
+  })
+
+  it('never counts an unknown step as finished', () => {
+    const s = setupState({
+      parties: [ed],
+      charter: issued,
+      signatures: [{ charter_id: 'c1', party_id: 'p1', signed_at: '2026-09-02T00:00:00Z' }],
+      deliverables: [paidDeliverable],
+      signaturesUnavailable: true,
+    })
+    expect(s.done).toBe(false)
+    expect(s.finished).toBe(2)
+  })
+
+  it('leaves the steps it could read alone', () => {
+    // The point of saying "not known" is to keep the rest of the checklist
+    // useful, rather than hiding all three because one read failed.
+    const s = setupState({ parties: [ed], deliverablesUnavailable: true })
+    expect(s.steps[0].done).toBe(true)
+    expect(s.steps[0].unknown).toBeFalsy()
+  })
+})

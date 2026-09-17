@@ -113,10 +113,10 @@ export default function SetupChecklist({ clientId, onGoTo }) {
           }}>
             <span aria-hidden style={{
               ...mono, fontSize: '1.01rem', fontWeight: 700,
-              color: step.done ? C.green : C.amber, lineHeight: 1.4,
-            }}>{step.done ? '✓' : '•'}</span>
+              color: step.unknown ? C.slate : step.done ? C.green : C.amber, lineHeight: 1.4,
+            }}>{step.unknown ? '?' : step.done ? '✓' : '•'}</span>
             <span style={{ flex: '1 1 auto', minWidth: 0 }}>
-              <span style={{ fontSize: '1.01rem', color: C.navy, fontWeight: step.done ? 400 : 600 }}>
+              <span style={{ fontSize: '1.01rem', color: C.navy, fontWeight: step.done || step.unknown ? 400 : 600 }}>
                 {step.title}
               </span>
               <span style={{ display: 'block', ...hint }}>{step.detail}</span>

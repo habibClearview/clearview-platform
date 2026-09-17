@@ -46,16 +46,53 @@ describe('the tokens that change meaning between themes', () => {
   it('keeps the header colour dark in both themes, which is what fills need', () => {
     const uses = css.match(/--cv-header:\s*#[0-9A-Fa-f]{6}/g) || []
     expect(uses.length).toBeGreaterThanOrEqual(2)
-    // Both values are dark: their first pair of hex digits is well below mid.
+    // ALL THREE CHANNELS, NOT JUST THE RED ONE. From the review on #283: a
+    // bright green passes a red-channel test and would be hopeless under white
+    // writing. This measures brightness the way the accessibility rules do.
+    const channel = (v: number) => {
+      const c = v / 255
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    }
     for (const u of uses) {
       const hex = u.slice(u.indexOf('#') + 1)
-      expect(parseInt(hex.slice(0, 2), 16), u).toBeLessThan(0x40)
+      const lum = 0.2126 * channel(parseInt(hex.slice(0, 2), 16))
+        + 0.7152 * channel(parseInt(hex.slice(2, 4), 16))
+        + 0.0722 * channel(parseInt(hex.slice(4, 6), 16))
+      // White writing on it clears the 4.5:1 body-text minimum.
+      const againstWhite = (1 + 0.05) / (lum + 0.05)
+      expect(againstWhite, `${u} cannot carry white writing`).toBeGreaterThanOrEqual(4.5)
     }
   })
 
-  it('no screen fills a surface with the text colour', () => {
+  /** The style object a declaration sits inside. */
+  function enclosing(src: string, at: number): string | null {
+    let depth = 0
+    let open = -1
+    for (let i = at; i >= 0; i--) {
+      const ch = src[i]
+      if (ch === '}') depth++
+      else if (ch === '{') { if (depth === 0) { open = i; break } depth-- }
+    }
+    if (open < 0) return null
+    depth = 0
+    for (let i = at; i < src.length; i++) {
+      const ch = src[i]
+      if (ch === '{') depth++
+      else if (ch === '}') { if (depth === 0) return src.slice(open + 1, i); depth-- }
+    }
+    return null
+  }
+
+  it('no screen writes on a surface filled with the text colour', () => {
     // A fill painted in the text colour is invisible in one of the two themes,
     // and which one depends on what is written on top of it.
+    //
+    // A SWATCH IS NOT A SURFACE. A chart legend's colour sample is a square of
+    // the colour with nothing written on it, and it is painted in the text
+    // colour on purpose, because the line it stands for is drawn in the text
+    // colour too. Making those follow the header instead is how the legend
+    // stopped matching its own line in the dark theme. So the fault is a fill
+    // in the text colour with WRITING ON IT, which is what vanishes.
     const offenders: string[] = []
     for (const f of screens) {
       const s = fs.readFileSync(f, 'utf8')
@@ -63,10 +100,18 @@ describe('the tokens that change meaning between themes', () => {
       // is fixed in both themes and is not this fault.
       if (!/'var\(--cv-navy\)'/.test(s)) continue
       for (const m of s.matchAll(/background\s*:\s*(C\.navy|'var\(--cv-navy\)')/g)) {
-        offenders.push(`${f}: ${m[0]}`)
+        const obj = enclosing(s, m.index!)
+        if (obj === null) continue
+        if (/\bcolor\s*:/.test(obj)) offenders.push(`${f}: ${m[0]}`)
       }
     }
     expect(offenders).toEqual([])
+  })
+
+  it('still catches a fill in the text colour that does carry writing', () => {
+    // Otherwise the rule above could be satisfied by never setting a colour.
+    const bad = "style={{background:C.navy,color:'var(--cv-on-accent)'}}"
+    expect(/background\s*:\s*C\.navy/.test(bad) && /\bcolor\s*:/.test(bad)).toBe(true)
   })
 })
 
@@ -115,8 +160,16 @@ describe('who has signed in', () => {
   })
 
   it('is still only for somebody who may manage the engagement', () => {
+    // BOTH HAVE TO BE THERE BEFORE THEIR ORDER MEANS ANYTHING. From the review
+    // on #283: if the authorisation were deleted, indexOf returns -1, and -1
+    // is less than everything, so the test would pass on a route that checks
+    // nobody. This is the third time that shape has slipped through.
     const post = ROUTE.slice(ROUTE.indexOf('export async function POST'))
-    expect(post.indexOf('requireManager(req, admin, clientId)')).toBeLessThan(post.indexOf("=== 'relink'"))
+    const auth = post.indexOf('requireManager(req, admin, clientId)')
+    const branch = post.indexOf("=== 'relink'")
+    expect(auth, 'the route no longer checks who is asking').toBeGreaterThan(-1)
+    expect(branch, 'the relink branch is gone').toBeGreaterThan(-1)
+    expect(auth).toBeLessThan(branch)
   })
 
   it('never blanks the list when the check itself fails', () => {

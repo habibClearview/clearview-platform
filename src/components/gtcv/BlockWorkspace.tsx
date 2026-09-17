@@ -194,7 +194,7 @@ function ZoneBriefPanel({ dpId }) {
   }
   return (
     <section style={{
-      border: '1px solid var(--cv-border)', borderLeft: '3px solid #2A9D8F',
+      border: '1px solid var(--cv-border)', borderLeft: '3px solid var(--cv-teal)',
       borderRadius: 12, padding: '14px 16px', background: 'var(--cv-alt)',
     }}>
       <div style={cap}>What this zone settles</div>
@@ -359,7 +359,7 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
       {own.length === 0 ? (
         <div style={{
           fontFamily: "var(--cv-font)", fontSize: 13.5, color: 'var(--cv-slate)',
-          background: 'var(--cv-alt)', border: '1px dashed rgba(27,42,65,.18)', borderRadius: 12,
+          background: 'var(--cv-alt)', border: '1px dashed var(--cv-border-soft)', borderRadius: 12,
           padding: '14px 16px',
         }}>
           This block is worked through its nine components above. The evidence and the signature
