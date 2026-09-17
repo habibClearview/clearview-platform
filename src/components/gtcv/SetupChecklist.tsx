@@ -41,7 +41,7 @@ export default function SetupChecklist({ clientId, onGoTo }) {
     setLoading(true)
     try {
       const [pRes, cRes] = await Promise.all([
-        supabase.from('engagement_parties').select('id,name,email,is_signatory').eq('client_id', clientId),
+        supabase.from('engagement_parties').select('id,name,email,party_role,is_signatory').eq('client_id', clientId),
         supabase.from('engagement_charters').select('id,status,issued_at')
           .eq('client_id', clientId).order('version', { ascending: false }).limit(1),
       ])

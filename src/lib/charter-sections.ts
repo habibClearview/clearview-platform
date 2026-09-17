@@ -181,13 +181,38 @@ export const CHARTER_SECTIONS: CharterSection[] = [
   {
     number: 10,
     title: 'Signatures',
-    body: [],
+    // THREE SIGNATURES, NOT TWO AND AN ACKNOWLEDGEMENT. 17 September 2026.
+    // The specification had the funder tick "Reviewed" rather than sign.
+    // Habib, on reading it back: "the charter does not have anywhere for the
+    // lead coach and Tanager to sign, these are the 3 parties including Ikore
+    // that must sign the charter so all parties have witness at the meeting."
+    //
+    // That is a different thing from a review, and the reason is in his last
+    // six words. A charter signed by one party and acknowledged by another is
+    // a document with one person's name on it. Signed by all three in the same
+    // room, each party has witnessed the other two agreeing, and none of them
+    // can later have understood it differently.
+    body: [
+      'All three parties sign this charter: the organisation, the coach and the funder.',
+      'Signing in the same meeting means each party has witnessed the others agree to it.',
+    ],
     fields: [
-      { key: 'sig_chief_executive', label: 'Chief executive', kind: 'text' },
-      { key: 'sig_lead_practitioner', label: 'Lead practitioner', kind: 'text' },
-      { key: 'funder_reviewed', label: 'Funder reviewed', kind: 'text' },
+      { key: 'sig_chief_executive', label: 'Chief executive, for the organisation', kind: 'text' },
+      { key: 'sig_lead_practitioner', label: 'Lead practitioner, for the coach', kind: 'text' },
+      { key: 'sig_funder', label: 'Funder representative', kind: 'text' },
     ],
   },
+]
+
+/**
+ * The three parties who must sign, by the role each is recorded under on the
+ * engagement. Used to check that all three are marked as signing before the
+ * charter goes out, rather than discovering it in the room.
+ */
+export const CHARTER_SIGNING_ROLES = [
+  { role: 'lsp_ed', who: 'the organisation' },
+  { role: 'lead_consultant', who: 'the coach' },
+  { role: 'funder_rep', who: 'the funder' },
 ]
 
 /**

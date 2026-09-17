@@ -28,8 +28,32 @@ export interface SetupParty {
   id: string
   name?: string | null
   email?: string | null
+  party_role?: string | null
   is_signatory?: boolean | null
 }
+
+/**
+ * The three parties who must sign the Charter, by the role they are recorded
+ * under on the engagement.
+ *
+ * Habib, 17 September 2026: "the charter does not have anywhere for the lead
+ * coach and Tanager to sign, these are the 3 parties including Ikore that must
+ * sign the charter so all parties have witness at the meeting."
+ *
+ * The reason is in his last six words. A charter signed by one party and
+ * acknowledged by another is a document with one person's name on it. Signed
+ * by all three in the same meeting, each has witnessed the others agree, and
+ * none of them can later have understood it differently.
+ *
+ * The platform has always allowed any party to be marked as signing. What it
+ * never did was say that one of the three was missing, so it was found out in
+ * the room, which is the worst moment to find it out.
+ */
+export const MUST_SIGN = [
+  { role: 'lsp_ed', who: 'the organisation' },
+  { role: 'lead_consultant', who: 'the coach' },
+  { role: 'funder_rep', who: 'the funder' },
+]
 
 export interface SetupCharter {
   id: string
@@ -100,15 +124,20 @@ export function setupState(input: {
   const deliverables = input.deliverables || []
 
   // ─── 1. The people ───────────────────────────────────────
-  const peopleDone = parties.length > 0 && signatories.length > 0
+  // All three parties have to be on the engagement AND marked as signing.
+  const signingRoles = new Set(signatories.map((p) => p.party_role).filter(Boolean))
+  const missingSigners = MUST_SIGN.filter((m) => !signingRoles.has(m.role))
+  const peopleDone = parties.length > 0 && missingSigners.length === 0
   const people: SetupStep = {
-    title: 'The people are named, and so is whoever signs',
+    title: 'The people are named, and all three parties are marked as signing',
     done: peopleDone,
     detail: parties.length === 0
       ? 'Nobody has been added to this engagement yet.'
       : signatories.length === 0
         ? `${parties.length} ${parties.length === 1 ? 'person is' : 'people are'} named, but nobody is marked as signing.`
-        : `${parties.length} named, ${signatories.length} of them signing.`,
+        : missingSigners.length > 0
+          ? `${parties.length} named. Nobody is signing for ${missingSigners.map((m) => m.who).join(', ')}. All three parties sign the Charter, so each has witnessed the others agree.`
+          : `${parties.length} named, and all three parties are signing.`,
     goTo: peopleDone ? null : 'eng_setup',
   }
 
