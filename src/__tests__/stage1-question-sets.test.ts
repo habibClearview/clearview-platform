@@ -7,7 +7,7 @@
 // ============================================================
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
-import { PROBLEM_COLUMNS, ACTIVITY_VALUE_FIELDS } from '@/lib/stage1-accept'
+import { PROBLEM_COLUMNS, ACTIVITY_VALUE_FIELDS, CHAIN_TABLES, planAccept, NOT_FILED_HERE } from '@/lib/stage1-accept'
 import { GATES } from '@/lib/gtcv-gates'
 import {
   startingQuestionSet, BLOCKS_WITH_QUESTIONS, NO_QUESTIONS_YET,
@@ -241,8 +241,12 @@ describe('every prompt files into a real column', () => {
           if (!table) { bad.push(`${gate.id} has no table but "${seed.question_text.slice(0, 40)}" files into ${f.column}`); continue }
           const allowed = blockColumns[table] || []
           // A column routed by the accept chain belongs to another table on
-          // purpose, so those are not failures here.
-          if (!allowed.includes(f.column) && !ACCEPT_CHAIN.includes(f.column)) {
+          // purpose, but ONLY on the blocks that chain is built out of. It
+          // used to be allowed everywhere, which is why this test waved
+          // through a Decision Point 3 prompt that would have filed its
+          // answer as a Phase 0 problem in a different block.
+          const chainAllowed = CHAIN_TABLES.includes(table) && ACCEPT_CHAIN.includes(f.column)
+          if (!allowed.includes(f.column) && !chainAllowed) {
             bad.push(`${gate.id} -> ${table} has no column ${f.column}`)
           }
         }
@@ -294,5 +298,47 @@ describe('every prompt files into a real column', () => {
         }
       }
     }
+  })
+})
+
+// ============================================================
+// AN ANSWER MUST LAND IN THE BLOCK IT WAS AGREED IN
+//
+// From the review on #281. ACCEPT_TARGETS is keyed by column name alone, so it
+// matched any block that happened to use one of those words. Decision Point 3
+// has a column genuinely called "problem" on its propositions table, and the
+// new prompt for it would have been filed as a Phase 0 problem, on
+// gtcv_problem_owner_budget, in another block entirely. The room would have
+// answered, the facilitator would have pressed Accept, and the proposition
+// would have stayed empty while a row appeared somewhere nobody was looking.
+//
+// These run planAccept itself rather than reading the file, because the whole
+// fault was that the code and the words about it disagreed.
+// ============================================================
+describe('where an accepted answer actually goes', () => {
+  const anchor = { serviceId: 'svc_1', problemId: 'prb_1', activityId: null }
+
+  it('files a Decision Point 3 problem on the propositions table', () => {
+    const plan = planAccept(['problem'], anchor, 'gtcv_propositions')
+    expect(plan).toEqual({ mode: 'createRow', table: 'gtcv_propositions' })
+  })
+
+  it('still builds the Phase 0 chain, which is what the chain is for', () => {
+    const plan = planAccept(['problem'], anchor, 'gtcv_assumptions')
+    expect(plan).toMatchObject({ mode: 'createProblem', table: 'gtcv_problem_owner_budget' })
+  })
+
+  it('does not route an activity out of a block that is not in the chain', () => {
+    const plan = planAccept(['activity'], anchor, 'gtcv_channel_logic')
+    expect(plan).toEqual({ mode: 'createRow', table: 'gtcv_channel_logic' })
+  })
+
+  it('says what to do when the block files nothing as a row', () => {
+    const plan = planAccept(['segment_name'], anchor, null)
+    expect(plan).toEqual({ refusal: NOT_FILED_HERE })
+    // And the wording suits an answer in words as well as a score, because
+    // the pre-engagement questions are answered in sentences.
+    expect(NOT_FILED_HERE).toContain('Record what the room agrees')
+    expect(NOT_FILED_HERE).not.toContain('the score the room agrees')
   })
 })
