@@ -6,6 +6,8 @@
 // easy mistake: nine empty blocks look like nine gaps.
 // ============================================================
 import { describe, it, expect } from 'vitest'
+import fs from 'fs'
+import { PROBLEM_COLUMNS, ACTIVITY_VALUE_FIELDS } from '@/lib/stage1-accept'
 import { GATES } from '@/lib/gtcv-gates'
 import {
   startingQuestionSet, BLOCKS_WITH_QUESTIONS, NO_QUESTIONS_YET,
@@ -20,13 +22,20 @@ describe('R4, which blocks have questions', () => {
     expect(startingQuestionSet('dp01').length).toBeGreaterThan(0)
   })
 
-  it('gives every other block none, without error', () => {
-    const others = GATES.filter((g) => !BLOCKS_WITH_QUESTIONS.includes(g.id))
-    for (const gate of others) {
-      expect(startingQuestionSet(gate.id), `${gate.id} should have no questions`).toEqual([])
+  it('gives every block something to ask, so nothing is greyed out', () => {
+    // Habib, 17 September 2026: "All sessions should be able to run in the
+    // room so there should be nothing greyed out saying there is no question
+    // set." Every block the platform has, not most of them.
+    const without = GATES.filter((g) => startingQuestionSet(g.id).length === 0)
+    expect(without.map((g) => g.id)).toEqual([])
+  })
+
+  it('offers the room every block it has questions for', () => {
+    // BLOCKS_WITH_QUESTIONS is what decides whether a block says there is
+    // nothing to ask, so it and the sets cannot be allowed to disagree.
+    for (const g of GATES) {
+      expect(BLOCKS_WITH_QUESTIONS, g.id).toContain(g.id)
     }
-    // The negative case is still the majority of the platform.
-    expect(others.length).toBe(GATES.length - BLOCKS_WITH_QUESTIONS.length)
   })
 
   it('returns nothing for a block identifier that does not exist', () => {
@@ -180,5 +189,110 @@ describe('the Commercial Readiness fit tests', () => {
     // BLOCKS_WITH_QUESTIONS is what decides whether the block says
     // "no questions have been set up for this block yet".
     expect(BLOCKS_WITH_QUESTIONS).toContain('dp09')
+  })
+})
+
+// ============================================================
+// A PROMPT THAT WRITES TO A COLUMN THAT IS NOT THERE
+//
+// The room answers, the facilitator presses Accept, and nothing arrives. The
+// prompts are new and every one of them names a column it files into, so this
+// checks each name against the columns the accept route will actually let
+// through, and against the block it belongs to.
+// ============================================================
+/**
+ * Columns the accept chain deliberately routes to a different table, taken
+ * from the accept module itself rather than copied, so this cannot go stale.
+ */
+const ACCEPT_CHAIN: string[] = ['problem', 'activity', ...PROBLEM_COLUMNS, ...ACTIVITY_VALUE_FIELDS]
+
+describe('every prompt files into a real column', () => {
+  const route = fs.readFileSync('app/api/facilitate/route.ts', 'utf8')
+
+  /** BLOCK_TABLE, as the route actually declares it. */
+  const blockTable: Record<string, string> = {}
+  {
+    const body = route.slice(route.indexOf('const BLOCK_TABLE'), route.indexOf('}', route.indexOf('const BLOCK_TABLE')))
+    for (const m of body.matchAll(/(\w+):\s*'([^']+)'/g)) blockTable[m[1]] = m[2]
+  }
+
+  /** BLOCK_COLUMNS, likewise. */
+  const blockColumns: Record<string, string[]> = {}
+  {
+    const start = route.indexOf('const BLOCK_COLUMNS')
+    const body = route.slice(start, route.indexOf('\n}', start))
+    for (const m of body.matchAll(/(\w+):\s*\[([^\]]*)\]/g)) {
+      blockColumns[m[1]] = [...m[2].matchAll(/'([^']+)'/g)].map((x) => x[1])
+    }
+  }
+
+  it('found the route own maps, rather than testing nothing', () => {
+    // If the parsing above breaks, every check below passes vacuously.
+    expect(Object.keys(blockTable).length).toBeGreaterThan(8)
+    expect(Object.keys(blockColumns).length).toBeGreaterThan(8)
+  })
+
+  it('names a column the accept route will let through', () => {
+    const bad: string[] = []
+    for (const gate of GATES) {
+      for (const seed of startingQuestionSet(gate.id)) {
+        for (const f of seed.target_fields) {
+          const table = blockTable[gate.id]
+          if (!table) { bad.push(`${gate.id} has no table but "${seed.question_text.slice(0, 40)}" files into ${f.column}`); continue }
+          const allowed = blockColumns[table] || []
+          // A column routed by the accept chain belongs to another table on
+          // purpose, so those are not failures here.
+          if (!allowed.includes(f.column) && !ACCEPT_CHAIN.includes(f.column)) {
+            bad.push(`${gate.id} -> ${table} has no column ${f.column}`)
+          }
+        }
+      }
+    }
+    expect(bad).toEqual([])
+  })
+
+  // TWO QUESTIONS PREDATE THE RULE. Decision Point 1 has two prompts that each
+  // ask for two things at once, so the room can only ever send one of each.
+  // They are named here rather than quietly allowed: the rule holds for every
+  // other question, and these two are on the list to be split, which changes a
+  // session Habib is currently running and so is not done in passing.
+  const KNOWN_DOUBLE = [
+    'Name one service this organisation delivers today',
+    'What does this service cost us that the budget does not show?',
+  ]
+
+  it('gives every person one thing to answer, never two', () => {
+    // The rule that cost most of a week: one variable per question, so the
+    // room can send three of something instead of one.
+    const doubles: string[] = []
+    for (const gate of GATES) {
+      for (const seed of startingQuestionSet(gate.id)) {
+        if (seed.target_fields.length > 1) doubles.push(seed.question_text)
+      }
+    }
+    const unexpected = doubles.filter((t) => !KNOWN_DOUBLE.some((k) => t.startsWith(k)))
+    expect(unexpected).toEqual([])
+    // And the known two have not quietly multiplied.
+    expect(doubles.length).toBe(KNOWN_DOUBLE.length)
+  })
+
+  it('gives a question that offers choices some choices to offer', () => {
+    for (const gate of GATES) {
+      for (const seed of startingQuestionSet(gate.id)) {
+        if (seed.question_type === 'classify') {
+          expect(seed.options.length, seed.question_text.slice(0, 50)).toBeGreaterThan(1)
+        }
+      }
+    }
+  })
+
+  it('gives every scored question a scale that runs the right way', () => {
+    for (const gate of GATES) {
+      for (const seed of startingQuestionSet(gate.id)) {
+        if (seed.question_type === 'score') {
+          expect(seed.scale_max, seed.question_text.slice(0, 50)).toBeGreaterThan(seed.scale_min)
+        }
+      }
+    }
   })
 })

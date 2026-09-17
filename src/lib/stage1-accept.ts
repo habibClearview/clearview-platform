@@ -123,6 +123,22 @@ export function isRefusal(d: AcceptDecision): d is AcceptRefusal {
  *                     overrides the anchor. This is how a second activity gets
  *                     its own "who pays" when the room named three of them.
  */
+/**
+ * WHAT TO DO WITH AN ANSWER THAT IS NOT FILED AS A ROW. 17 September 2026.
+ *
+ * Some blocks are scored and argued rather than listed: the pre-engagement
+ * questions, the six Commercial Readiness fit tests, the five independence
+ * tests at handover. The room still answers them, still sees the spread, and
+ * still agrees a number. What it does not do is create a row, because the
+ * number belongs on that block's own panel, where it is signed.
+ *
+ * This used to say "that block does not take answers yet", which reads as a
+ * thing somebody forgot to build and tells the facilitator nothing to do next.
+ */
+export const NOT_FILED_HERE =
+  'The room\'s answers stay on screen here to be read and discussed. '
+  + 'Record the score the room agrees on the panel below, where it is signed.'
+
 export function planAccept(
   columns: string[],
   anchor: RoomAnchor,
@@ -136,7 +152,7 @@ export function planAccept(
   const target = column ? ACCEPT_TARGETS[column] : null
 
   if (!target) {
-    if (!blockTable) return { refusal: 'That block does not take answers yet' }
+    if (!blockTable) return { refusal: NOT_FILED_HERE }
     return { mode: 'createRow', table: blockTable }
   }
 
@@ -188,7 +204,7 @@ export function planAccept(
     }
 
     default:
-      return { refusal: 'That block does not take answers yet' }
+      return { refusal: NOT_FILED_HERE }
   }
 }
 

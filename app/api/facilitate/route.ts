@@ -31,9 +31,23 @@ export const dynamic = 'force-dynamic'
 type Admin = ReturnType<typeof getAdminClient>
 
 /** The block tables Stage 1 writes into, and nothing else. */
+// WHERE A BLOCK'S ACCEPTED ANSWERS LAND. 17 September 2026. Only the first two
+// blocks were here, so the room could be asked a question anywhere and the
+// answer could only be filed in two places. Every block the room can now be
+// run in has its own table, which is the table that block's own screen reads.
 const BLOCK_TABLE: Record<string, string> = {
   phase_0: 'gtcv_assumptions',
   dp01: 'gtcv_service_inventory',
+  dp02: 'gtcv_customer_segments',
+  dp03: 'gtcv_propositions',
+  dp04: 'gtcv_cost_lines',
+  dp05: 'gtcv_pipeline',
+  dp06: 'gtcv_partner_map',
+  dp07: 'gtcv_pilot_sessions',
+  dp08: 'gtcv_channel_logic',
+  // setup, dp09 and handover are scored and discussed rather than filed as
+  // rows: the agreed number goes on the block's own panel, where it is signed.
+  // acceptRefusal below says so, rather than refusing without explanation.
 }
 
 /**
@@ -74,6 +88,38 @@ const BLOCK_COLUMNS: Record<string, string[]> = {
   gtcv_service_inventory: [
     'service_name', 'what_it_delivers', 'logic_type', 'has_demand',
     'hidden_delivery_costs', 'delivery_quality_risk', 'decision', 'notes',
+  ],
+  // TEXT COLUMNS ONLY, on every one of these. A person types words into a box,
+  // and a value arriving from a room is a string. Numbers, dates and yes/no
+  // are set on the block's own screen, where the format can be checked, so
+  // naming one here would only let a word reach a numeric column.
+  gtcv_customer_segments: [
+    'segment_name', 'problem_in_their_words', 'budget_holder_name',
+    'budget_holder_role', 'willing', 'able', 'prioritised', 'notes',
+  ],
+  gtcv_propositions: [
+    'segment_label', 'capability', 'problem', 'outcome', 'reason_to_choose',
+    'differentiation_type', 'differentiation_statement', 'credibility_signal', 'notes',
+  ],
+  gtcv_cost_lines: ['category', 'item', 'unit', 'notes'],
+  gtcv_pipeline: [
+    'organisation', 'contact_name', 'contact_role', 'stage',
+    'last_action', 'next_action', 'owner', 'notes',
+  ],
+  gtcv_partner_map: [
+    'partner_name', 'partner_type', 'what_they_bring', 'what_they_need',
+    'positioning_effect', 'action', 'notes',
+  ],
+  gtcv_channel_logic: [
+    'segment', 'entry_or_scale', 'channel', 'channel_logic',
+    'evidence_needed', 'first_action', 'timeline',
+  ],
+  gtcv_pilot_sessions: [
+    'pilot_client_label', 'session_title', 'hypothesis', 'price_tier',
+    'who_leads', 'who_observes', 'obs_engagement', 'obs_language',
+    'obs_resistance', 'obs_surprise', 'obs_price_moment', 'verbatim_responses',
+    'purchasing_signals', 'close_type', 'what_surprised_us',
+    'revision_recommended', 'key_learning', 'notes',
   ],
 }
 

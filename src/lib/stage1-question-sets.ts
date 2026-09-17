@@ -291,11 +291,10 @@ const SERVICE_REALITY: QuestionSeed[] = [
  * because the answer looked deliberate.
  */
 export function startingQuestionSet(gateId: string): QuestionSeed[] {
-  if (gateId === 'phase_0') return [...CLEARING_THE_GROUND, ...PROBLEM_OWNER_BUDGET]
-  if (gateId === 'dp01') return SERVICE_REALITY
-  if (gateId === 'dp09') return DP09
-  return []
+  return SETS[gateId] || []
 }
+
+
 
 /**
  * The starting set for ONE TOOL of a block.
@@ -329,6 +328,358 @@ export const TOOL_NAMES: Record<number, string> = {
   4: 'Signal vs Story',
   5: 'Continue / Pause / Kill',
 }
+
+// ============================================================
+// EVERY OTHER BLOCK, SO NOTHING IS GREYED OUT
+//
+// Habib, 17 September 2026: "All sessions should be able to run in the room so
+// there should be nothing greyed out saying there is no question set." And,
+// before that: "the run in the room button is not just about questions, it is
+// about participation. There are decision points that are not question driven
+// but participants writing ideas, sentences and suggestions. These should
+// appear on the page that is projected in the room, it can then be discussed
+// and rephrased on the projected board and then finalised by saving. Decision
+// points 4, 5, 6 and so on are not necessarily questions but brainstorming
+// sessions."
+//
+// He is describing the collect type, which has existed all along. A collect
+// question puts a box in front of every person in the room, their words arrive
+// on the projected board, the room argues about them, and Accept writes the
+// agreed wording into the block's own table. That is brainstorming. What was
+// missing was not the machinery but the prompts: nobody had written them for
+// these blocks, so the room was told there was nothing to ask.
+//
+// ONE VARIABLE PER QUESTION. This is the rule that cost most of a week when it
+// was broken (see the note on Tool 1 above). A prompt asking for a segment and
+// its budget holder together can only ever produce one of each; asked
+// separately, the room can send three segments and five budget holders, and
+// "+ add" arrives from the floor instead of being typed in afterwards.
+//
+// THE COLUMNS ARE REAL. Each target column below exists on the block's own
+// table and is a text column, because that is what a person types into a box.
+// Numbers, dates and yes/no live on the block's table and are set there, where
+// the format can be checked.
+// ============================================================
+
+// The three questions asked of the Executive Director, with the funder in the
+// room, before Decision Point 1 can open. They are answered out loud and the
+// answers are written down verbatim, so these carry no target column: the
+// record goes on the Pre-engagement diagnostic tab, where it is signed.
+const PRE_ENGAGEMENT: QuestionSeed[] = [
+  q({
+    gate_id: 'setup', sort_order: 1, suggested_minutes: 10,
+    question_text: 'What does commercial success look like for your organisation in 18 months?',
+    question_type: 'collect',
+  }),
+  q({
+    gate_id: 'setup', sort_order: 2, suggested_minutes: 10,
+    question_text: 'What is the biggest thing stopping you from earning commercial revenue right now?',
+    question_type: 'collect',
+  }),
+  q({
+    gate_id: 'setup', sort_order: 3, suggested_minutes: 10,
+    question_text: 'What would have to be true for your organisation to stop needing grant funding?',
+    question_type: 'collect',
+  }),
+]
+
+// DECISION POINT 2, the opening plenary on customer segments. The guide:
+// "Map segments from the revenue ready inventory. Separate paying clients from
+// clients and programme officers. Name the budget holder for each segment."
+// Lands in gtcv_customer_segments.
+const CUSTOMER_CLARITY: QuestionSeed[] = [
+  q({
+    gate_id: 'dp02', sort_order: 1, suggested_minutes: 8,
+    question_text: 'Name one group of organisations that might pay for this service. One group per answer, and send as many as you can think of.',
+    question_type: 'collect',
+    target_fields: [{ column: 'segment_name', heading: 'The group' }],
+  }),
+  q({
+    gate_id: 'dp02', sort_order: 2, suggested_minutes: 8,
+    question_text: 'In their words, not ours: what problem does that group have? Write the sentence you have actually heard one of them say.',
+    question_type: 'collect',
+    target_fields: [{ column: 'problem_in_their_words', heading: 'The problem, in their words' }],
+  }),
+  q({
+    gate_id: 'dp02', sort_order: 3, suggested_minutes: 6,
+    question_text: 'Who in that organisation holds the budget for this? Name the person, not the department.',
+    question_type: 'collect',
+    target_fields: [{ column: 'budget_holder_name', heading: 'Who holds the budget' }],
+  }),
+  q({
+    gate_id: 'dp02', sort_order: 4, suggested_minutes: 5,
+    question_text: 'What is that person job title?',
+    question_type: 'collect',
+    target_fields: [{ column: 'budget_holder_role', heading: 'Their job title' }],
+  }),
+  q({
+    gate_id: 'dp02', sort_order: 5, suggested_minutes: 6,
+    question_text: 'How badly does this group feel the problem today? 1 is they can live with it, 5 is it is costing them money right now.',
+    question_type: 'score',
+  }),
+]
+
+// DECISION POINT 3, the value proposition workshop. The guide: "Build the four
+// components using the exact language clients used in Decision Point 2." Lands
+// in gtcv_propositions.
+const VALUE_PROPOSITION: QuestionSeed[] = [
+  q({
+    gate_id: 'dp03', sort_order: 1, suggested_minutes: 8,
+    question_text: 'What can we actually do for this group? One capability per answer, and only what we can do today.',
+    question_type: 'collect',
+    target_fields: [{ column: 'capability', heading: 'What we can do' }],
+  }),
+  q({
+    gate_id: 'dp03', sort_order: 2, suggested_minutes: 8,
+    question_text: 'Which of their problems does that solve? Use the words they used, not ours.',
+    question_type: 'collect',
+    target_fields: [{ column: 'problem', heading: 'The problem it solves' }],
+  }),
+  q({
+    gate_id: 'dp03', sort_order: 3, suggested_minutes: 8,
+    question_text: 'What is different for them afterwards? Write the change they would notice, not the activity we delivered.',
+    question_type: 'collect',
+    target_fields: [{ column: 'outcome', heading: 'What changes for them' }],
+  }),
+  q({
+    gate_id: 'dp03', sort_order: 4, suggested_minutes: 8,
+    question_text: 'Why would they choose us over anyone else doing this? Be honest. If there is no good answer, say so.',
+    question_type: 'collect',
+    target_fields: [{ column: 'reason_to_choose', heading: 'Why us' }],
+  }),
+  q({
+    gate_id: 'dp03', sort_order: 5, suggested_minutes: 6,
+    question_text: 'What proof do we have that we can do this? Name something a client could check.',
+    question_type: 'collect',
+    target_fields: [{ column: 'credibility_signal', heading: 'The proof' }],
+  }),
+]
+
+// DECISION POINT 4, cost mapping. The guide runs three sessions across five
+// categories, finance and leadership only, with the field team validating
+// delivery time separately and never seeing the totals. The room names the
+// cost lines; the actual figures are typed into the table, where the format is
+// checked. Lands in gtcv_cost_lines.
+const VIABILITY: QuestionSeed[] = [
+  q({
+    gate_id: 'dp04', sort_order: 1, suggested_minutes: 8,
+    question_text: 'Name one thing we pay for in order to deliver this service. One per answer. Nothing is too small.',
+    question_type: 'collect',
+    target_fields: [{ column: 'item', heading: 'What we pay for' }],
+  }),
+  q({
+    gate_id: 'dp04', sort_order: 2, suggested_minutes: 5,
+    question_text: 'Which kind of cost is that? Direct labour, direct materials, travel and logistics, quality assurance, or overhead.',
+    question_type: 'classify',
+    options: ['Direct labour', 'Direct materials', 'Travel and logistics', 'Quality assurance', 'Overhead'],
+    target_fields: [{ column: 'category', heading: 'Kind of cost' }],
+  }),
+  q({
+    gate_id: 'dp04', sort_order: 3, suggested_minutes: 6,
+    question_text: 'What is that cost counted in? Per day, per person, per trip, per delivery.',
+    question_type: 'collect',
+    target_fields: [{ column: 'unit', heading: 'Counted in' }],
+  }),
+  q({
+    gate_id: 'dp04', sort_order: 4, suggested_minutes: 8,
+    question_text: 'Name a cost we are currently carrying without counting it. Somebody time, an office, a vehicle, a subsidy nobody has written down.',
+    question_type: 'collect',
+    target_fields: [{ column: 'notes', heading: 'The uncounted cost' }],
+  }),
+]
+
+// DECISION POINT 5, market entry. The guide builds a pipeline of "minimum 10
+// target institutions with an outreach sequence", and debriefs the A/B message
+// test in plenary. Lands in gtcv_pipeline.
+const MARKET_ENTRY: QuestionSeed[] = [
+  q({
+    gate_id: 'dp05', sort_order: 1, suggested_minutes: 8,
+    question_text: 'Name one organisation we should approach. One per answer, and send every one you can think of before we start choosing.',
+    question_type: 'collect',
+    target_fields: [{ column: 'organisation', heading: 'The organisation' }],
+  }),
+  q({
+    gate_id: 'dp05', sort_order: 2, suggested_minutes: 6,
+    question_text: 'Who do we know there, or who should we be trying to reach?',
+    question_type: 'collect',
+    target_fields: [{ column: 'contact_name', heading: 'The person' }],
+  }),
+  q({
+    gate_id: 'dp05', sort_order: 3, suggested_minutes: 5,
+    question_text: 'What is their job title?',
+    question_type: 'collect',
+    target_fields: [{ column: 'contact_role', heading: 'Their job title' }],
+  }),
+  q({
+    gate_id: 'dp05', sort_order: 4, suggested_minutes: 6,
+    question_text: 'What is the first thing we should do to reach them? One action, and one somebody could do this week.',
+    question_type: 'collect',
+    target_fields: [{ column: 'next_action', heading: 'First move' }],
+  }),
+  q({
+    gate_id: 'dp05', sort_order: 5, suggested_minutes: 5,
+    question_text: 'Who is going to do it? Name a person, not a team.',
+    question_type: 'collect',
+    target_fields: [{ column: 'owner', heading: 'Who does it' }],
+  }),
+]
+
+// DECISION POINT 6, identity and partners. The guide: every current and
+// potential partner categorised as referral, co-delivery, endorsement or
+// conflict, and the conflicts named with a recommendation for each. Lands in
+// gtcv_partner_map.
+const IDENTITY_AND_PARTNERS: QuestionSeed[] = [
+  q({
+    gate_id: 'dp06', sort_order: 1, suggested_minutes: 8,
+    question_text: 'Name one organisation we work with, or would like to. One per answer.',
+    question_type: 'collect',
+    target_fields: [{ column: 'partner_name', heading: 'The partner' }],
+  }),
+  q({
+    gate_id: 'dp06', sort_order: 2, suggested_minutes: 5,
+    question_text: 'What kind of relationship is that? They send us work, we deliver together, they vouch for us, or they compete with us.',
+    question_type: 'classify',
+    options: ['They send us work', 'We deliver together', 'They vouch for us', 'They compete with us'],
+    target_fields: [{ column: 'partner_type', heading: 'Kind of relationship' }],
+  }),
+  q({
+    gate_id: 'dp06', sort_order: 3, suggested_minutes: 6,
+    question_text: 'What do they bring that we do not have?',
+    question_type: 'collect',
+    target_fields: [{ column: 'what_they_bring', heading: 'What they bring' }],
+  }),
+  q({
+    gate_id: 'dp06', sort_order: 4, suggested_minutes: 6,
+    question_text: 'What do they need from us in return?',
+    question_type: 'collect',
+    target_fields: [{ column: 'what_they_need', heading: 'What they need' }],
+  }),
+  q({
+    gate_id: 'dp06', sort_order: 5, suggested_minutes: 8,
+    question_text: 'How does being seen with them change how a paying client sees us? Say it plainly, including when the answer is that it makes us look like a grant project.',
+    question_type: 'collect',
+    target_fields: [{ column: 'positioning_effect', heading: 'How it makes us look' }],
+  }),
+]
+
+// DECISION POINT 7, the pilot. Two iterations: in the first the coach leads
+// the conversation with a real potential customer and the organisation
+// observes; in the second the organisation pitches and the coach is the
+// backstop. These are the debrief prompts, run straight after a session while
+// everybody still remembers it. Lands in gtcv_pilot_sessions.
+const PILOT: QuestionSeed[] = [
+  q({
+    gate_id: 'dp07', sort_order: 1, suggested_minutes: 8,
+    question_text: 'Write down something the client actually said, in their words. Not what you think they meant.',
+    question_type: 'collect',
+    target_fields: [{ column: 'verbatim_responses', heading: 'What they said' }],
+  }),
+  q({
+    gate_id: 'dp07', sort_order: 2, suggested_minutes: 6,
+    question_text: 'Where did they lean in, and where did their attention drop away?',
+    question_type: 'collect',
+    target_fields: [{ column: 'obs_engagement', heading: 'Where they leaned in' }],
+  }),
+  q({
+    gate_id: 'dp07', sort_order: 3, suggested_minutes: 6,
+    question_text: 'What did they push back on, and how hard?',
+    question_type: 'collect',
+    target_fields: [{ column: 'obs_resistance', heading: 'What they pushed back on' }],
+  }),
+  q({
+    gate_id: 'dp07', sort_order: 4, suggested_minutes: 6,
+    question_text: 'What happened in the seconds after the price was said? Describe it, do not interpret it.',
+    question_type: 'collect',
+    target_fields: [{ column: 'obs_price_moment', heading: 'The price moment' }],
+  }),
+  q({
+    gate_id: 'dp07', sort_order: 5, suggested_minutes: 6,
+    question_text: 'What surprised you? Something you did not expect before we walked in.',
+    question_type: 'collect',
+    target_fields: [{ column: 'what_surprised_us', heading: 'What surprised us' }],
+  }),
+  q({
+    gate_id: 'dp07', sort_order: 6, suggested_minutes: 8,
+    question_text: 'What should we change before the next one? One change per answer.',
+    question_type: 'collect',
+    target_fields: [{ column: 'revision_recommended', heading: 'What to change' }],
+  }),
+  q({
+    gate_id: 'dp07', sort_order: 7, suggested_minutes: 5,
+    question_text: 'On what we saw today, how likely is this to sell? 1 is not at this price to this person, 5 is they were reaching for a pen.',
+    question_type: 'score',
+  }),
+]
+
+// DECISION POINT 8, scale. The guide: name the entry point segment and the
+// scale segment, and work out what is needed to reach them "without programme
+// facilitation. A route that runs only through the programme is not an
+// independent channel." Lands in gtcv_channel_logic.
+const SCALE: QuestionSeed[] = [
+  q({
+    gate_id: 'dp08', sort_order: 1, suggested_minutes: 8,
+    question_text: 'Name a group we could grow into. One per answer.',
+    question_type: 'collect',
+    target_fields: [{ column: 'segment', heading: 'The group' }],
+  }),
+  q({
+    gate_id: 'dp08', sort_order: 2, suggested_minutes: 5,
+    question_text: 'Is that where we start, or where we grow to?',
+    question_type: 'classify',
+    options: ['Where we start', 'Where we grow to'],
+    target_fields: [{ column: 'entry_or_scale', heading: 'Start or grow' }],
+  }),
+  q({
+    gate_id: 'dp08', sort_order: 3, suggested_minutes: 8,
+    question_text: 'How would we reach them? One route per answer.',
+    question_type: 'collect',
+    target_fields: [{ column: 'channel', heading: 'The route' }],
+  }),
+  q({
+    gate_id: 'dp08', sort_order: 4, suggested_minutes: 8,
+    question_text: 'Would that route still work if this programme ended tomorrow? If it only works because the funder opens the door, say so.',
+    question_type: 'collect',
+    target_fields: [{ column: 'channel_logic', heading: 'Does it work without the programme' }],
+  }),
+  q({
+    gate_id: 'dp08', sort_order: 5, suggested_minutes: 6,
+    question_text: 'What is the first thing we would have to do to make that route real?',
+    question_type: 'collect',
+    target_fields: [{ column: 'first_action', heading: 'First move' }],
+  }),
+]
+
+// HANDOVER. The leadership team presents the commercial model unassisted, and
+// the coach and the funder are evaluators rather than helpers. These are the
+// five independence tests, scored by the room. The agreed score goes on the
+// handover record in the block, which is where it is signed.
+const HANDOVER: QuestionSeed[] = [
+  q({
+    gate_id: 'handover', sort_order: 1, scale_min: 1, scale_max: 5, suggested_minutes: 5,
+    question_text: 'Can the team explain the pricing without help? 1 is they looked to the coach, 5 is they defended it themselves.',
+    question_type: 'score',
+  }),
+  q({
+    gate_id: 'handover', sort_order: 2, scale_min: 1, scale_max: 5, suggested_minutes: 5,
+    question_text: 'Can they update the financial model themselves? 1 is not without the coach, 5 is they did it in front of us.',
+    question_type: 'score',
+  }),
+  q({
+    gate_id: 'handover', sort_order: 3, scale_min: 1, scale_max: 5, suggested_minutes: 5,
+    question_text: 'Can they hold a customer conversation without the coach in the room? 1 is no, 5 is they already have.',
+    question_type: 'score',
+  }),
+  q({
+    gate_id: 'handover', sort_order: 4, scale_min: 1, scale_max: 5, suggested_minutes: 5,
+    question_text: 'Can they reach a paying client without the programme opening the door? 1 is no, 5 is they have done it.',
+    question_type: 'score',
+  }),
+  q({
+    gate_id: 'handover', sort_order: 5, scale_min: 1, scale_max: 5, suggested_minutes: 5,
+    question_text: 'Can they defend every decision in the model on the evidence behind it? 1 is no, 5 is any decision, on the spot.',
+    question_type: 'score',
+  }),
+]
 
 // ============================================================
 // DECISION POINT 9: THE SIX FIT TESTS, SCORED BY THE ROOM
@@ -385,8 +736,33 @@ const DP09: QuestionSeed[] = [
   }),
 ]
 
-/** The blocks Stage 1 gives questions to. */
-export const BLOCKS_WITH_QUESTIONS = ['phase_0', 'dp01', 'dp09']
+
 
 /** Shown beside "Run this with the room" on a block that has none (Q8). */
 export const NO_QUESTIONS_YET = 'No questions have been set up for this block yet.'
+
+/** Every block, and what the room is asked in it. */
+const SETS: Record<string, QuestionSeed[]> = {
+  setup: PRE_ENGAGEMENT,
+  phase_0: [...CLEARING_THE_GROUND, ...PROBLEM_OWNER_BUDGET],
+  dp01: SERVICE_REALITY,
+  dp02: CUSTOMER_CLARITY,
+  dp03: VALUE_PROPOSITION,
+  dp04: VIABILITY,
+  dp05: MARKET_ENTRY,
+  dp06: IDENTITY_AND_PARTNERS,
+  dp07: PILOT,
+  dp08: SCALE,
+  dp09: DP09,
+  handover: HANDOVER,
+}
+
+/**
+ * The blocks that can be run with the room, which is now all of them.
+ *
+ * Habib, 17 September 2026: "All sessions should be able to run in the room so
+ * there should be nothing greyed out saying there is no question set." Derived
+ * from the sets rather than typed out beside them, so the two can never
+ * disagree: a block has questions exactly when it has questions.
+ */
+export const BLOCKS_WITH_QUESTIONS = Object.keys(SETS)
