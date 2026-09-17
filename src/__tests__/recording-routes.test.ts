@@ -978,3 +978,55 @@ describe('a decision point that is not open yet', () => {
     expect(fn).toContain('isCoachingTeam:canViewCoachGuidance(previewRoleId)')
   })
 })
+
+// ============================================================
+// THE SMALL THINGS THAT MADE THE PAGE FEEL BROKEN
+//
+// Habib, 17 September 2026: "The tab now starts in the middle not at the
+// bottom, how frustrating is this... The tab title is sessions and rooms, the
+// content shows workplan, please make this consistent... why does the key to
+// the different types of rooms stacked like that, makes the whole thing
+// cluttered... The workplan page is showing 3 sessions, where did that come
+// from, I did not set up anything."
+// ============================================================
+describe('the workplan page', () => {
+  const PLAN = fs.readFileSync('src/components/gtcv/SessionWorkplan.tsx', 'utf8')
+  const TYPES = fs.readFileSync('src/lib/coach-types.ts', 'utf8')
+  const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('is called the same thing in the menu as on the page', () => {
+    expect(TYPES).toContain("label: 'Workplan'")
+    expect(TYPES).not.toContain("label: 'Sessions and rooms'")
+  })
+
+  it('folds the room key away, instead of stacking six cards above the work', () => {
+    expect(PLAN).toContain('<details')
+    expect(PLAN).toContain('The six rooms, and who the method puts in each')
+  })
+
+  it('says when a session was added, so an unfamiliar one can be accounted for', () => {
+    // Nothing on the platform creates a session by itself, so every row was
+    // added by somebody pressing Add. Saying when makes that answerable.
+    expect(PLAN).toContain('added {new Date(s.created_at)')
+  })
+})
+
+describe('a tab opens at its top, and stays there', () => {
+  const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('scrolls when the tab changes', () => {
+    expect(DASH).toContain('window.scrollTo({top:0,left:0,behavior:\'auto\'})')
+    expect(DASH).toContain('[activeTab,selClientId,view]')
+  })
+
+  it('scrolls again once the panels have finished loading', () => {
+    // A tab's panels fetch their own data, so the page is short at the moment
+    // of the change and grows as each one answers. Scrolling only then puts
+    // you at the top of a page that is not there yet.
+    expect(DASH).toContain('requestAnimationFrame(top)')
+    expect(DASH).toContain('setTimeout(top,250)')
+    // And it tidies up after itself, so a fast click does not leave a timer
+    // that scrolls the next tab out from under you.
+    expect(DASH).toContain('cancelAnimationFrame(frame);clearTimeout(settle)')
+  })
+})

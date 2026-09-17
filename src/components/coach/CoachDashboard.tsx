@@ -2029,9 +2029,22 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // This runs on every tab change including the first, and on a zone arriving
   // in the address, which is exactly when somebody has followed a link and
   // should be looking at the beginning of what they were sent.
+  //
+  // AND IT HAS TO SCROLL AGAIN AFTER THE CONTENT ARRIVES. 17 September 2026.
+  // Habib: "The tab now starts in the middle not at the bottom." A tab's
+  // panels load their own data, so the page is short when the tab changes and
+  // grows as each panel answers. Scrolling once, at the moment of the change,
+  // puts you at the top of a page that is not there yet; the browser then
+  // restores roughly where you were as the height comes back. So it scrolls on
+  // the change, again on the next paint, and once more shortly after, which
+  // covers the panels that fetch before they draw.
   useEffect(()=>{
     if(typeof window==='undefined')return
-    window.scrollTo({top:0,left:0,behavior:'auto'})
+    const top=()=>window.scrollTo({top:0,left:0,behavior:'auto'})
+    top()
+    const frame=requestAnimationFrame(top)
+    const settle=setTimeout(top,250)
+    return ()=>{cancelAnimationFrame(frame);clearTimeout(settle)}
   },[activeTab,selClientId,view])
   // ──────────────────────────────────────────────────────────────
   // THE BLOCK IS IN THE ADDRESS. 15 August 2026.
