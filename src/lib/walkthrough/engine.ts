@@ -39,7 +39,20 @@ export interface WalkthroughState {
   mode: Mode
   sound: boolean
   room: Room
+  /** How slowly the sequences run. 1 is the approved design's own pace. */
+  speed: number
+  /** True while the sequence is held at the beat it has reached. */
+  held: boolean
+  /** Whether there is text below the fold on the panel, and above it. */
+  more: { down: boolean; up: boolean }
 }
+
+/** The three paces, named the way the remote names them. */
+export const SPEEDS: { label: string; factor: number }[] = [
+  { label: 'Normal', factor: 1 },
+  { label: 'Slower', factor: 1.8 },
+  { label: 'Slowest', factor: 3 },
+]
 
 export interface Controller {
   go(index: number, animate?: boolean): void
@@ -48,6 +61,12 @@ export interface Controller {
   setMode(mode: Mode): void
   setSound(on: boolean): void
   setRoom(room: Room): void
+  /** Slow the sequences down, or put them back to the approved pace. */
+  setSpeed(factor: number): void
+  /** Hold the sequence where it is, or let it carry on. */
+  setHeld(held: boolean): void
+  /** Move the reading panel, because on some screens it has more than fits. */
+  scrollPanel(direction: 1 | -1): void
   state(): WalkthroughState
   /** Told after every change. Returns a function that stops listening. */
   onState(fn: (s: WalkthroughState) => void): () => void
@@ -359,13 +378,47 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
   function setStatus(k: string, t: string) { if (GE[k].status) GE[k].status!.textContent = t }
 
   // ── animation ────────────────────────────────────────────
+  //
+  // HOW FAST, AND WHETHER AT ALL. 17 September 2026. Habib, watching the
+  // sequence move between the boxes: "it moves really fast but I can talk to
+  // it ... it may be useful to have a level of control on the speed."
+  //
+  // So every pause in every sequence is multiplied by one number, and one flag
+  // holds the sequence where it is. The hold takes effect at the end of the
+  // beat that is running rather than in the middle of it, because a signature
+  // stamp frozen half drawn looks like a fault, and a presenter who has just
+  // pressed hold is about to talk for a minute anyway.
   let run = 0
+  let speedFactor = 1
+  let held = false
+  let releases: (() => void)[] = []
   class Cancel {}
-  const waiter = (my: number) => (ms: number) => new Promise<void>((res, rej) =>
-    setTimeout(() => (my === run ? res() : rej(new Cancel())), reduced ? 0 : ms))
 
-  function travel(my: number, a: string, b: string, ms: number) {
+  function setSpeed(factor: number) {
+    speedFactor = Number.isFinite(factor) && factor > 0 ? factor : 1
+    tell()
+  }
+  function setHeld(on: boolean) {
+    held = !!on
+    if (!held) { const waiting = releases; releases = []; waiting.forEach((r) => r()) }
+    tell()
+  }
+  /** Resolves at once unless the sequence is being held. */
+  function untilReleased(my: number) {
+    if (!held) return Promise.resolve()
+    return new Promise<void>((res, rej) => {
+      releases.push(() => (my === run ? res() : rej(new Cancel())))
+    })
+  }
+  const waiter = (my: number) => async (ms: number) => {
+    await new Promise<void>((res, rej) =>
+      setTimeout(() => (my === run ? res() : rej(new Cancel())), reduced ? 0 : ms * speedFactor))
+    await untilReleased(my)
+  }
+
+  function travel(my: number, a: string, b: string, msAtFullSpeed: number) {
     if (reduced) return Promise.resolve()
+    const ms = msAtFullSpeed * speedFactor
     const p0 = ctr(a); const p1 = ctr(b)
     token!.style.opacity = '1'
     SFX.travel()
@@ -563,7 +616,10 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
   function prev() { go(cur - 1, false) }
   function schedule() {
     if (playTimer) clearTimeout(playTimer)
-    playTimer = setTimeout(() => { if (mode === 'play') next() }, STEPS[cur].kind === 'scene' ? 5000 : 5200)
+    playTimer = setTimeout(
+      () => { if (mode === 'play' && !held) next() },
+      (STEPS[cur].kind === 'scene' ? 5000 : 5200) * speedFactor,
+    )
   }
 
   function setMode(m: Mode, quiet?: boolean) {
@@ -649,6 +705,29 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
     area.addEventListener('touchend', touchEnd, { passive: true })
   })
 
+  /**
+   * The panel on the right, and the scene when a scene is showing. Some
+   * screens hold more than fits, and the presenter is at the other end of the
+   * room with a phone rather than beside the laptop with a mouse.
+   */
+  function panel(): HTMLElement {
+    return (app.dataset.kind === 'scene' ? scene : narr) as HTMLElement
+  }
+  function scrollPanel(direction: 1 | -1) {
+    const el = panel()
+    const step = Math.max(120, Math.round(el.clientHeight * 0.7))
+    el.scrollBy({ top: step * direction, behavior: reduced ? 'auto' : 'smooth' })
+    // The remote's own arrows light up from this, so it is told straight away
+    // rather than after the smooth scroll has finished.
+    setTimeout(tell, reduced ? 0 : 420)
+  }
+  /** Whether there is anything to scroll to, in either direction. */
+  function moreToRead() {
+    const el = panel()
+    const room = el.scrollHeight - el.clientHeight
+    return { down: room > 4 && el.scrollTop < room - 4, up: room > 4 && el.scrollTop > 4 }
+  }
+
   function setRoom(r: Room) {
     app.dataset.room = r
     try { localStorage.setItem('gtcv-room', r) } catch {}
@@ -707,12 +786,19 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
     return {
       index: cur, total: STEPS.length, name: STEPS[cur]?.name || '',
       mode, sound: soundOn, room: (app.dataset.room === 'light' ? 'light' : 'dark'),
+      speed: speedFactor, held, more: moreToRead(),
     }
   }
   function tell() {
     const s = current()
     listeners.forEach((fn) => { try { fn(s) } catch {} })
   }
+
+  // Somebody scrolling the panel with a finger or a wheel changes what the
+  // remote should be offering, so the panel says when it has been moved.
+  const onScroll = () => tell()
+  narr.addEventListener('scroll', onScroll, { passive: true })
+  scene.addEventListener('scroll', onScroll, { passive: true })
 
   return {
     go: (i, animate) => { setMode('walk', true); go(i, animate === undefined ? false : animate) },
@@ -721,11 +807,18 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
     setMode: (m) => (m === 'walk' ? backToWalk() : setMode(m)),
     setSound,
     setRoom,
+    setSpeed,
+    setHeld,
+    scrollPanel,
     state: current,
     onState: (fn) => { listeners.add(fn); fn(current()); return () => { listeners.delete(fn) } },
     steps: () => STEPS,
     destroy() {
       run++
+      held = false
+      releases = []
+      narr.removeEventListener('scroll', onScroll)
+      scene.removeEventListener('scroll', onScroll)
       if (playTimer) clearTimeout(playTimer)
       document.removeEventListener('keydown', onKey)
       if (mq) {

@@ -2,13 +2,18 @@
 // THE REMOTE'S OWN LAYOUT.
 //
 // The walkthrough's colours and font, arranged for a phone held in one hand in
-// a dim room: the two buttons are 64 pixels tall so they can be pressed without
-// looking, and the notes are 18 pixels so they can be read at arm's length.
-// Every value here is the one Habib specified.
+// a dim room: the two buttons at the bottom are 64 pixels tall so they can be
+// pressed without looking, and the cue is 18 pixels so it can be read at arm's
+// length. Those values are the ones Habib specified.
+//
+// Between them the phone now carries what he asked for after using it: the same
+// four buttons the screen's own header has, across the top where they can be
+// reached, the talking points for the screen that is up, and a row for moving
+// the reading panel, holding the sequence and changing its pace.
 // ============================================================
 
 export const REMOTE_CSS = `
-.gtcvw-remote{display:flex;flex-direction:column;min-height:100vh;height:auto;background:var(--ground);color:var(--ink)}
+.gtcvw-remote{display:flex;flex-direction:column;min-height:100vh;height:100vh;background:var(--ground);color:var(--ink)}
 .gtcvw-remote .rm-top{display:flex;align-items:center;gap:12px;padding:16px 18px;background:var(--bar);border-bottom:1px solid var(--line)}
 .gtcvw-remote .rm-where{flex:1;min-width:0;font-size:14px;font-weight:600;letter-spacing:.02em;color:var(--ink)}
 .gtcvw-remote .rm-menu{flex:none;font-size:13px;font-weight:600;padding:8px 14px;background:transparent;color:var(--ink-2);border:1px solid var(--line-2);cursor:pointer}
@@ -20,6 +25,18 @@ export const REMOTE_CSS = `
 .gtcvw-remote .rm-body{flex:1;min-height:0;overflow:auto;padding:20px 18px 24px}
 .gtcvw-remote .rm-note{margin:0;font-size:18px;line-height:1.5;color:var(--ink)}
 .gtcvw-remote .rm-note.quiet{margin-top:18px;font-size:14px;color:var(--ink-3)}
+.gtcvw-remote .rm-modes{display:flex;border-bottom:1px solid var(--line)}
+.gtcvw-remote .rm-modes button{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--ink-2);background:transparent;border:0;border-right:1px solid var(--line);padding:12px 4px;cursor:pointer;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gtcvw-remote .rm-modes button:last-child{border-right:0}
+.gtcvw-remote .rm-modes button.on{background:var(--blue);color:var(--on-blue)}
+.gtcvw-remote .rm-points{margin:16px 0 0;padding-left:20px}
+.gtcvw-remote .rm-points li{font-size:16px;line-height:1.45;color:var(--ink-2);margin-bottom:12px}
+.gtcvw-remote .rm-points li::marker{color:var(--blue)}
+.gtcvw-remote .rm-tools{display:flex;gap:6px;padding:8px 14px;border-top:1px solid var(--line)}
+.gtcvw-remote .rm-tools button{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--ink-2);background:transparent;border:1px solid var(--line-2);padding:12px 4px;cursor:pointer;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gtcvw-remote .rm-tools button:disabled{opacity:.3}
+.gtcvw-remote .rm-tools button.on{background:var(--cv-prog);color:#0F1A2B;border-color:var(--cv-prog)}
+.gtcvw-remote .rm-tools button.wants{border-color:var(--blue);color:var(--blue)}
 .gtcvw-remote .rm-list{display:flex;flex-direction:column;gap:6px;margin-bottom:22px}
 .gtcvw-remote .rm-list button{display:block;width:100%;text-align:left;font-size:16px;font-weight:500;color:var(--ink-2);background:transparent;border:1px solid var(--line-2);padding:12px 14px;cursor:pointer}
 .gtcvw-remote .rm-list button.on{border-color:var(--blue);color:var(--ink)}

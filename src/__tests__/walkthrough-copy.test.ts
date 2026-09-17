@@ -34,10 +34,15 @@ const TANAGER = buildContext({
   workspaceUrl: 'https://clearview.habibonifade.com/engagement/ikore',
 })
 
-/** Every word either walkthrough puts on a screen, as one block of text. */
+/** Everything a presenter reads on the phone, as one block of text. */
+function allNotes(ctx: any): string {
+  return speakerNotes(ctx).map((n) => [n.cue, ...n.points].join('\n')).join('\n')
+}
+
+/** Every word either walkthrough puts on a screen or on the phone. */
 function allCopy(ctx: any): string {
   return buildSteps(ctx).map((s) => (s.kind === 'scene' ? s.scene!() : `${s.kicker}${s.title!.join(' ')}${s.html!()}`)).join('\n')
-    + '\n' + speakerNotes(ctx).join('\n')
+    + '\n' + allNotes(ctx)
 }
 
 describe('the walkthrough copy keeps the house rules', () => {
@@ -141,9 +146,19 @@ describe('the speaker notes', () => {
     expect(speakerNotes(GENERIC_CONTEXT)).toHaveLength(buildSteps(GENERIC_CONTEXT).length)
   })
 
+  it('carry talking points as well as the one line cue', () => {
+    // A single sentence left the middle of the phone empty, which is the part
+    // the presenter is looking at while talking.
+    for (const note of speakerNotes(TANAGER)) {
+      expect(note.cue.length).toBeGreaterThan(10)
+      expect(note.points.length).toBeGreaterThanOrEqual(3)
+      for (const point of note.points) expect(point.length).toBeGreaterThan(10)
+    }
+  })
+
   it('name the engagement in client mode and nobody in generic mode', () => {
-    expect(speakerNotes(TANAGER)[1]).toContain('Tanager')
-    expect(speakerNotes(GENERIC_CONTEXT).join(' ')).not.toContain('Tanager')
-    expect(speakerNotes(GENERIC_CONTEXT).join(' ')).not.toContain('Ikore')
+    expect(speakerNotes(TANAGER)[1].cue).toContain('Tanager')
+    expect(allNotes(GENERIC_CONTEXT)).not.toContain('Tanager')
+    expect(allNotes(GENERIC_CONTEXT)).not.toContain('Ikore')
   })
 })

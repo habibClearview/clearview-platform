@@ -43,6 +43,12 @@ export type RemoteMessage =
   | { type: 'room'; room: 'dark' | 'light' }
   | { type: 'reveal' }
   | { type: 'hello' }
+  /** Slow the sequences down, or put them back to the approved pace. */
+  | { type: 'speed'; factor: number }
+  /** Hold the sequence at the beat it has reached, or let it carry on. */
+  | { type: 'hold'; held: boolean }
+  /** Move the reading panel on the screen, from the other end of the room. */
+  | { type: 'scroll'; direction: 1 | -1 }
 
 /** What the screen says back, after every change. */
 export interface ScreenState {
@@ -53,8 +59,14 @@ export interface ScreenState {
   mode: string
   sound: boolean
   room: string
-  /** The screen's note for the presenter, so the phone never guesses. */
-  notes?: string[]
+  /** How slowly the sequences are running. 1 is the approved pace. */
+  speed?: number
+  /** True while the sequence is held where it is. */
+  held?: boolean
+  /** Whether the panel on the screen has more text above or below the fold. */
+  more?: { down: boolean; up: boolean }
+  /** The presenter's cue and talking points, so the phone never guesses. */
+  notes?: { cue: string; points: string[] }[]
   /** Every screen's name, for the jump-to list. */
   names?: string[]
 }
