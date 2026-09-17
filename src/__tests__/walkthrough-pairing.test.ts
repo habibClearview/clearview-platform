@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest'
 import {
   randomKey, isCode, isKey, accepts, pairingFromLink, channelName, KEY_LENGTH,
 } from '@/lib/walkthrough/pairing'
+import { SPEEDS } from '@/lib/walkthrough/engine'
 
 const MINE = { code: '4821', key: 'a'.repeat(KEY_LENGTH) }
 const seal = (key: string, message: unknown) => ({ key, message })
@@ -83,6 +84,20 @@ describe('what comes in on the end of the remote address', () => {
     expect(isCode('48211')).toBe(false)
     expect(isCode('48a1')).toBe(false)
     expect(isCode('')).toBe(false)
+  })
+})
+
+describe('the pace the sequences run at', () => {
+  it('starts at the approved pace and only ever slows down', () => {
+    // Habib, watching the sequence move between the boxes: "it moves really
+    // fast ... it may be useful to have a level of control on the speed."
+    // Normal is the design as approved, so it multiplies every pause by one.
+    expect(SPEEDS[0].factor).toBe(1)
+    expect(SPEEDS[0].label).toBe('Normal')
+    for (let i = 1; i < SPEEDS.length; i++) {
+      expect(SPEEDS[i].factor).toBeGreaterThan(SPEEDS[i - 1].factor)
+    }
+    expect(SPEEDS.length).toBeGreaterThanOrEqual(3)
   })
 })
 

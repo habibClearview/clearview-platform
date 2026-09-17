@@ -4,13 +4,21 @@
 //
 // The presenter scans the square code on the holding screen, signs in as a
 // coach, and this becomes the clicker: the notes for the screen that is up, the
-// whole screen list to jump to, and two large buttons at the bottom.
+// same four buttons the screen's own header carries, a way to move the reading
+// panel that is out of arm's reach, a way to slow the sequences down or hold
+// them, and two large buttons at the bottom.
 //
 // IT NEVER GUESSES WHERE THE SCREEN IS. Every instruction it sends is answered
 // by the screen saying what it is now showing, and that answer is what is drawn
 // here. So a press that does not arrive shows as nothing happening, rather than
 // as a remote that quietly believes it is on screen 12 while the room is
 // looking at screen 9.
+//
+// WHY THE CONTROLS ARE ON THE PAGE AND NOT IN THE MENU. 17 September 2026.
+// Habib: "I am unable to select the sound, walkthrough, explore or play button
+// on the phone, it doesn't show that bar at all." They were in the menu, which
+// is where a thing goes to be unavailable to somebody standing in front of a
+// room. The bar is now where it is on the screen: across the top.
 //
 // ONLY A COACH GETS HERE. The page around this sends anyone else away. Without
 // that, the four digit code on the screen would be the only thing between a
@@ -21,8 +29,20 @@ import { WALKTHROUGH_CSS } from '@/lib/walkthrough/styles'
 import { REMOTE_CSS } from '@/lib/walkthrough/remote-styles'
 import { joinAsRemote, type ScreenState, type Pairing } from '@/lib/walkthrough/channel'
 import { remoteHeading } from '@/lib/walkthrough/notes'
+import { SPEEDS } from '@/lib/walkthrough/engine'
 
 type Status = 'connecting' | 'connected' | 'lost'
+
+/** The pace after this one, so one button cycles through the three. */
+function nextSpeed(current: number | undefined): { label: string; factor: number } {
+  const at = SPEEDS.findIndex((s) => Math.abs(s.factor - (current ?? 1)) < 0.01)
+  return SPEEDS[(at < 0 ? 0 : at + 1) % SPEEDS.length]
+}
+
+function speedLabel(current: number | undefined): string {
+  const at = SPEEDS.find((s) => Math.abs(s.factor - (current ?? 1)) < 0.01)
+  return at ? at.label : 'Normal'
+}
 
 export default function WalkthroughRemote({ slug, pairing }: { slug: string; pairing: Pairing | null }) {
   const [status, setStatus] = useState<Status>('connecting')
@@ -42,13 +62,14 @@ export default function WalkthroughRemote({ slug, pairing }: { slug: string; pai
 
   const send = (m: any) => { sender.current?.(m) }
   const buzz = () => { try { navigator.vibrate?.(10) } catch {} }
+  const tap = (m: any) => { buzz(); send(m) }
 
   const heading = state
     ? remoteHeading(state.index, state.total, state.name)
     : 'Waiting for the screen'
   const note = useMemo(() => {
-    if (!state?.notes) return ''
-    return state.notes[state.index] || ''
+    if (!state?.notes) return null
+    return state.notes[state.index] || null
   }, [state])
 
   if (!pairing) {
@@ -65,6 +86,9 @@ export default function WalkthroughRemote({ slug, pairing }: { slug: string; pai
     )
   }
 
+  const mode = state?.mode || 'walk'
+  const more = state?.more || { down: false, up: false }
+
   return (
     <div className="gtcvw gtcvw-remote" data-room="dark">
       <style dangerouslySetInnerHTML={{ __html: WALKTHROUGH_CSS + REMOTE_CSS }} />
@@ -77,13 +101,31 @@ export default function WalkthroughRemote({ slug, pairing }: { slug: string; pai
           aria-expanded={menu}
           onClick={() => setMenu((m) => !m)}
         >
-          {menu ? 'Close' : 'Menu'}
+          {menu ? 'Close' : 'Screens'}
         </button>
         <span className={`rm-dot ${status}`} aria-label={
           status === 'connected' ? 'Connected to the screen'
             : status === 'connecting' ? 'Connecting' : 'Reconnecting'
         } />
       </header>
+
+      {/* The same four the screen's own header carries, in the same order. */}
+      <div className="rm-modes" role="group" aria-label="Mode">
+        <button
+          type="button"
+          className={state?.sound ? 'on' : ''}
+          aria-pressed={!!state?.sound}
+          onClick={() => tap({ type: 'sound', on: !state?.sound })}
+        >
+          {state?.sound ? 'Sound on' : 'Sound off'}
+        </button>
+        <button type="button" className={mode === 'walk' ? 'on' : ''} aria-pressed={mode === 'walk'}
+          onClick={() => tap({ type: 'mode', mode: 'walk' })}>Walkthrough</button>
+        <button type="button" className={mode === 'explore' ? 'on' : ''} aria-pressed={mode === 'explore'}
+          onClick={() => tap({ type: 'mode', mode: 'explore' })}>Explore</button>
+        <button type="button" className={mode === 'play' ? 'on' : ''} aria-pressed={mode === 'play'}
+          onClick={() => tap({ type: 'mode', mode: 'play' })}>Play</button>
+      </div>
 
       {status === 'lost' && (
         <p className="rm-warn">
@@ -100,20 +142,17 @@ export default function WalkthroughRemote({ slug, pairing }: { slug: string; pai
                 type="button"
                 key={n + i}
                 className={i === state?.index ? 'on' : ''}
-                onClick={() => { buzz(); send({ type: 'goto', index: i }); setMenu(false) }}
+                onClick={() => { tap({ type: 'goto', index: i }); setMenu(false) }}
               >
                 <b>{String(i + 1).padStart(2, '0')}</b> {n}
               </button>
             ))}
           </div>
           <div className="rm-toggles">
-            <button type="button" onClick={() => send({ type: 'sound', on: !state?.sound })}>
-              {state?.sound ? 'Sound on' : 'Sound off'}
-            </button>
-            <button type="button" onClick={() => send({ type: 'room', room: state?.room === 'light' ? 'dark' : 'light' })}>
+            <button type="button" onClick={() => tap({ type: 'room', room: state?.room === 'light' ? 'dark' : 'light' })}>
               {state?.room === 'light' ? 'Light room' : 'Dark room'}
             </button>
-            <button type="button" onClick={() => { send({ type: 'reveal' }); setMenu(false) }}>
+            <button type="button" onClick={() => { tap({ type: 'reveal' }); setMenu(false) }}>
               Show workspace
             </button>
           </div>
@@ -124,13 +163,57 @@ export default function WalkthroughRemote({ slug, pairing }: { slug: string; pai
         </div>
       ) : (
         <div className="rm-body">
-          <p className="rm-note">{note || 'The screen has not said what it is showing yet.'}</p>
+          {note ? (
+            <>
+              <p className="rm-note">{note.cue}</p>
+              {note.points.length > 0 && (
+                <ul className="rm-points">
+                  {note.points.map((point, i) => <li key={i}>{point}</li>)}
+                </ul>
+              )}
+            </>
+          ) : (
+            <p className="rm-note">The screen has not said what it is showing yet.</p>
+          )}
         </div>
       )}
 
+      {/* Moving the reading panel, holding the sequence, and its pace. */}
+      <div className="rm-tools">
+        <button
+          type="button"
+          disabled={!more.up}
+          onClick={() => tap({ type: 'scroll', direction: -1 })}
+        >
+          Text up
+        </button>
+        <button
+          type="button"
+          className={more.down ? 'wants' : ''}
+          disabled={!more.down}
+          onClick={() => tap({ type: 'scroll', direction: 1 })}
+        >
+          Text down
+        </button>
+        <button
+          type="button"
+          className={state?.held ? 'on' : ''}
+          aria-pressed={!!state?.held}
+          onClick={() => tap({ type: 'hold', held: !state?.held })}
+        >
+          {state?.held ? 'Carry on' : 'Hold'}
+        </button>
+        <button
+          type="button"
+          onClick={() => tap({ type: 'speed', factor: nextSpeed(state?.speed).factor })}
+        >
+          {speedLabel(state?.speed)}
+        </button>
+      </div>
+
       <footer className="rm-foot">
-        <button type="button" className="rm-back" onClick={() => { buzz(); send({ type: 'prev' }) }}>Back</button>
-        <button type="button" className="rm-next" onClick={() => { buzz(); send({ type: 'next' }) }}>Next</button>
+        <button type="button" className="rm-back" onClick={() => tap({ type: 'prev' })}>Back</button>
+        <button type="button" className="rm-next" onClick={() => tap({ type: 'next' })}>Next</button>
       </footer>
     </div>
   )

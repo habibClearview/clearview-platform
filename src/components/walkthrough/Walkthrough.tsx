@@ -55,6 +55,12 @@ export default function Walkthrough({
       go: (i: number) => ctrl.go(i),
       count: ctrl.steps().length,
       names: ctrl.steps().map((s) => s.name),
+      // The same things the phone can do, for a presenter whose phone has gone
+      // flat and who has the browser console open, and for the checks.
+      speed: (factor: number) => ctrl.setSpeed(factor),
+      hold: (on: boolean) => ctrl.setHeld(on),
+      scroll: (direction: 1 | -1) => ctrl.scrollPanel(direction),
+      state: () => ctrl.state(),
     }
     return () => {
       ctrl.destroy()
@@ -96,6 +102,9 @@ export default function Walkthrough({
         else if (m.type === 'mode') ctrl.setMode(m.mode)
         else if (m.type === 'sound') ctrl.setSound(m.on)
         else if (m.type === 'room') ctrl.setRoom(m.room)
+        else if (m.type === 'speed') ctrl.setSpeed(m.factor)
+        else if (m.type === 'hold') ctrl.setHeld(m.held)
+        else if (m.type === 'scroll') ctrl.scrollPanel(m.direction)
         else if (m.type === 'reveal') {
           // A browser will not let a message from another device open a tab, so
           // the phone cannot do this for the presenter. It asks the screen to
