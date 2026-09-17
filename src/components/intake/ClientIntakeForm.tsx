@@ -676,7 +676,7 @@ function MonthRow({label,labelColor,lineId,pastMonths,futureMonths,figureData,se
               <th key={o} style={{
                 padding:'3px 5px',textAlign:'center',minWidth:80,
                 background:o===0?C.cyan:o<0?'#F4F8FC':'#EBF8FF',
-                color:o===0?C.white:C.navy,
+                color:o===0?'var(--cv-on-cyan)':C.navy,
                 borderLeft:o===0?`2px solid ${C.navy}`:'none',
                 borderRight:o===0?`2px solid ${C.navy}`:'none',
                 fontWeight:o===0?700:600, fontSize:compact?'0.62rem':'0.68rem',

@@ -58,6 +58,15 @@ describe('the rule stays in one place', () => {
   const files = [...sourceFiles('src'), ...sourceFiles('app')]
     .filter(f => !f.includes('__tests__'))
 
+  // SCREENS ONLY, for the white-on-cyan sweep below. A React style object
+  // separates its properties with commas; the HTML email templates in
+  // src/lib/email.ts are CSS in a string, separated with semicolons, so the
+  // reader runs straight past the end of one property and into the next. It
+  // reported the navy email header as a cyan background because the cyan
+  // border on the line below was swallowed into the same value. Emails are not
+  // buttons and have their own rules.
+  const screens = files.filter(f => f.endsWith('.tsx'))
+
   it('is defined once, in src/lib/ink.ts', () => {
     const definers = files.filter(f => /function onSolid\s*\(/.test(fs.readFileSync(f, 'utf8')))
     expect(definers).toEqual(['src/lib/ink.ts'])
@@ -90,6 +99,28 @@ describe('the rule stays in one place', () => {
       else if (ch === '}') { if (depth === 0) return src.slice(open + 1, i) ; depth-- }
     }
     return null
+  }
+
+  /** One property's value, from just after its colon to where the value ends. */
+  function valueAt(src: string, from: number): string {
+    let i = from
+    let depth = 0
+    let quote: string | null = null
+    const out: string[] = []
+    for (; i < src.length; i++) {
+      const ch = src[i]
+      if (quote) {
+        out.push(ch)
+        if (ch === quote && src[i - 1] !== '\\') quote = null
+        continue
+      }
+      if (ch === "'" || ch === '"' || ch === '`') { quote = ch; out.push(ch); continue }
+      if ('([{'.includes(ch)) depth++
+      if (')]}'.includes(ch)) { if (depth === 0) break; depth-- }
+      if (ch === ',' && depth === 0) break
+      out.push(ch)
+    }
+    return out.join('')
   }
 
   /** The value of the background property, stopping where the value stops. */
@@ -141,24 +172,33 @@ describe('the rule stays in one place', () => {
     expect(backgroundValue(src, src.indexOf('--cv-on-accent'))).toBeNull()
   })
 
+  /** Every way white is spelled on this platform, which is the point. */
+  const WHITE = /(C\.white|C\.ink|C\.cream|CC\.white|'white'|"white"|#fff\b|#ffffff\b|cv-on-accent|cv-card\)|cv-cream\))/i
+  const LIGHT_FILL = /(C\.cyan|C\.teal|C\.amber|C\.green|cv-cyan\)|cv-teal\)|cv-amber\)|cv-green\)|#2A9D8F|#008383|#1A9DAA|#00CCCC)/
+
+  it('catches white however it is spelled, not just one of its names', () => {
+    // This is why the first version of this check passed while the platform
+    // was still full of white on cyan: it looked only for --cv-on-accent, and
+    // the screens Habib was looking at said '#fff', '#FFFFFF', C.white and
+    // C.ink instead.
+    for (const spelling of ["C.white", "C.ink", "'#fff'", "'#FFFFFF'", "'white'", "var(--cv-on-accent)"]) {
+      expect(WHITE.test(spelling), spelling).toBe(true)
+    }
+  })
+
   it('no screen writes white onto a cyan or teal fill by hand', () => {
-    // The pairing this whole file exists to prevent: a background of one of
-    // the light accents with --cv-on-accent, which is white, written on it.
-    //
-    // A BACKGROUND THAT SWITCHES IS TWO BACKGROUNDS. From the review on #280.
-    // This first asked "does the background mention a light colour and no dark
-    // one", so `background: two ? C.purple : C.cyan` was read as dark and
-    // waved through, while the cyan half of it was white on cyan exactly as
-    // before. Every colour the background itself can take is now judged, and
-    // one light branch is enough to fail.
-    const LIGHT = /(C\.cyan|C\.teal|C\.amber|C\.green|cv-cyan|cv-teal|cv-amber|cv-green)/
     const offenders: string[] = []
-    for (const f of files) {
-      const s = fs.readFileSync(f, 'utf8')
-      for (const m of s.matchAll(/var\(--cv-on-accent\)/g)) {
-        const value = backgroundValue(s, m.index!)
-        if (!value) continue
-        if (LIGHT.test(value)) offenders.push(`${f}: background:${value.trim().slice(0, 70)}`)
+    for (const f of screens) {
+      const src = fs.readFileSync(f, 'utf8')
+      for (const m of src.matchAll(/background\s*:/g)) {
+        const value = valueAt(src, m.index! + m[0].length)
+        if (!LIGHT_FILL.test(value)) continue
+        const obj = enclosingObject(src, m.index!)
+        if (obj === null) continue
+        const cm = /\bcolor\s*:([^,]*(?:\([^)]*\))?[^,]*)/.exec(obj)
+        if (cm && WHITE.test(cm[1])) {
+          offenders.push(`${f}: background:${value.trim().slice(0, 44)} / color:${cm[1].trim().slice(0, 44)}`)
+        }
       }
     }
     expect(offenders).toEqual([])

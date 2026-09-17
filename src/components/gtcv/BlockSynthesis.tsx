@@ -127,7 +127,7 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
     setNote('Saved to the gate record.')
   }
 
-  if (loading) return <p style={{ color: C.slate, fontSize: '0.9rem' }}>Loading...</p>
+  if (loading) return <p style={{ color: C.slate, fontSize: '1.01rem' }}>Loading...</p>
 
   const dirty = text !== saved
 
@@ -188,7 +188,7 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
           style={{
             width: '100%', padding: '0.7rem 0.8rem', borderRadius: 8,
             border: `1px solid ${C.border}`, background: C.card, color: 'inherit',
-            fontFamily: "var(--cv-font)", fontSize: '0.92rem', lineHeight: 1.55,
+            fontFamily: "var(--cv-font)", fontSize: '1.01rem', lineHeight: 1.55,
             resize: 'vertical',
           }}
         />
@@ -198,7 +198,7 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
               onClick={save}
               disabled={busy || !dirty}
               style={{
-                ...mono, fontSize: '0.86rem', fontWeight: 600, padding: '0.42rem 1rem',
+                ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.42rem 1rem',
                 borderRadius: 7, border: `1px solid ${dirty ? C.teal : C.border}`,
                 background: dirty ? C.teal : 'transparent',
                 color: dirty ? 'var(--cv-on-cyan)' : C.slate,
@@ -208,7 +208,7 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
               {busy ? 'Saving...' : dirty ? 'Save to the gate record' : 'Saved'}
             </button>
           ) : null}
-          {note ? <span style={{ fontSize: '0.85rem', color: C.slate }}>{note}</span> : null}
+          {note ? <span style={{ fontSize: '1.01rem', color: C.slate }}>{note}</span> : null}
         </div>
       </div>
     </div>

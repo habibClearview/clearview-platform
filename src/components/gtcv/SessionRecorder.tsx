@@ -51,9 +51,9 @@ const C = {
   amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.86rem', fontWeight: 700, padding: '0.42rem 0.95rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 700, padding: '0.42rem 0.95rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -363,7 +363,7 @@ export default function SessionRecorder({
           {mine.measuring && mine.silentSeconds >= SILENCE_ALARM_SECONDS && (
             <div style={{
               marginTop: '0.5rem', padding: '0.6rem 0.75rem', border: `1px solid ${C.red}`,
-              borderRadius: 8, color: C.red, fontSize: '0.88rem', lineHeight: 1.5,
+              borderRadius: 8, color: C.red, fontSize: '1.01rem', lineHeight: 1.5,
             }}>
               <b>Nothing is reaching this microphone.</b> It has been silent for{' '}
               {Math.round(mine.silentSeconds)} seconds. The recording is running and it is capturing
@@ -409,7 +409,7 @@ export default function SessionRecorder({
                 style={{
                   flex: '1 1 200px', minWidth: 160, padding: '0.35rem 0.5rem', borderRadius: 7,
                   border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit',
-                  fontSize: '0.88rem',
+                  fontSize: '1.01rem',
                 }}
               >
                 <option value="">Whichever this device calls default</option>
@@ -430,7 +430,7 @@ export default function SessionRecorder({
               display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.3rem 0',
               borderBottom: i < live.length - 1 ? `1px solid ${C.border}` : 'none',
             }}>
-              <span style={{ color: l.ok ? C.green : C.red, fontSize: '1rem' }}>{l.ok ? '●' : '▲'}</span>
+              <span style={{ color: l.ok ? C.green : C.red, fontSize: '1.01rem' }}>{l.ok ? '●' : '▲'}</span>
               <span style={{ fontWeight: 600 }}>{l.who}</span>
               <span style={{ ...mono, fontSize: '0.82rem', color: C.slate, marginLeft: 'auto' }}>
                 {l.ok ? `${l.minutes} min captured` : l.problem}

@@ -24,17 +24,17 @@ const C = {
   green: 'var(--cv-green)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const labelText = {
   ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate,
 }
 const field = {
   width: '100%', padding: '0.44rem 0.58rem', borderRadius: 7,
   border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit',
-  fontFamily: 'var(--cv-font)', fontSize: '0.93rem',
+  fontFamily: 'var(--cv-font)', fontSize: '1.01rem',
 }
 const smallBtn = (col, solid) => ({
-  ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.36rem 0.85rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.36rem 0.85rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? 'var(--cv-on-cyan)' : col, cursor: 'pointer',
@@ -202,7 +202,7 @@ export default function WelcomePack({ clientId, canManage }) {
         organisation paying, one to the organisation being served. Read either before it goes.
       </p>
       {err ? (
-        <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>
+        <div style={{ color: C.red, fontSize: '1.01rem', marginTop: '0.7rem' }}>
           {err}
           {' '}
           {/* A red line that can only be cleared by reloading the whole page
@@ -218,7 +218,7 @@ export default function WelcomePack({ clientId, canManage }) {
           >Try again</button>
         </div>
       ) : null}
-      {note ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.7rem' }}>{note}</div> : null}
+      {note ? <div style={{ color: C.green, fontSize: '1.01rem', marginTop: '0.7rem' }}>{note}</div> : null}
 
       <Setting
         label="Read it from the contract"
@@ -643,7 +643,7 @@ export default function WelcomePack({ clientId, canManage }) {
                     Save, then rebuild the preview to read it back.
                   </p>
                   <textarea
-                    style={{ ...field, minHeight: 320, fontFamily: 'var(--cv-font-mono)', fontSize: '0.86rem', lineHeight: 1.55 }}
+                    style={{ ...field, minHeight: 320, fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', lineHeight: 1.55 }}
                     value={letterDraft}
                     onChange={(e) => setLetterDraft(e.target.value)}
                   />

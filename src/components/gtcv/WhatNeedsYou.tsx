@@ -31,7 +31,7 @@ const C = {
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 
 const DP_LABEL = {
   setup: 'the pre-engagement diagnostic', phase_0: 'Phase 0',
@@ -264,7 +264,7 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
         What needs you
       </div>
 
-      {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.5rem' }}>{err}</div> : null}
+      {err ? <div style={{ color: C.red, fontSize: '1.01rem', marginTop: '0.5rem' }}>{err}</div> : null}
 
       {showing.length === 0 ? (
         <p style={{ ...hint, margin: '0.45rem 0 0' }}>
@@ -282,7 +282,7 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
               alignItems: 'center', flexWrap: 'wrap',
             }}>
               <div style={{ flex: '1 1 320px', minWidth: 240 }}>
-                <div style={{ fontSize: '0.98rem', color: C.navy, fontWeight: 600 }}>{i.what}</div>
+                <div style={{ fontSize: '1.01rem', color: C.navy, fontWeight: 600 }}>{i.what}</div>
                 <div style={{ ...hint, marginTop: 2 }}>{i.why}</div>
               </div>
               {onGoTo && i.goTo ? (
@@ -332,7 +332,7 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
                   justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
                 }}>
                   <div style={{ flex: '1 1 320px', minWidth: 240 }}>
-                    <div style={{ fontSize: '0.94rem', color: C.slate }}>{i.what}</div>
+                    <div style={{ fontSize: '1.01rem', color: C.slate }}>{i.what}</div>
                   </div>
                   {canManage ? (
                     <button

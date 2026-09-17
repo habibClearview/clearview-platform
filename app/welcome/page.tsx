@@ -60,7 +60,7 @@ export default function WelcomePage() {
             </p>
             <a
               href={target}
-              style={{ display: 'inline-block', background: C.cyan, color: '#fff', textDecoration: 'none', fontWeight: 600, padding: '0.8rem 1.4rem', borderRadius: 8 }}
+              style={{ display: 'inline-block', background: C.cyan, color: 'var(--cv-on-cyan)', textDecoration: 'none', fontWeight: 600, padding: '0.8rem 1.4rem', borderRadius: 8 }}
             >Sign in and set your password</a>
             <p style={{ color: C.slate, fontSize: '0.85rem', lineHeight: 1.6, margin: '1.25rem 0 0' }}>
               If it says the link has expired, go to{' '}

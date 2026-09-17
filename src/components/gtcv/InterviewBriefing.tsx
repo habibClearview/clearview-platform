@@ -126,7 +126,7 @@ export default function InterviewBriefing() {
         </div>
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', margin: '0.6rem 0 0.9rem' }}>
           {TESTS.map((t) => (
-            <span key={t} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: C.teal, border: `1px solid ${C.teal}`, borderRadius: 999, padding: '0.2rem 0.7rem' }}>{t}</span>
+            <span key={t} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', color: C.teal, border: `1px solid ${C.teal}`, borderRadius: 999, padding: '0.2rem 0.7rem' }}>{t}</span>
           ))}
         </div>
         <div style={{ ...hint, color: C.navy }}>
@@ -136,7 +136,7 @@ export default function InterviewBriefing() {
         </div>
       </div>
 
-      <div style={{ ...hint, marginTop: '1rem', fontSize: '0.95rem' }}>
+      <div style={{ ...hint, marginTop: '1rem', fontSize: '1.01rem' }}>
         Write every conversation up in the Interview Capture form within 30 minutes of it ending.
         Verbatim first. No polishing.
       </div>

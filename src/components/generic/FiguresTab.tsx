@@ -87,7 +87,7 @@ function InfoDot({ text }: { text: string }) {
   return (
     <span style={{ position: 'relative', display: 'inline-block' }}>
       <button type="button" onClick={() => setOpen(o => !o)} aria-label="What does this mean?" title="What does this mean?"
-        style={{ marginLeft: 6, width: 19, height: 19, borderRadius: 10, border: `1.5px solid ${C.cyan}`, background: open ? C.cyan : 'transparent', color: open ? '#fff' : C.cyan, fontSize: '0.78rem', fontWeight: 700, fontFamily: 'var(--cv-font)', fontStyle: 'italic', cursor: 'pointer', lineHeight: 1, padding: 0, verticalAlign: 'middle' }}>i</button>
+        style={{ marginLeft: 6, width: 19, height: 19, borderRadius: 10, border: `1.5px solid ${C.cyan}`, background: open ? C.cyan : 'transparent', color: open ? 'var(--cv-on-cyan)' : C.cyan, fontSize: '0.78rem', fontWeight: 700, fontFamily: 'var(--cv-font)', fontStyle: 'italic', cursor: 'pointer', lineHeight: 1, padding: 0, verticalAlign: 'middle' }}>i</button>
       {open && (
         <>
           <span onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />

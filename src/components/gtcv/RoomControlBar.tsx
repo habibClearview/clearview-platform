@@ -300,6 +300,6 @@ function btn(colour: string): React.CSSProperties {
   return {
     ...mono, fontSize: 13, fontWeight: 700, padding: '7px 14px', borderRadius: 8,
     border: `1px solid ${colour}`, background: colour === C.teal ? colour : 'transparent',
-    color: C.ink, cursor: 'pointer',
+    color: 'var(--cv-on-cyan)', cursor: 'pointer',
   }
 }

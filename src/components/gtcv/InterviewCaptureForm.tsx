@@ -58,8 +58,8 @@ const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
 const lbl = { display: 'block', fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, marginBottom: '0.25rem' }
 const cell = { width: '100%', padding: '0.45rem 0.6rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box' }
 const readCell = { fontSize: '1.01rem', color: C.navy, lineHeight: 1.45, padding: '0.45rem 0.6rem', whiteSpace: 'pre-wrap', minHeight: '1.2rem', background: C.alt, borderRadius: 6 }
-const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.91rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
-const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-cyan)', cursor: 'pointer' }
+const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
+const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-cyan)', cursor: 'pointer' }
 const th = { padding: '0.45rem 0.6rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { padding: '0.45rem 0.6rem', verticalAlign: 'top', borderBottom: '1px solid var(--cv-border-soft)', fontSize: '1.01rem', color: C.navy }
 
@@ -336,7 +336,7 @@ export default function InterviewCaptureForm({ clientId, canManage, clientName =
               onClick={() => editable && setAndSave(row.id, field, n)}
               style={{
                 width: 34, height: 34, borderRadius: 8, cursor: editable ? 'pointer' : 'default',
-                fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700,
+                fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', fontWeight: 700,
                 border: `1px solid ${on ? scoreColor(n) : C.border}`,
                 background: on ? scoreColor(n) : 'transparent',
                 color: on ? 'var(--cv-on-accent)' : C.slate,
@@ -370,7 +370,7 @@ export default function InterviewCaptureForm({ clientId, canManage, clientName =
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             {savePill && (
-              <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: savePill.color, border: `1px solid ${savePill.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
+              <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', color: savePill.color, border: `1px solid ${savePill.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
                 {savePill.text}
               </span>
             )}
@@ -391,7 +391,7 @@ export default function InterviewCaptureForm({ clientId, canManage, clientName =
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', margin: '0.85rem 0 1rem' }}>
             {[{ k: 'draft', l: 'Draft', c: C.amber }, { k: 'submitted', l: 'Submitted', c: C.green }].map((s) => (
               <div key={s.k} style={{ borderTop: `3px solid ${s.c}`, background: C.alt, borderRadius: 8, padding: '0.5rem 0.9rem', minWidth: 108 }}>
-                <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }}>{s.l}</div>
+                <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }}>{s.l}</div>
                 <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.5rem', fontWeight: 700, color: s.c, lineHeight: 1.1 }}>{counts[s.k]}</div>
               </div>
             ))}
@@ -430,7 +430,7 @@ export default function InterviewCaptureForm({ clientId, canManage, clientName =
                       <td style={td}>{fmtDate(r.interview_date) || '...'}</td>
                       <td style={td}>
                         <div style={{ fontWeight: 600 }}>{r.interviewee_name || 'Not named yet'}</div>
-                        <div style={{ fontSize: '0.9rem', color: C.slate }}>{r.interviewee_role || ''}</div>
+                        <div style={{ fontSize: '1.01rem', color: C.slate }}>{r.interviewee_role || ''}</div>
                       </td>
                       <td style={td}>{r.organisation || ''}</td>
                       <td style={td}>{r.segment || ''}</td>
@@ -441,11 +441,11 @@ export default function InterviewCaptureForm({ clientId, canManage, clientName =
                         {r.budget_signal_strength || '...'}
                       </td>
                       <td style={td}>
-                        <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', color: r.status === 'submitted' ? C.green : C.amber, border: `1px solid ${r.status === 'submitted' ? C.green : C.amber}`, borderRadius: 999, padding: '0.1rem 0.55rem' }}>
+                        <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', color: r.status === 'submitted' ? C.green : C.amber, border: `1px solid ${r.status === 'submitted' ? C.green : C.amber}`, borderRadius: 999, padding: '0.1rem 0.55rem' }}>
                           {r.status === 'submitted' ? 'submitted' : 'draft'}
                         </span>
                         {rowElapsed && (
-                          <div style={{ fontSize: '0.85rem', color: rowElapsed.color, marginTop: '0.25rem' }}>
+                          <div style={{ fontSize: '1.01rem', color: rowElapsed.color, marginTop: '0.25rem' }}>
                             {rowElapsed.mins} min since interview
                           </div>
                         )}
@@ -488,7 +488,7 @@ export default function InterviewCaptureForm({ clientId, canManage, clientName =
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               {open.status === 'submitted' ? (
                 <>
-                  <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: C.green, border: `1px solid ${C.green}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>Submitted</span>
+                  <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', color: C.green, border: `1px solid ${C.green}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>Submitted</span>
                   {canManage && <button type="button" style={ghostBtn} onClick={() => reopenCapture(open.id)}>Reopen as draft</button>}
                 </>
               ) : (
@@ -583,7 +583,7 @@ export default function InterviewCaptureForm({ clientId, canManage, clientName =
                       Dimension {i + 1}
                     </div>
                     <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.08rem', fontWeight: 700, color: C.navy }}>{d.label}</div>
-                    <div style={{ ...hint, fontSize: '0.95rem', marginTop: '0.15rem' }}>{d.prompt}</div>
+                    <div style={{ ...hint, fontSize: '1.01rem', marginTop: '0.15rem' }}>{d.prompt}</div>
                   </div>
                   <div>
                     <label style={lbl}>Score 1 to 5</label>

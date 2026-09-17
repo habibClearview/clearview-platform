@@ -23,7 +23,7 @@ const C = {
   amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 
 const STATE = {
   opening: { label: 'Recording now', colour: C.red },
@@ -249,15 +249,15 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
             <div style={{ display: 'flex', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
               {r.session_id ? (
                 <>
-                  <span style={{ ...mono, fontSize: '0.84rem', color: C.slate }}>
+                  <span style={{ ...mono, fontSize: '1.01rem', color: C.slate }}>
                     On a planned session
                   </span>
-                  <a href={`/call/${r.session_id}`} style={{ ...mono, fontSize: '0.84rem', color: C.teal }}>
+                  <a href={`/call/${r.session_id}`} style={{ ...mono, fontSize: '1.01rem', color: C.teal }}>
                     Open the session room
                   </a>
                 </>
               ) : (
-                <span style={{ ...mono, fontSize: '0.84rem', color: C.slate }}>
+                <span style={{ ...mono, fontSize: '1.01rem', color: C.slate }}>
                   Not on a planned session
                 </span>
               )}

@@ -33,9 +33,9 @@ const C = {
   amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.86rem', fontWeight: 700, padding: '0.42rem 0.95rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 700, padding: '0.42rem 0.95rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -332,14 +332,14 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
           style={{
             width: '100%', minHeight: 320, marginTop: '0.8rem', padding: '0.7rem 0.8rem',
             border: `1px solid ${C.border}`, borderRadius: 8, background: 'var(--cv-bg-2)',
-            color: 'inherit', fontFamily: 'var(--cv-font)', fontSize: '0.95rem', lineHeight: 1.6,
+            color: 'inherit', fontFamily: 'var(--cv-font)', fontSize: '1.01rem', lineHeight: 1.6,
           }}
         />
       ) : transcript?.body ? (
         <div style={{
           marginTop: '0.8rem', padding: '0.8rem 0.9rem', border: `1px solid ${C.border}`,
           borderRadius: 8, background: 'var(--cv-bg-2)', whiteSpace: 'pre-wrap',
-          fontSize: '0.95rem', lineHeight: 1.65, maxHeight: 460, overflowY: 'auto',
+          fontSize: '1.01rem', lineHeight: 1.65, maxHeight: 460, overflowY: 'auto',
         }}>
           {transcript.body}
         </div>
@@ -385,7 +385,7 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
               placeholder="Your full name"
               style={{
                 flex: '1 1 240px', padding: '0.45rem 0.6rem', border: `1px solid ${C.border}`,
-                borderRadius: 7, background: 'var(--cv-card)', color: 'inherit', fontSize: '0.95rem',
+                borderRadius: 7, background: 'var(--cv-card)', color: 'inherit', fontSize: '1.01rem',
               }}
             />
             <button onClick={sign} disabled={busy === 'sign' || !typed.trim()} style={btn(C.green, true)}>
@@ -409,7 +409,7 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
           </div>
           {tracks.map((t) => (
             <div key={t.id} style={{ marginTop: '0.5rem' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.2rem' }}>
+              <div style={{ fontWeight: 600, fontSize: '1.01rem', marginBottom: '0.2rem' }}>
                 {t.speaker_name || 'Unnamed speaker'}
               </div>
               {audio[t.id]

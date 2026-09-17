@@ -417,6 +417,29 @@ const CUSTOMER_CLARITY: QuestionSeed[] = [
     question_text: 'How badly does this group feel the problem today? 1 is they can live with it, 5 is it is costing them money right now.',
     question_type: 'score',
   }),
+  // The Three-Stage Adoption Test, which this zone has to produce for every
+  // segment: are they willing, are they able, and is it near the top of their
+  // list. Three questions, because a segment can be any combination of them
+  // and the interesting ones are willing but not able, and able but not
+  // bothered.
+  q({
+    gate_id: 'dp02', sort_order: 6, suggested_minutes: 5,
+    question_text: 'Adoption test, one of three. Would they WANT this if it were offered tomorrow? Say what makes you think so.',
+    question_type: 'collect',
+    target_fields: [{ column: 'willing', heading: 'Would they want it' }],
+  }),
+  q({
+    gate_id: 'dp02', sort_order: 7, suggested_minutes: 5,
+    question_text: 'Adoption test, two of three. COULD they pay for it? Is there money, and can this person release it?',
+    question_type: 'collect',
+    target_fields: [{ column: 'able', heading: 'Could they pay' }],
+  }),
+  q({
+    gate_id: 'dp02', sort_order: 8, suggested_minutes: 5,
+    question_text: 'Adoption test, three of three. Is this near the top of their list, or something they would get to eventually?',
+    question_type: 'collect',
+    target_fields: [{ column: 'prioritised', heading: 'Is it a priority' }],
+  }),
 ]
 
 // DECISION POINT 3, the value proposition workshop. The guide: "Build the four
@@ -522,6 +545,15 @@ const MARKET_ENTRY: QuestionSeed[] = [
     question_type: 'collect',
     target_fields: [{ column: 'owner', heading: 'Who does it' }],
   }),
+  // The zone has to leave behind a live pipeline, and a pipeline without a
+  // stage on each row is a list of names.
+  q({
+    gate_id: 'dp05', sort_order: 6, suggested_minutes: 5,
+    question_text: 'Where are we with them today? Be honest: a name we have never contacted is not a conversation.',
+    question_type: 'classify',
+    options: ['Not contacted yet', 'Contacted, no reply', 'In conversation', 'They have asked for a proposal', 'Agreed'],
+    target_fields: [{ column: 'stage', heading: 'Where we are' }],
+  }),
 ]
 
 // DECISION POINT 6, identity and partners. The guide: every current and
@@ -609,6 +641,15 @@ const PILOT: QuestionSeed[] = [
     question_text: 'On what we saw today, how likely is this to sell? 1 is not at this price to this person, 5 is they were reaching for a pen.',
     question_type: 'score',
   }),
+  // The zone closes on a Pilot Learning Summary, and the signal it is real is
+  // "the leadership team makes a revision the coach did not identify". So the
+  // room is asked for the lesson in its own words, not the coach's.
+  q({
+    gate_id: 'dp07', sort_order: 8, suggested_minutes: 6,
+    question_text: 'In one sentence, what did today teach us that we did not know this morning?',
+    question_type: 'collect',
+    target_fields: [{ column: 'key_learning', heading: 'What we learned' }],
+  }),
 ]
 
 // DECISION POINT 8, scale. The guide: name the entry point segment and the
@@ -646,6 +687,18 @@ const SCALE: QuestionSeed[] = [
     question_text: 'What is the first thing we would have to do to make that route real?',
     question_type: 'collect',
     target_fields: [{ column: 'first_action', heading: 'First move' }],
+  }),
+  q({
+    gate_id: 'dp08', sort_order: 6, suggested_minutes: 6,
+    question_text: 'What would we need to see before we believed this route works? Name the evidence, not the hope.',
+    question_type: 'collect',
+    target_fields: [{ column: 'evidence_needed', heading: 'The evidence we need' }],
+  }),
+  q({
+    gate_id: 'dp08', sort_order: 7, suggested_minutes: 5,
+    question_text: 'How long before this route brings in money? Months, not quarters, and say what it depends on.',
+    question_type: 'collect',
+    target_fields: [{ column: 'timeline', heading: 'How long' }],
   }),
 ]
 

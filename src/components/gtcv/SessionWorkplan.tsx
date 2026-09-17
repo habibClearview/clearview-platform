@@ -59,7 +59,7 @@ const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.32rem', fontWeight: 70
 const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.95rem', fontWeight: 700, padding: '0.42rem 0.9rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 700, padding: '0.42rem 0.9rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -268,7 +268,7 @@ export default function SessionWorkplan({ clientId, clientName = '' }) {
         {KINDS.map(k => (
           <div key={k.v} style={{ borderLeft: `3px solid ${k.color}`, background: 'var(--cv-alt)', borderRadius: 8, padding: '0.4rem 0.7rem', minWidth: 150 }}>
             <div style={{ ...mono, fontSize: '0.74rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: k.color }}>{k.l}</div>
-            <div style={{ ...hint, fontSize: '0.84rem' }}>
+            <div style={{ ...hint, fontSize: '1.01rem' }}>
               {sessions.filter(s => s.session_kind === k.v).length} session{sessions.filter(s => s.session_kind === k.v).length === 1 ? '' : 's'}
             </div>
             <div style={{ ...hint, fontSize: '0.82rem' }}>{k.blurb}</div>
@@ -345,7 +345,7 @@ export default function SessionWorkplan({ clientId, clientName = '' }) {
                               ) : (
                                 <span style={{ fontWeight: 600 }}>{s.title || 'Untitled session'}</span>
                               )}
-                              {s.purpose && <div style={{ ...hint, fontSize: '0.84rem', marginTop: '0.15rem' }}>{s.purpose}</div>}
+                              {s.purpose && <div style={{ ...hint, fontSize: '1.01rem', marginTop: '0.15rem' }}>{s.purpose}</div>}
                             </td>
                             <td style={{ ...td, color: room ? room.color : C.slate, whiteSpace: 'nowrap' }}>
                               {s.session_kind ? (KIND_LABEL[s.session_kind] || s.session_kind) : 'Not set'}

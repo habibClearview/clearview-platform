@@ -279,7 +279,14 @@ describe('the welcome letter to a co-implementer', () => {
 
   it('the letter box can be read out and does not shrink on a phone', () => {
     expect(DASH).toContain('aria-label="The welcome letter sent to a new co-implementer"')
-    expect(DASH).toContain("fontSize:'1rem'")
+    // A text box under 16px makes iOS zoom the whole page the moment you tap
+    // it, and it does not zoom back. 1rem is 16px, so the rule is a floor and
+    // not an exact number: this asked for exactly 1rem and failed when the
+    // body size across the platform was standardised slightly above it.
+    const box = DASH.slice(DASH.indexOf('aria-label="The welcome letter sent to a new co-implementer"'))
+    const m = /fontSize:\s*'([\d.]+)rem'/.exec(box.slice(0, 600)) || /fontSize:\s*'([\d.]+)rem'/.exec(DASH.slice(Math.max(0, DASH.indexOf('aria-label="The welcome letter sent to a new co-implementer"') - 600)))
+    expect(m, 'the letter box sets no font size at all').not.toBeNull()
+    expect(Number(m![1])).toBeGreaterThanOrEqual(1)
   })
 
   it('reading and saving it are held to a sensible number of knocks', () => {

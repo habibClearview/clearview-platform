@@ -35,7 +35,7 @@ const C = {
   green: 'var(--cv-green)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 
 export default function ViewAsBar({ realRole, viewingAs, onChange }) {
   // The detail is shut by default. This bar renders above the tab strip, so it
@@ -65,7 +65,7 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
           onChange={(e) => onChange(e.target.value)}
           style={{
             padding: '0.35rem 0.55rem', border: `1px solid ${C.border}`, borderRadius: 7,
-            background: 'var(--cv-bg-2)', color: C.navy, fontSize: '0.95rem', minWidth: 240,
+            background: 'var(--cv-bg-2)', color: C.navy, fontSize: '1.01rem', minWidth: 240,
           }}
         >
           {PREVIEW_ROLES.map((r) => (
@@ -103,19 +103,19 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
                 One sentence, always visible, saying the two things that
                 actually differ.
                 ───────────────────────────────────────────────────── */}
-            <span style={{ ...hint, color: C.navy, fontSize: '0.85rem' }}>
+            <span style={{ ...hint, color: C.navy, fontSize: '1.01rem' }}>
               <strong>{canEdit(viewingAs) ? 'Can change the working tables' : 'Read only — cannot change anything'}</strong>
               {canSignOff(viewingAs) ? ' · can sign a decision point off' : ' · cannot sign anything off'}
               {canViewCoachGuidance(viewingAs) ? ' · sees your coaching guidance' : ' · never sees your guidance or the fee'}
             </span>
-            <span style={{ ...hint, color: C.amber, fontSize: '0.85rem' }}>
+            <span style={{ ...hint, color: C.amber, fontSize: '1.01rem' }}>
               You are seeing their screen. Anything you save is still saved as you.
             </span>
             <button
               type="button"
               onClick={() => onChange(realRole)}
               style={{
-                ...mono, fontSize: '0.85rem', fontWeight: 700, padding: '0.35rem 0.9rem', border: 'none',
+                ...mono, fontSize: '1.01rem', fontWeight: 700, padding: '0.35rem 0.9rem', border: 'none',
                 borderRadius: 7, background: C.amber, color: 'var(--cv-on-cyan)', cursor: 'pointer',
               }}
             >Back to your own view</button>
@@ -144,7 +144,7 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
             gap: '0.35rem 1.1rem', marginTop: '0.6rem',
           }}>
             {caps.map((c) => (
-              <div key={c.what} style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', fontSize: '0.9rem' }}>
+              <div key={c.what} style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', fontSize: '1.01rem' }}>
                 <span style={{ color: c.allowed ? C.green : C.red, fontWeight: 700 }}>{c.allowed ? 'Yes' : 'No'}</span>
                 <span style={{ color: C.slate }}>{c.what}</span>
               </div>

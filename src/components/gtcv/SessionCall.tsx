@@ -42,7 +42,7 @@ const C = {
   card: 'var(--cv-card)', border: 'var(--cv-border)', slate: 'var(--cv-slate)',
   navy: 'var(--cv-navy)', teal: 'var(--cv-teal)', red: 'var(--cv-red)', amber: 'var(--cv-amber)',
 }
-const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 
 /**
  * Why the call ended, in words somebody can act on.
@@ -152,7 +152,7 @@ export default function SessionCall({ clientId, sessionId = null, onConnected = 
           Everyone on this engagement joins here. There is nothing to install and no second sign in.
         </div>
         <button onClick={join} disabled={joining} style={{
-          fontFamily: 'var(--cv-font-mono)', fontSize: '0.9rem', fontWeight: 700,
+          fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', fontWeight: 700,
           padding: '0.5rem 1.1rem', border: 'none', borderRadius: 7,
           background: C.teal, color: 'var(--cv-on-cyan)', cursor: 'pointer',
         }}>

@@ -81,23 +81,23 @@ const cardHead = { background: C.header, color: 'var(--cv-on-accent)', padding: 
 const cardBody = { padding: '1.1rem 1.2rem 1.3rem' }
 const toolNo = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--cv-wa-75)' }
 const toolTitle = { fontFamily: 'var(--cv-font)', fontSize: '1.12rem', fontWeight: 700 }
-const purpose = { fontSize: '0.95rem', color: C.slate, lineHeight: 1.45, marginBottom: '0.9rem' }
+const purpose = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45, marginBottom: '0.9rem' }
 const tableWrap = { overflowX: 'auto' }
-const table = { width: '100%', borderCollapse: 'collapse', fontSize: '0.93rem', minWidth: 860 }
+const table = { width: '100%', borderCollapse: 'collapse', fontSize: '1.01rem', minWidth: 860 }
 // T1.23. The seven headings must be readable without scrolling sideways at a
 // normal screen width, so Tool 1's table sets no floor and lets its cells wrap.
 // Everything inside it is a box that wraps rather than a fixed-width control.
-const toolOneTable = { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', tableLayout: 'fixed' }
+const toolOneTable = { width: '100%', borderCollapse: 'collapse', fontSize: '1.01rem', tableLayout: 'fixed' }
 const th = { padding: '0.45rem 0.55rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 /** T1.23. A heading that may wrap rather than force the table wider. */
 const thWrap = { ...th, whiteSpace: 'normal' }
 const td = { padding: '0.4rem 0.4rem', verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
-const cellInput = { width: '100%', minWidth: 0, padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.93rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
+const cellInput = { width: '100%', minWidth: 0, padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
 const roInput = { ...cellInput, background: C.disabled, cursor: 'default' }
 const selectStyle = { ...cellInput, minWidth: 108 }
-const addButton = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-cyan)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
-const delButton = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, padding: '0.28rem 0.55rem', cursor: 'pointer' }
-const emptyNote = { fontSize: '0.93rem', color: C.faint, padding: '0.7rem 0' }
+const addButton = { fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-cyan)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
+const delButton = { fontFamily: 'var(--cv-font-mono)', fontSize: '1.01rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, padding: '0.28rem 0.55rem', cursor: 'pointer' }
+const emptyNote = { fontSize: '1.01rem', color: C.faint, padding: '0.7rem 0' }
 /** Two controls on one heading, without either wrapping under the other. */
 function HeadingControls({ children }) {
   return <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>{children}</span>
@@ -105,7 +105,7 @@ function HeadingControls({ children }) {
 const runWithRoomButton = {
   fontFamily: 'var(--cv-font-mono)',
   fontSize: '0.78rem', fontWeight: 700, padding: '0.4rem 0.8rem', borderRadius: 8,
-  border: '1px solid var(--cv-teal)', background: 'var(--cv-teal)', color: '#FFFFFF',
+  border: '1px solid var(--cv-teal)', background: 'var(--cv-teal)', color: 'var(--cv-on-cyan)',
   cursor: 'pointer', whiteSpace: 'nowrap',
 }
 
@@ -122,13 +122,13 @@ const PLACEHOLDERS = {
 }
 
 const anchorSelect = {
-  fontSize: '0.86rem', padding: '0.3rem 0.4rem', borderRadius: 6,
+  fontSize: '1.01rem', padding: '0.3rem 0.4rem', borderRadius: 6,
   border: '1px solid rgba(27,42,65,.22)', background: 'var(--cv-bg-2, #FAFAF7)',
   maxWidth: '100%',
 }
 
 /** The service name reads as the frame it is, not as another editable cell. */
-const serviceCell = { fontWeight: 700, color: C.navy, fontSize: '0.9rem' }
+const serviceCell = { fontWeight: 700, color: C.navy, fontSize: '1.01rem' }
 /**
  * THE ONE WAY TO ADD ANOTHER OF ANYTHING. 14 August 2026.
  *
@@ -150,7 +150,7 @@ function pill(bg, fg) {
   return { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.22rem 0.6rem', borderRadius: 999, background: bg, color: fg, display: 'inline-block', whiteSpace: 'nowrap' }
 }
 function noteBox(border, bg) {
-  return { border: `1px solid ${border}`, background: bg, borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: '0.9rem', color: C.navy, lineHeight: 1.45 }
+  return { border: `1px solid ${border}`, background: bg, borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: '1.01rem', color: C.navy, lineHeight: 1.45 }
 }
 
 // ─── Method content (fixed IP, identical for every engagement) ───
@@ -482,8 +482,8 @@ function MultiValueCell({ activity, field, values, canManage, onAction, placehol
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {shown.length === 0
-          ? <span style={{ color: C.faint, fontSize: '0.88rem' }}>Not filled in</span>
-          : shown.map((v, i) => <span key={v.id || i} style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{v.value}</span>)}
+          ? <span style={{ color: C.faint, fontSize: '1.01rem' }}>Not filled in</span>
+          : shown.map((v, i) => <span key={v.id || i} style={{ fontSize: '1.01rem', whiteSpace: 'pre-wrap' }}>{v.value}</span>)}
       </div>
     )
   }
@@ -588,7 +588,7 @@ function ProblemMatrixTable({ groups, editable, clientId, onEdit, onAddProblem, 
                 <tr>
                   <td style={td}><span style={serviceCell}>{g.serviceName || '—'}</span></td>
                   <td style={td} colSpan={editable ? 7 : 6}>
-                    <span style={{ fontSize: '0.85rem', color: C.faint, fontStyle: 'italic' }}>
+                    <span style={{ fontSize: '1.01rem', color: C.faint, fontStyle: 'italic' }}>
                       No problem stated for this service yet. State it here or in Tool 1 — it is the same row.
                     </span>
                   </td>
@@ -806,7 +806,7 @@ function ActivityGroup({ activity, problemCount, noProblemStated, collapsed, onT
         >
           <Chevron open={!collapsed} />
           <span style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Activity</span>
-          <span style={{ fontWeight: 600, fontSize: '0.97rem', color: C.navy }}>{activityLabel(activity)}</span>
+          <span style={{ fontWeight: 600, fontSize: '1.01rem', color: C.navy }}>{activityLabel(activity)}</span>
         </button>
         {noProblemStated ? (
           <span style={pill(C.tintAmber, C.navy)}>{NO_PROBLEM_STATED}</span>
@@ -942,7 +942,7 @@ function HypothesisBlock({
         {collapsed ? null : (
           <div style={{ marginTop: '0.4rem' }}>
             {build.activities.length === 0 ? (
-              <div style={{ fontSize: '0.88rem', color: C.slate, lineHeight: 1.45 }}>
+              <div style={{ fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }}>
                 Name the activities and the problems this hypothesis is built from, so the board shows what it rests on
                 rather than the room having to remember.
               </div>
@@ -952,7 +952,7 @@ function HypothesisBlock({
                 <div key={a.id} style={{ borderLeft: `3px solid ${C.borderSoft}`, paddingLeft: '0.55rem', marginBottom: '0.35rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                     <span style={{ ...mono, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: C.slate }}>Activity</span>
-                    <span style={{ fontWeight: 600, fontSize: '0.92rem', color: C.navy }}>{activityLabel(a)}</span>
+                    <span style={{ fontWeight: 600, fontSize: '1.01rem', color: C.navy }}>{activityLabel(a)}</span>
                     {editable ? (
                       <button
                         type="button"
@@ -966,7 +966,7 @@ function HypothesisBlock({
                   {build.problems.filter((p) => p.activity_id === a.id).map((p) => (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', paddingLeft: '1rem', flexWrap: 'wrap' }}>
                       <span style={{ ...mono, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: C.slate }}>Problem</span>
-                      <span style={{ fontSize: '0.88rem', color: C.navy }}>{problemLabel(p)}</span>
+                      <span style={{ fontSize: '1.01rem', color: C.navy }}>{problemLabel(p)}</span>
                       {editable ? (
                         <button
                           type="button"
@@ -1799,7 +1799,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         <div>
           <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>Phase 0</div>
           <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.45rem', fontWeight: 700 }}>Clear the ground</div>
-          <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '92ch', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '1.01rem', color: C.slate, maxWidth: '92ch', marginTop: '0.25rem' }}>
             Five tools, used in order. Strip the activity back to what is actually true, find out who has the
             money, shortlist the few problems worth testing, separate what was observed from what is believed,
             and decide what continues, pauses or stops before any gate work begins.
@@ -2280,7 +2280,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
           {splitSignals.parked.map((r) => (
             <div key={r.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.2rem 0' }}>
               <span style={pill(classificationMeta(r.classification).color, 'var(--cv-on-accent)')}>{classificationMeta(r.classification).label}</span>
-              <span style={{ fontSize: '0.92rem', color: C.navy }}>{(r.item || '').trim() || 'Nothing written yet'}</span>
+              <span style={{ fontSize: '1.01rem', color: C.navy }}>{(r.item || '').trim() || 'Nothing written yet'}</span>
               {editable && anchoredService ? (
                 <button
                   type="button"
@@ -2399,7 +2399,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
           {splitDecisions.parked.map((r) => (
             <div key={r.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.2rem 0' }}>
               <span style={pill(decisionMeta(r.decision).color, 'var(--cv-on-accent)')}>{decisionMeta(r.decision).label}</span>
-              <span style={{ fontSize: '0.92rem', color: C.navy }}>{(r.activity || '').trim() || 'Nothing written yet'}</span>
+              <span style={{ fontSize: '1.01rem', color: C.navy }}>{(r.activity || '').trim() || 'Nothing written yet'}</span>
               {editable && anchoredService ? (
                 <button
                   type="button"

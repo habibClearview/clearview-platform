@@ -51,21 +51,21 @@ const C = {
   amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const label = {
   ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase',
   color: C.slate, display: 'block', marginBottom: '0.3rem',
 }
 const field = {
   width: '100%', padding: '0.5rem 0.6rem', border: `1px solid ${C.border}`,
-  borderRadius: 7, background: 'var(--cv-bg-2)', color: C.navy, fontSize: '0.98rem',
+  borderRadius: 7, background: 'var(--cv-bg-2)', color: C.navy, fontSize: '1.01rem',
 }
 const solid = {
-  ...mono, fontSize: '0.9rem', fontWeight: 700, padding: '0.45rem 1rem', border: 'none',
+  ...mono, fontSize: '1.01rem', fontWeight: 700, padding: '0.45rem 1rem', border: 'none',
   borderRadius: 7, background: C.cyan, color: 'var(--cv-on-cyan)', cursor: 'pointer',
 }
 const ghost = {
-  ...mono, fontSize: '0.85rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.border}`,
+  ...mono, fontSize: '1.01rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.border}`,
   borderRadius: 6, background: 'transparent', color: C.slate, cursor: 'pointer',
 }
 
@@ -240,8 +240,8 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
         opens one block and stops working when you close it or when it expires.
       </p>
 
-      {err ? <p style={{ color: C.red, fontSize: '0.95rem', margin: '0.6rem 0 0' }}>{err}</p> : null}
-      {note ? <p style={{ color: C.cyan, fontSize: '0.95rem', margin: '0.6rem 0 0' }}>{note}</p> : null}
+      {err ? <p style={{ color: C.red, fontSize: '1.01rem', margin: '0.6rem 0 0' }}>{err}</p> : null}
+      {note ? <p style={{ color: C.cyan, fontSize: '1.01rem', margin: '0.6rem 0 0' }}>{note}</p> : null}
 
       {canManage ? (
         <div style={{
@@ -314,7 +314,7 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
                     {/* Numbered, because the code is the biggest thing on the
                         card and reads as the address to visit. It is not: the
                         address is /join, and the code goes in the box there. */}
-                    <div style={{ ...hint, fontSize: '0.85rem', marginTop: '0.3rem' }}>
+                    <div style={{ ...hint, fontSize: '1.01rem', marginTop: '0.3rem' }}>
                       1. Open <strong style={{ ...mono, color: C.navy }}>{origin.replace(/^https?:\/\//, '')}/join</strong> in a browser.
                       <br />
                       2. Type the code above into the box on that page.
@@ -370,7 +370,7 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
               {' · '}{GATES.find((g) => g.id === c.dp_id)?.label || c.dp_id}
               {' · '}{when(c.created_at)}
             </div>
-            <p style={{ margin: '0.4rem 0 0', color: C.navy, fontSize: '1rem', whiteSpace: 'pre-wrap' }}>{c.contribution}</p>
+            <p style={{ margin: '0.4rem 0 0', color: C.navy, fontSize: '1.01rem', whiteSpace: 'pre-wrap' }}>{c.contribution}</p>
             {canManage ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginTop: '0.6rem' }}>
                 {!c.promoted_at && promotionTargetFor(c.dp_id) ? (

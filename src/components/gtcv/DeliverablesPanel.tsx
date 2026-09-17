@@ -33,14 +33,14 @@ const C = {
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.5 }
 const field = {
   width: '100%', padding: '0.42rem 0.55rem', borderRadius: 7,
   border: `1px solid ${C.border}`, background: 'transparent', color: 'inherit',
-  fontFamily: "var(--cv-font)", fontSize: '0.92rem',
+  fontFamily: "var(--cv-font)", fontSize: '1.01rem',
 }
 const btn = (col, solid) => ({
-  ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.34rem 0.78rem',
+  ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.34rem 0.78rem',
   border: `1px solid ${col}`, borderRadius: 7,
   background: solid ? col : 'transparent',
   color: solid ? onSolid(col) : col, cursor: 'pointer',
@@ -168,8 +168,8 @@ export default function DeliverablesPanel({ clientId, canManage , currency: enga
           <Stat label="Claims" value={state.packs.length} />
         </div>
 
-        {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>{err}</div> : null}
-        {note ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.7rem' }}>{note}</div> : null}
+        {err ? <div style={{ color: C.red, fontSize: '1.01rem', marginTop: '0.7rem' }}>{err}</div> : null}
+        {note ? <div style={{ color: C.green, fontSize: '1.01rem', marginTop: '0.7rem' }}>{note}</div> : null}
       </div>
 
       {torOpen ? (
@@ -368,7 +368,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <div style={{ maxWidth: 560 }}>
-                    <div style={{ fontSize: '0.98rem', color: C.navy, fontWeight: 600 }}>{DP_LABEL[m.dp_id] || m.dp_id}</div>
+                    <div style={{ fontSize: '1.01rem', color: C.navy, fontWeight: 600 }}>{DP_LABEL[m.dp_id] || m.dp_id}</div>
                     {m.required_evidence ? <div style={{ ...hint, marginTop: '0.15rem' }}>{m.required_evidence}</div> : null}
                     <div style={{ ...mono, fontSize: '0.78rem', color: C.slate, marginTop: '0.2rem' }}>
                       {m.source === 'ai' ? 'Proposed from the document' : 'Added by hand'}
@@ -425,7 +425,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
           <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>Claims</div>
           {live.map((p) => (
             <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
-              <div style={{ ...mono, fontSize: '0.87rem', color: C.navy }}>
+              <div style={{ ...mono, fontSize: '1.01rem', color: C.navy }}>
                 {p.reference} · {money(p.amount, p.currency)} · {p.status}
                 {p.sent_at ? ` · sent ${fmtDate(p.sent_at)}` : ''}
               </div>
@@ -528,8 +528,8 @@ function PackViewer({ clientId, packId, onClose }) {
         <button type="button" style={btn(C.slate)} onClick={onClose}>Close</button>
       </div>
 
-      {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.6rem' }}>{err}</div> : null}
-      {msg ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.6rem' }}>{msg}</div> : null}
+      {err ? <div style={{ color: C.red, fontSize: '1.01rem', marginTop: '0.6rem' }}>{err}</div> : null}
+      {msg ? <div style={{ color: C.green, fontSize: '1.01rem', marginTop: '0.6rem' }}>{msg}</div> : null}
 
       {gaps.length > 0 ? (
         <div style={{ marginTop: '0.8rem', border: `1px solid ${C.red}`, borderRadius: 9, padding: '0.6rem 0.8rem' }}>
@@ -545,7 +545,7 @@ function PackViewer({ clientId, packId, onClose }) {
       </div>
       {gates.map((g) => (
         <div key={g.dp_id} style={{ border: `1px solid ${C.border}`, borderRadius: 9, padding: '0.5rem 0.75rem', marginTop: '0.35rem' }}>
-          <div style={{ fontSize: '0.97rem', fontWeight: 600, color: C.navy }}>{g.label}</div>
+          <div style={{ fontSize: '1.01rem', fontWeight: 600, color: C.navy }}>{g.label}</div>
           {g.required_evidence ? <div style={hint}>{g.required_evidence}</div> : null}
           <div style={{ ...mono, fontSize: '0.78rem', color: g.gap ? C.red : C.green, marginTop: '0.2rem' }}>
             {g.evidence_count} evidence {g.evidence_count === 1 ? 'entry' : 'entries'} · {g.signature_count} {g.signature_count === 1 ? 'signature' : 'signatures'}

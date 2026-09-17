@@ -52,12 +52,12 @@ const C = {
 }
 const card = { background: C.white, border: '1px solid var(--cv-border-soft)', borderRadius: 14, padding: '1.25rem 1.4rem', marginBottom: '1.1rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
 const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
-const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.45 }
+const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
 const th = { ...mono, padding: '0.45rem 0.55rem', textAlign: 'left', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
-const td = { padding: '0.35rem 0.55rem', verticalAlign: 'top', fontSize: '0.9rem', color: C.navy }
-const inp = { width: '100%', padding: '0.34rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
-const btn = (col) => ({ ...mono, fontSize: '0.86rem', fontWeight: 600, padding: '0.4rem 0.85rem', border: `1px solid ${col}`, borderRadius: 7, background: 'transparent', color: col, cursor: 'pointer' })
+const td = { padding: '0.35rem 0.55rem', verticalAlign: 'top', fontSize: '1.01rem', color: C.navy }
+const inp = { width: '100%', padding: '0.34rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
+const btn = (col) => ({ ...mono, fontSize: '1.01rem', fontWeight: 600, padding: '0.4rem 0.85rem', border: `1px solid ${col}`, borderRadius: 7, background: 'transparent', color: col, cursor: 'pointer' })
 
 const pct = (v) => (v === null ? 'n/a' : `${(v * 100).toFixed(0)}%`)
 const today = () => new Date().toISOString().split('T')[0]
@@ -354,7 +354,7 @@ export default function ABTestingLog({ clientId, canManage }) {
                       <td style={{ ...td, textAlign: 'right' }}>
                         <button type="button" title="Delete this line" disabled={busy}
                           onClick={() => removeRow(r)}
-                          style={{ ...mono, border: 'none', background: 'transparent', color: C.red, cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.3rem' }}>x</button>
+                          style={{ ...mono, border: 'none', background: 'transparent', color: C.red, cursor: 'pointer', fontSize: '1.01rem', padding: '0.2rem 0.3rem' }}>x</button>
                       </td>
                     )}
                   </tr>
