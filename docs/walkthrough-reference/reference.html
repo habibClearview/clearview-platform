@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GtCV Canvas Walkthrough</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+
+:root{
+  --ground:#111111; --bar:#12222C; --panel:#12222C; --line:rgba(245,245,220,.16); --line-2:rgba(245,245,220,.32);
+  --ink:#F5F5DC; --ink-2:rgba(245,245,220,.78); --ink-3:rgba(245,245,220,.5);
+  --blue:#00AFEF; --on-blue:#111111; --glow:rgba(0,175,239,.32);
+  --font:"Poppins",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  /* ClearView canvas palette */
+  --cv-card:#192439; --cv-signed:#1C2F3A; --cv-border:#51678E; --cv-ink:#EEF2F8; --cv-ink-2:#ADB9C8; --cv-ink-3:#7E899A;
+  --cv-cyan:#70E8E9; --cv-on-cyan:#0F1A2B; --cv-slate:#445C87; --cv-gold:#D9B268; --cv-lav:#B29CD2; --cv-teal:#496D71; --cv-green:#457B3C;
+  --cv-glow:rgba(112,232,233,.38); --cv-done:#82BC7B; --cv-prog:#D9B268; --cv-prog-glow:rgba(217,178,104,.42);
+}
+.app[data-room="light"]{
+  --ground:#F5F5DC; --bar:#EDEDCF; --panel:#FAFAEC; --line:rgba(18,34,44,.16); --line-2:rgba(18,34,44,.34);
+  --ink:#12222C; --ink-2:rgba(18,34,44,.8); --ink-3:rgba(18,34,44,.54);
+  --blue:#0083BA; --on-blue:#FFFFFF; --glow:rgba(0,131,186,.24);
+  --cv-card:#FFFFFF; --cv-signed:#EAF4E8; --cv-border:#7F90AE; --cv-ink:#12222C; --cv-ink-2:#4A5A70; --cv-ink-3:#6F7C8F;
+  --cv-cyan:#139EA2; --cv-on-cyan:#FFFFFF; --cv-glow:rgba(19,158,162,.28);
+}
+html,body{height:100%}
+body{margin:0;background:#111111}
+.app{min-height:100%;height:100%;display:grid;grid-template-rows:auto 1fr auto;background:var(--ground);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.55;transition:background .35s,color .35s}
+.app *{box-sizing:border-box}
+.app button{font-family:var(--font)}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px;padding:18px 36px;background:var(--bar);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:24px;min-width:0}
+.logo{height:68px;width:auto;display:block}
+.logo.navy{display:none}
+.app[data-room="light"] .logo.cream{display:none}
+.app[data-room="light"] .logo.navy{display:block}
+.brand .rule{width:1px;align-self:stretch;background:var(--line-2)}
+.brand .name{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.brand .name b{font-weight:600;font-size:26px;letter-spacing:-.02em;line-height:1.15}
+.brand .name span{font-size:14px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);margin-top:4px}
+.tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.modes{display:flex;border:1px solid var(--line-2)}
+.modes button,.tbtn{font-weight:600;font-size:15px;color:var(--ink-2);background:transparent;border:0;padding:11px 18px;cursor:pointer;line-height:1}
+.modes button[aria-pressed="true"]{background:var(--blue);color:var(--on-blue)}
+.tbtn{border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:7px}
+.tbtn[aria-pressed="true"]{color:var(--blue);border-color:var(--blue)}
+.tbtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
+.app button:focus-visible,.gate:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+/* canvas stage */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:24px;padding:16px 24px;min-height:0}
+.canvas-wrap{min-height:0;display:flex;align-items:center;justify-content:center;touch-action:pan-y}
+.canvas-wrap svg{width:100%;height:100%;display:block}
+.narr{min-height:0;overflow:auto;padding:24px 26px;background:var(--panel);border:1px solid var(--line-2)}
+.eyebrow{display:flex;align-items:center;gap:12px;margin:0 0 14px;font-size:11.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--blue)}
+.eyebrow::before{content:"";width:34px;height:2px;background:var(--blue);flex:none}
+.eyebrow .count{margin-left:auto;color:var(--ink-3);letter-spacing:.12em;font-weight:600}
+.narr h2{font-weight:700;font-size:31px;line-height:1.08;letter-spacing:-.035em;margin:0 0 16px;text-wrap:balance}
+.narr h2 em,.s-h1 em{font-style:normal;color:var(--blue);display:block}
+.narr p{margin:0 0 12px;color:var(--ink-2)}
+.narr strong{color:var(--ink);font-weight:600}
+.narr ol,.narr ul{margin:0 0 14px;padding-left:20px;color:var(--ink-2)}
+.narr li{margin-bottom:8px;transition:color .25s}
+.narr li::marker{color:var(--blue);font-weight:600}
+.narr .q{font-weight:500;font-size:16.5px;color:var(--ink);line-height:1.42;letter-spacing:-.01em}
+.narr .quiet{font-size:14px;color:var(--ink-3)}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;border:1px solid var(--line-2);color:var(--ink-2);padding:4px 10px;margin:0 0 12px}
+.tag.gold{border-color:var(--cv-gold);color:var(--cv-gold)}
+.block{border-top:1px solid var(--line);padding-top:12px;margin-top:8px}
+.block h3{font-weight:600;font-size:15px;margin:0 0 6px;color:var(--ink);letter-spacing:-.01em}
+.sync li{color:var(--ink-3)}
+.sync li.on{color:var(--ink)}
+.beats{list-style:none;padding:0!important;margin:4px 0 14px}
+.beats li{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink-3)}
+.beats li:last-child{border-bottom:0}
+.beats li i{width:14px;height:14px;border-radius:50%;border:2px solid var(--ink-3);margin-top:5px;transition:all .25s}
+.beats li b{display:block;font-weight:600;font-size:14.5px;color:var(--ink-2)}
+.beats li.on{color:var(--ink-2)}
+.beats li.on b{color:var(--ink)}
+.beats li.on i{background:var(--blue);border-color:var(--blue);box-shadow:0 0 0 5px var(--glow)}
+.back{font-weight:600;font-size:13px;background:transparent;color:var(--blue);border:1px solid var(--blue);padding:8px 14px;cursor:pointer;margin-top:8px}
+
+/* full-screen scenes */
+.scene{display:none;min-height:0;overflow:auto;padding:clamp(24px,4.5vw,72px) clamp(20px,5vw,80px);position:relative}
+.app[data-kind="scene"] .stage{display:none}
+.app[data-kind="scene"] .scene{display:flex;flex-direction:column;justify-content:center}
+.reveal>*{animation:up .7s cubic-bezier(.2,.7,.2,1) both}
+.reveal>*:nth-child(2){animation-delay:.08s}.reveal>*:nth-child(3){animation-delay:.18s}.reveal>*:nth-child(4){animation-delay:.28s}.reveal>*:nth-child(5){animation-delay:.38s}
+@keyframes up{from{opacity:.001;transform:translateY(14px)}to{opacity:1;transform:none}}
+.s-h1{font-weight:700;font-size:clamp(38px,5.4vw,92px);line-height:1;letter-spacing:-.045em;margin:0 0 clamp(18px,2.4vw,34px);max-width:19ch;text-wrap:balance}
+.s-h1.mid{font-size:clamp(34px,4.2vw,68px);max-width:24ch}
+.s-body{font-size:clamp(18px,1.7vw,26px);color:var(--ink-2);max-width:48ch;line-height:1.5;margin:0}
+.s-quote{font-size:clamp(20px,2.2vw,34px);font-weight:500;color:var(--ink);max-width:40ch;line-height:1.38;letter-spacing:-.015em;border-left:4px solid var(--blue);padding-left:clamp(16px,2vw,28px);margin:0}
+.hold .logo-lg{height:clamp(44px,5.5vw,80px);width:auto;display:block;margin-bottom:clamp(24px,4vw,56px)}
+.app[data-room="light"] .hold .logo-lg.cream,.app:not([data-room="light"]) .hold .logo-lg.navy{display:none}
+.hold .status{display:inline-flex;align-items:center;gap:10px;margin-top:clamp(24px,3.5vw,48px);font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.hold .status i{width:10px;height:10px;border-radius:50%;background:var(--ink-3);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+.ghost{position:absolute;right:-9vw;top:50%;transform:translateY(-50%);width:min(52vw,760px);opacity:.14;pointer-events:none}
+.ghost rect{fill:none;stroke:var(--cv-cyan);stroke-width:2}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(10px,1.2vw,18px);max-width:1280px}
+.card{border:1.5px solid var(--line-2);background:var(--panel);padding:clamp(16px,1.6vw,26px)}
+.card b{display:block;font-size:12px;font-weight:700;letter-spacing:.18em;color:var(--blue);margin-bottom:10px}
+.card p{margin:0;font-size:clamp(15px,1.3vw,21px);line-height:1.4;color:var(--ink);letter-spacing:-.01em}
+.card.hl{border-color:var(--blue)}
+.rep{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:clamp(24px,4vw,64px);align-items:center}
+.paper{background:#F5F5DC;color:#12222C;padding:clamp(18px,2.2vw,34px);box-shadow:0 30px 60px rgba(0,0,0,.45);transform:rotate(-1.2deg);position:relative;max-width:620px;justify-self:center;width:100%}
+.paper .ph{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #12222C;padding-bottom:10px;margin-bottom:14px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+.paper h4{margin:0 0 4px;font-size:clamp(16px,1.5vw,22px);letter-spacing:-.02em;line-height:1.2}
+.paper .meta{font-size:12px;color:#4A5560;margin-bottom:14px}
+.paper .sec{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#00769F;margin:14px 0 6px}
+.paper .bar{height:9px;background:rgba(18,34,44,.14);margin:7px 0}
+.paper .sign{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid rgba(18,34,44,.25);margin-top:16px;padding-top:12px;font-size:12px;font-weight:600}
+.paper .sent{background:#12222C;color:#F5F5DC;padding:4px 9px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
+.paper .sample{position:absolute;top:-12px;right:18px;background:var(--cv-gold);color:#12222C;font-size:10.5px;font-weight:700;letter-spacing:.16em;padding:4px 10px}
+.tl{max-width:1280px;margin-top:clamp(8px,1.5vw,20px)}
+.tl .axis{position:relative;height:44px;border-bottom:2px solid var(--line-2);margin-bottom:0}
+.tl .axis span{white-space:nowrap;position:absolute;bottom:10px;font-size:12px;font-weight:600;letter-spacing:.12em;color:var(--ink-3);transform:translateX(-50%)}
+.tl .axis span:first-child{transform:none}.tl .axis span:last-child{transform:translateX(-100%)}
+.tl .cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(10px,1.2vw,18px)}
+.tl .col{position:relative;padding-top:26px}
+.tl .col::before{content:"";position:absolute;top:-8px;left:0;width:14px;height:14px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 5px var(--glow)}
+.tl .col h3{margin:0 0 8px;font-size:clamp(18px,1.7vw,26px);letter-spacing:-.025em;line-height:1.1}
+.tl .col p{margin:0;font-size:clamp(14px,1.2vw,18px);color:var(--ink-2);line-height:1.45}
+.tl .note{margin-top:22px;font-size:13px;color:var(--ink-3)}
+.cta{display:inline-flex;align-items:center;gap:12px;margin-top:clamp(22px,3vw,40px);background:var(--blue);color:var(--on-blue);font-weight:600;font-size:clamp(16px,1.4vw,20px);padding:18px 30px;border:0;cursor:pointer}
+.qlist{margin:0;padding-left:1.4em;max-width:44ch}
+.qlist li{font-size:clamp(20px,2.2vw,34px);font-weight:500;line-height:1.3;letter-spacing:-.02em;margin-bottom:.7em;color:var(--ink)}
+.qlist li::marker{color:var(--blue);font-weight:700}
+
+/* footer */
+.ctrl{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px;padding:10px 24px 14px;border-top:1px solid var(--line);background:var(--ground)}
+.nav{display:flex;align-items:center;gap:10px}
+.nb{font-weight:600;font-size:14px;background:transparent;color:var(--ink);border:1px solid var(--line-2);padding:10px 18px;cursor:pointer;line-height:1}
+.nb.primary{background:var(--blue);color:var(--on-blue);border-color:var(--blue)}
+.nb:disabled{opacity:.35;cursor:default}
+.dots{display:flex;flex-wrap:wrap;gap:6px;margin-left:6px}
+.dots button{width:10px;height:10px;border-radius:50%;border:0;padding:0;background:var(--line-2);cursor:pointer}
+.dots button[aria-current="step"]{background:var(--blue);transform:scale(1.3)}
+.stepnum{display:none;font-size:13px;font-weight:600;color:var(--ink-3);letter-spacing:.06em}
+.keys{font-size:11.5px;color:var(--ink-3)}
+.keys kbd{font-family:inherit;border:1px solid var(--line-2);padding:0 5px;color:var(--ink-2);font-size:11px}
+.foot{font-size:12px;color:var(--ink-3)}
+
+/* svg canvas, ClearView palette */
+.hdr{fill:var(--cv-ink-3);font-weight:700;letter-spacing:.2em}
+.region{fill:var(--cv-glow);stroke:var(--cv-cyan);stroke-width:3;opacity:0;pointer-events:none;transition:opacity .45s}
+.region.on{opacity:.55}
+.gate{cursor:pointer;transition:opacity .45s}
+.gate .box{fill:var(--cv-card);stroke:var(--cv-border);stroke-width:1.8;transition:fill .4s,stroke .4s,stroke-width .3s}
+.gate:hover .box{stroke:var(--cv-cyan)}
+.gate:focus{outline:none}
+.gate.locked{opacity:.42}
+.gate.active .box{stroke:var(--cv-prog);stroke-width:3.2;filter:drop-shadow(0 0 12px var(--cv-prog-glow))}
+.gate.signed .box{fill:var(--cv-signed)}
+.gate.reopened .box{stroke:var(--cv-gold);stroke-width:3.2}
+.gate.wave .box{stroke:var(--cv-done);stroke-width:3.2}
+.gate .pip{fill:none;stroke:var(--cv-ink-3);stroke-width:1.5;transition:all .25s}
+.gate .pip.on{fill:var(--cv-cyan);stroke:var(--cv-cyan)}
+.gate.reopened .pip.on{fill:var(--cv-gold);stroke:var(--cv-gold)}
+.gate .status{fill:var(--cv-ink-3);font-weight:600;letter-spacing:.06em}
+.gate.signed .status{fill:var(--cv-done)}
+.gate.reopened .status{fill:var(--cv-gold)}
+.stamp{transform-box:fill-box;transform-origin:center;transform:scale(0);transition:transform .45s cubic-bezier(.3,1.6,.5,1)}
+.stamp circle{fill:var(--cv-done)}
+.stamp path{fill:none;stroke:#0F1A2B;stroke-linecap:round;stroke-linejoin:round}
+.gate.signed .stamp{transform:scale(1)}
+.gate.v2 .stamp circle{fill:var(--cv-done)}
+.fitbar{transition:opacity .3s}
+.gtxt{font-family:var(--font);padding:12px 16px 0;height:100%;overflow:hidden}
+.g-num{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;background:var(--cv-cyan);color:var(--cv-on-cyan);padding:2px 7px;border-radius:3px;text-transform:uppercase}
+.g-num.slate{background:#445C87;color:#EEF2F8}.g-num.gold{background:#D9B268;color:#0F1A2B}.g-num.cyan{background:#70E8E9;color:#0F1A2B}.g-num.lav{background:#B29CD2;color:#0F1A2B}
+.colbar text{font-weight:700;letter-spacing:.2em}
+.g-kind{font-size:10px;font-weight:600;letter-spacing:.16em;color:var(--cv-ink-3);margin-left:8px;text-transform:uppercase}
+.g-name{font-weight:600;font-size:18.5px;line-height:1.16;letter-spacing:-.02em;color:var(--cv-ink);margin:6px 0 5px;padding-right:18px}
+.g-q{font-size:13px;line-height:1.38;color:var(--cv-ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gtxt.tr .g-q{display:none}
+.gtxt.nm2 .g-q{-webkit-line-clamp:1}
+.narrow .gtxt .g-q{-webkit-line-clamp:8}
+.fit{display:inline-block;font-family:var(--font);font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:5px 8px;border-radius:3px;color:#0F1A2B;white-space:nowrap;line-height:1}
+.fit.gold{background:#D9B268}.fit.lav{background:#B29CD2}.fit.cyan{background:#70E8E9}.fit.slate{background:#445C87;color:#EEF2F8}
+.narrow .gtxt{padding:12px 11px 0}
+.narrow .g-name{font-size:17px;padding-right:0}
+.narrow .g-q{font-size:12.5px}
+.compact .gtxt{padding:7px 7px 0}
+.compact .g-num{font-size:7.5px;padding:1px 4px;letter-spacing:.04em}
+.compact .g-name{font-size:11.5px;line-height:1.15;margin:4px 0 0;padding-right:0;letter-spacing:-.01em}
+.compact .strip .gtxt{display:flex;align-items:center;gap:8px;padding:0 10px;height:100%}
+.compact .strip .g-name{margin:0;font-size:13px}
+.setup{cursor:pointer}
+.setup .box{fill:var(--cv-card);stroke:var(--cv-border);stroke-width:1.8;transition:all .4s}
+.setup.active .box{stroke:var(--cv-prog);stroke-width:3.2;filter:drop-shadow(0 0 12px var(--cv-prog-glow))}
+.setup .t1{fill:var(--cv-cyan);font-weight:700;letter-spacing:.2em}
+.setup .t2{fill:var(--cv-ink);font-weight:500}
+.scale text{font-weight:700;letter-spacing:.04em}
+.reading circle{fill:transparent;stroke:var(--cv-ink-3);stroke-width:2;stroke-dasharray:3 3;transition:all .35s}
+.reading.on circle{fill:#EEF2F8;stroke:#111111;stroke-dasharray:none}
+.reading text{fill:var(--cv-ink-3);font-weight:700;letter-spacing:.1em;transition:fill .35s}
+.reading.on text{fill:var(--cv-ink)}
+.rec-label{fill:var(--cv-ink-3);font-weight:700;letter-spacing:.18em}
+.recwrap{transition:filter .4s}
+.recwrap.glow{filter:drop-shadow(0 0 8px var(--cv-glow))}
+.rchip{transition:transform .2s}
+.rchip rect{fill:none;stroke:var(--cv-border);stroke-width:1.5;transition:all .35s}
+.rchip text{fill:var(--cv-ink-3);font-weight:600;transition:fill .35s}
+.rchip.signed rect{fill:var(--cv-done);stroke:var(--cv-done)}
+.rchip.signed text{fill:#0F1A2B}
+.rchip.v2 rect{stroke:var(--cv-gold);stroke-width:3}
+.own-track{fill:none;stroke:var(--cv-border);stroke-width:1.5}
+.own-fill{fill:var(--cv-cyan);transition:width .8s ease}
+.own-lab{fill:var(--cv-ink-3);font-weight:600;letter-spacing:.12em}
+#token{pointer-events:none;opacity:0;transition:opacity .2s}
+#token .core{fill:var(--cv-cyan)}
+#token .halo{fill:var(--cv-cyan);opacity:.28}
+.arc{fill:none;stroke:var(--cv-gold);stroke-linecap:round;opacity:0;transition:opacity .4s}
+.arrowHead{fill:var(--cv-gold)}
+@keyframes rise{from{opacity:.15}to{opacity:1}}
+.intro .gate,.intro .setup{animation:rise .7s ease both}
+
+/* compact: phones and portrait tablets */
+@media (max-width: 720px), (orientation: portrait) and (max-width: 1100px){
+  .app{height:auto;min-height:100%}
+  .top{padding:12px 16px;position:sticky;top:env(safe-area-inset-top,0px);z-index:3}
+  .logo{height:40px}
+  .brand .name b{font-size:16px}
+  .brand .name span{font-size:10.5px}
+  .stage{grid-template-columns:1fr;padding:12px 16px;gap:14px}
+  .canvas-wrap{display:block}
+  .canvas-wrap svg{height:auto;max-height:64vh;margin:0 auto}
+  .narr{padding:20px}
+  .narr h2{font-size:26px}
+  .scene{padding:28px 16px 40px;min-height:70vh}
+  .ghost{display:none}
+  .cards,.tl .cols{grid-template-columns:1fr}
+  .rep{grid-template-columns:1fr}
+  .ctrl{position:sticky;bottom:0;z-index:3;padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+  .nav{width:100%}
+  .nav .nb{flex:1;padding:14px}
+  .dots,.keys,.foot{display:none}
+  .stepnum{display:block;flex:none;min-width:52px;text-align:center}
+  .eyebrow{letter-spacing:.14em;font-size:10.5px}
+  .eyebrow .count{display:none}
+}
+@media (max-width: 420px){
+  .brand .rule,.brand .name{display:none}
+  .modes button,.tbtn{padding:8px 10px;font-size:12px}
+}
+@media (prefers-reduced-motion: reduce){
+  .app *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+
+
+<div class="app" id="app" data-room="dark" data-kind="scene">
+  <header class="top">
+    <div class="brand">
+      <img class="logo cream" alt="Habib Onifade" src="logo-cream.png">
+      <img class="logo navy" alt="Habib Onifade" src="logo-navy.png">
+      <div class="rule"></div>
+      <div class="name"><b>Grant-to-Commercial Viability Canvas™</b><span id="prepared">How the work runs</span></div>
+    </div>
+    <div class="tools">
+      <button class="tbtn" id="sound" aria-pressed="false" title="Sound (S)"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="waves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" opacity=".35"/></svg><span id="soundLab">Sound off</span></button>
+      <div class="modes" role="group" aria-label="Mode">
+        <button id="mWalk" aria-pressed="true">Walkthrough</button>
+        <button id="mExplore" aria-pressed="false">Explore</button>
+        <button id="mPlay" aria-pressed="false">Play</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="canvas-wrap" id="cwrap">
+      <svg id="cv" role="img" aria-label="The Grant-to-Commercial Viability Canvas with eleven decision points"></svg>
+    </div>
+    <aside class="narr" id="narr" aria-live="polite"></aside>
+  </main>
+  <section class="scene" id="scene" aria-live="polite"></section>
+
+  <footer class="ctrl">
+    <div class="nav">
+      <button class="nb" id="prev">Back</button>
+      <span class="stepnum" id="stepnum"></span>
+      <button class="nb primary" id="next">Next</button>
+      <div class="dots" id="dots" aria-label="Screens"></div>
+    </div>
+    <div class="keys"><kbd>→</kbd> next · <kbd>←</kbd> back · <kbd>E</kbd> explore · <kbd>P</kbd> play · <kbd>S</kbd> sound · <kbd>L</kbd> light room · <kbd>F</kbd> full screen</div>
+    <div class="foot">© Habib Onifade · The Canvas Coach · habibonifade.com</div>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const NS="http://www.w3.org/2000/svg", XH="http://www.w3.org/1999/xhtml";
+const LOGO_CREAM="logo-cream.png", LOGO_NAVY="logo-navy.png";
+
+/* ---------- client context: defaults, overridable by link ---------- */
+const DEFAULT_CTX={};
+const P=new URLSearchParams(location.search);
+const raw=Object.assign({funder:"",org:"",service:"",prepared:"",close:"",market:"",portfolio:"",programme:""},DEFAULT_CTX);
+Object.keys(raw).forEach(k=>{if(P.has(k))raw[k]=P.get(k);});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const C={
+  funder:esc(raw.funder||"the funder"), org:esc(raw.org||"the organisation"),
+  service:esc(raw.service||"service"), hasFunder:!!raw.funder, hasOrg:!!raw.org,
+  close:esc(raw.close||"At close"), market:esc(raw.market), portfolio:esc(raw.portfolio||"your portfolio"),
+  programme:esc(raw.programme),
+  prepared:raw.prepared?esc(raw.prepared):(raw.funder?"Prepared for "+esc(raw.funder):"How the work runs")
+};
+C.Funder=cap(C.funder); C.Org=cap(C.org);
+document.getElementById("prepared").innerHTML=C.prepared;
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- sound (off by default) ---------- */
+let actx=null, soundOn=false;
+function tone(f,dur,{type="sine",gain=.06,at=0,to=null}={}){
+  if(!soundOn||!actx)return;
+  const t=actx.currentTime+at,o=actx.createOscillator(),g=actx.createGain();
+  o.type=type;o.frequency.setValueAtTime(f,t);if(to)o.frequency.exponentialRampToValueAtTime(to,t+dur);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(gain,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g).connect(actx.destination);o.start(t);o.stop(t+dur+.05);
+}
+const SFX={
+  beat:()=>tone(1320,.07,{type:"triangle",gain:.025}),
+  sign:()=>{tone(784,.16,{gain:.05});tone(1175,.32,{gain:.045,at:.08});},
+  travel:()=>tone(330,.35,{gain:.018,to:520}),
+  reopen:()=>{tone(523,.2,{gain:.05});tone(415,.38,{gain:.05,at:.14});},
+  step:()=>tone(660,.05,{type:"triangle",gain:.018}),
+  finale:()=>{[523,659,784,1047].forEach((f,i)=>tone(f,.9,{gain:.035,at:i*.09}));}
+};
+function setSound(on){
+  soundOn=on;
+  if(on&&!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){soundOn=false;}}
+  if(actx&&actx.state==="suspended")actx.resume();
+  document.getElementById("sound").setAttribute("aria-pressed",String(soundOn));
+  document.getElementById("soundLab").textContent=soundOn?"Sound on":"Sound off";
+  document.getElementById("waves").setAttribute("opacity",soundOn?"1":".35");
+  if(soundOn)SFX.sign();
+}
+document.getElementById("sound").onclick=()=>setSound(!soundOn);
+
+/* ---------- canvas content (ClearView wording where available) ---------- */
+const INFO={
+  cg:{num:"Before",name:"Clearing the Ground",short:"What have we assumed, and what have we tested?",col:"Before the canvas opens",lead:"Coach leads",
+      q:"Which beliefs about what the service does, who benefits and who pays have been tested with real customers, and which have not?",
+      out:"Every assumption written down and sorted, using five tools: the Assumption Dump Canvas, the Problem, Owner and Budget Matrix, the Hypothesis Shortlist Board, the Signal vs Story Board, and the Continue, Pause or Kill Table. The baseline readiness reading is taken here."},
+  d1:{c:"gold",num:"DP 01",name:"Service Reality Audit",short:"What do we actually deliver, versus what we think we deliver?",col:"Internal",lead:"Coach leads",fit:["Problem-Provider Fit","gold"],
+      q:"What do we actually deliver, versus what we think we deliver?",
+      out:"A clear, honest inventory: services with real market demand, separated from those that exist only because a grant funds them."},
+  d2:{c:"slate",num:"DP 02",name:"Customer & Problem Clarity",short:"Who owns this problem, and will they pay to solve it?",col:"Bridge",lead:"Coach leads",fit:["Problem-Solution Fit","slate"],
+      q:"Who owns this problem, and will they pay to solve it?",
+      out:"Named customer segments with documented problem urgency and confirmed willingness to engage commercially."},
+  d3:{c:"cyan",num:"DP 03",name:"Value Proposition Architecture",tiny:"Value Proposition",short:"Why does this matter to this specific client, in their language?",col:"External",lead:"Coach designs, organisation builds",fit:["Solution-Problem Owner Fit","cyan"],
+      q:"Why does this matter to this specific client, in their language?",
+      out:"A client-tested value proposition for each service bundle, compelling to the identified paying customer."},
+  d4:{c:"gold",num:"DP 04",name:"Commercial Viability Model",short:"What does it cost to deliver, and what must clients pay for this to survive?",col:"Internal",lead:"Coach designs, organisation builds",fit:["Financial Sustainability · ClearView","gold"],
+      q:"What does it cost to deliver, and what must clients pay for this to survive?",
+      out:"A working financial model with at least two pricing tiers, break-even calculated, and the cost-recovery threshold documented."},
+  d6:{c:"lav",num:"DP 06",name:"Organisational Identity & Partner Architecture",tiny:"Identity & Partners",kind:"Threshold",short:"What type of commercial entity are we becoming, and who do we partner with?",col:"Bridge",lead:"Coach designs, organisation builds",fit:["Identity + Partnership","lav"],
+      q:"What type of commercial entity are we becoming, and who do we partner with?",
+      out:"A clear commercial identity statement and a partner map that reinforces market positioning."},
+  d5:{c:"cyan",num:"DP 05",name:"Market Entry Design",short:"Which clients do we pursue first, and how do we reach them?",col:"External",lead:"Coach designs, organisation builds",fit:["Solution-Market Fit","cyan"],
+      q:"Which clients do we pursue first, and how do we reach them?",
+      out:"A segmented outreach plan with tested messaging, client-facing materials, and a prioritised pipeline of target organisations."},
+  d7:{c:"slate",num:"DP 07",kind:"Transition",name:"Pilot & Learn Architecture",tiny:"Pilot & Learn",short:"What does success look like at small scale, before committing to full delivery?",col:"Transition",lead:"Iteration 1 coach-led, Iteration 2 organisation-led",fit:["Solution-Pilot Fit","slate"],
+      q:"What does success look like at small scale, before committing to full delivery?",
+      out:"Two rounds of live client engagement with documented feedback, service revisions, and evidence of what holds."},
+  d8:{c:"cyan",num:"DP 08",kind:"Transition",name:"Scale & Expansion Pathway",tiny:"Scale & Expansion",short:"Where does this go after the engagement, and what infrastructure enables it?",col:"Transition",lead:"Organisation operates, coach reviews",fit:["Solution-Scale Channel Fit","cyan"],
+      q:"Where does this go after the engagement, and what infrastructure enables it?",
+      out:"A documented scale pathway naming at least two expansion segments and the channel logic for reaching them independently."},
+  d9:{c:"cyan",num:"DP 09",kind:"Diagnostic spine",name:"Commercial Readiness Diagnostic",tiny:"Readiness Diagnostic",short:"",col:"Full width",lead:"Read three times",
+      q:"Where does this organisation sit on the journey from grant-dependency to commercial viability, right now?",
+      out:"A readiness reading at kick-off, mid-point and close, on six fit tests, placed on four stages: Grant-dependent, Commercially aware, Market-ready and Commercially viable."},
+  ho:{num:"At close",name:"Handover",short:"Can the organisation run the model alone?",col:"At close",lead:"Organisation presents, coach confirms",
+      q:"Can the organisation operate its commercial model without the coach?",
+      out:"A one-page written handover record, confirmed against five elements: the financial model, the value proposition, the outreach process, the client management process and the commercial identity."}
+};
+const ORDER=["cg","d1","d2","d3","d4","d5","d6","d7","d8","d9","ho"];
+const CHIP={cg:"CG",d1:"01",d2:"02",d3:"03",d4:"04",d5:"05",d6:"06",d7:"07",d8:"08",d9:"09",ho:"HO"};
+const FITCOL={cyan:"#70E8E9",gold:"#D9B268",lav:"#B29CD2",slate:"#445C87"};
+const SCALE=[["GRANT-DEPENDENT","#D9B268","#0F1A2B"],["COMMERCIALLY AWARE","#496D71","#EEF2F8"],["MARKET-READY","#70E8E9","#0F1A2B"],["COMMERCIALLY VIABLE","#457B3C","#EEF2F8"]];
+
+/* ---------- two layouts ---------- */
+const WIDE={
+  vb:[1200,780], compact:false,
+  G:{cg:[20,74,130,586],d1:[170,104,280,160],d2:[460,104,280,160],d3:[750,104,280,160],d4:[170,274,280,160],d6:[460,274,280,160],d5:[750,274,280,160],
+     d7:[170,446,425,120],d8:[605,446,425,120],d9:[170,578,860,82],ho:[1050,74,130,586]},
+  setup:[20,14,1160,44], setupT:{t1:[40,41,12],t2:[122,42,15,"Three questions for the chief executive  ·  Engagement Charter, signed at inception"]},
+  headers:[["INTERNAL CAPABILITY",170,280,"#D9B268","#0F1A2B"],["CONNECTING LAYER",460,280,"#445C87","#EEF2F8"],["EXTERNAL MARKET",750,280,"#70E8E9","#0F1A2B"]], hdrY:70, hdrH:26, hdrSize:11,
+  regions:[[164,66,292,374],[454,66,292,374],[744,66,292,374],[164,440,872,132],[164,572,872,94]],
+  arc:"M 214 520 C 128 505, 128 372, 204 356", arcW:3.5,
+  rec:{label:[20,696,11,"THE RECORD · SIGNED DECISIONS"],x:20,y:708,w:48,h:30,gap:8,fs:11},
+  own:{label:[680,696,11,"WHO LEADS THE WORK"],x:680,y:712,w:500,h:16,l1:[680,752,"COACH LEADS"],l2:[1180,752,"ORGANISATION LEADS"],fs:10.5},
+  scale:{x:562,y:596,w:108,h:20,fs:7.6,labels:true}, readX:[[615,"KICK-OFF"],[723,"MID-POINT"],[831,"CLOSE"]]
+};
+const TALL={
+  vb:[400,598], compact:true,
+  G:{cg:[8,46,384,40],d1:[8,106,120,100],d2:[140,106,120,100],d3:[272,106,120,100],d4:[8,214,120,100],d6:[140,214,120,100],d5:[272,214,120,100],
+     d7:[8,322,188,70],d8:[204,322,188,70],d9:[8,400,384,50],ho:[8,458,384,40]},
+  setup:[8,6,384,32], setupT:{t1:[18,27,9],t2:[74,27,11,"Three questions  ·  Engagement Charter"]},
+  headers:[["INTERNAL",8,120,"#D9B268","#0F1A2B"],["CONNECTING",140,120,"#445C87","#EEF2F8"],["EXTERNAL",272,120,"#70E8E9","#0F1A2B"]], hdrY:91, hdrH:12, hdrSize:7,
+  regions:[[4,92,128,226],[136,92,128,226],[268,92,128,226],[4,318,392,78],[4,396,392,58]],
+  arc:"M 34 352 C 6 336, 6 290, 30 272", arcW:3,
+  rec:{label:[8,520,8,"THE RECORD"],x:8,y:526,w:31,h:22,gap:4,fs:8.5},
+  own:{label:[8,572,8,"WHO LEADS"],x:8,y:580,w:384,h:10,l2:[392,572,"COACH  →  ORGANISATION"],fs:8},
+  scale:{x:168,y:420,w:50,h:10,labels:false}, readX:[[182,""],[235,""],[305,""]]
+};
+const compactQuery=matchMedia("(max-width: 720px), (orientation: portrait) and (max-width: 1100px)");
+let L=null, GE={}, RC={}, regEls=[], ownFill=null, readings=[], arc=null, token=null, setupEl=null, recwrap=null;
+const svg=document.getElementById("cv");
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const a in attrs)e.setAttribute(a,attrs[a]);if(parent)parent.appendChild(e);return e;}
+function txt(parent,attrs,t){const e=el("text",attrs,parent);e.textContent=t;return e;}
+function ctr(k){const [x,y,w,h]=L.G[k];return k==="d9"?{x:x+(L.compact?80:260),y:y+h/2}:{x:x+w/2,y:y+h/2};}
+function html(tag,cls,text){const e=document.createElementNS(XH,tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+
+function build(layout){
+  L=layout; svg.innerHTML=""; GE={}; RC={};
+  svg.setAttribute("viewBox","0 0 "+L.vb.join(" "));
+  svg.classList.toggle("compact",L.compact);
+  const defs=el("defs",{},svg);
+  const mk=el("marker",{id:"arrowHead",viewBox:"0 0 10 10",refX:"6",refY:"5",markerWidth:"5",markerHeight:"5",orient:"auto-start-reverse"},defs);
+  el("path",{d:"M0 0 L10 5 L0 10 z",class:"arrowHead"},mk);
+
+  setupEl=el("g",{class:"setup",tabindex:"0",role:"button","aria-label":"Set up: three questions and the Engagement Charter"},svg);
+  const [sx,sy,sw,sh]=L.setup; el("rect",{class:"box",x:sx,y:sy,width:sw,height:sh,rx:4},setupEl);
+  txt(setupEl,{class:"t1",x:L.setupT.t1[0],y:L.setupT.t1[1],"font-size":L.setupT.t1[2]},"SET UP");
+  txt(setupEl,{class:"t2",x:L.setupT.t2[0],y:L.setupT.t2[1],"font-size":L.setupT.t2[2]},L.setupT.t2[3]);
+  setupEl.addEventListener("click",showSetup);
+  setupEl.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();showSetup();}});
+
+  L.headers.forEach(([t,x,w,bg,ink])=>{const g=el("g",{class:"colbar"},svg);el("rect",{x:x,y:L.hdrY,width:w,height:L.hdrH,rx:3,fill:bg},g);txt(g,{x:x+w/2,y:L.hdrY+L.hdrH/2+L.hdrSize*.36,"text-anchor":"middle","font-size":L.hdrSize,fill:ink},t);});
+
+  const gatesG=el("g",{id:"gates"},svg);
+  ORDER.forEach((k,idx)=>{
+    const [x,y,w,h]=L.G[k], I=INFO[k], spine=k==="d9", book=(k==="cg"||k==="ho"), strip=L.compact&&book, narrow=!L.compact&&w<200;
+    const grp=el("g",{class:"gate"+(narrow?" narrow":"")+(strip?" strip":""),tabindex:"0",role:"button","aria-label":I.name},gatesG);
+    grp.style.animationDelay=(idx*55)+"ms";
+    el("rect",{class:"box",x:x,y:y,width:w,height:h,rx:4},grp);
+    if(I.c)el("rect",{class:"fitbar",x:x+1,y:y+1,width:w-2,height:L.compact?3:4,fill:FITCOL[I.c]},grp);
+    let fw=w, fh=h-(L.compact?14:40);
+    if(spine){fw=L.compact?160:380; fh=h-(L.compact?14:10);}
+    if(narrow){fh=h-50;}
+    if(strip){fw=260; fh=h;}
+    const fo=el("foreignObject",{x:x,y:y,width:fw,height:fh},grp);
+    const d=html("div","gtxt"+(I.kind==="Transition"?" tr":"")+(!L.compact&&!narrow&&I.name.length>22?" nm2":""));
+    const numEl=html("span","g-num "+(book?"slate":(I.c||"cyan")),L.compact?I.num.replace("At close","Close"):I.num);
+    const head=html("div");head.appendChild(numEl);
+    if(I.kind&&!L.compact&&I.kind!=="Threshold")head.appendChild(html("span","g-kind",I.kind));
+    d.appendChild(head);
+    d.appendChild(html("div","g-name",L.compact?(I.tiny||I.name):I.name));
+    if(!L.compact&&I.short)d.appendChild(html("div","g-q",I.short));
+    fo.appendChild(d);
+    /* fit tag (wide) */
+    if(!L.compact&&I.fit){
+      const ff=el("foreignObject",{x:x+14,y:y+h-32,width:w-28,height:26},grp);
+      ff.appendChild(html("span","fit "+I.fit[1],I.fit[0]));
+    }
+    /* pips and status */
+    const pips=[]; let px,py,pr,ps;
+    if(L.compact){pr=3.4;ps=10;
+      if(strip){px=x+w-80;py=y+h/2;} else if(spine){px=x+9;py=y+h-8;} else {px=x+9;py=y+h-9;}}
+    else {pr=5;ps=16;
+      if(spine){px=x+270;py=y+20;} else if(narrow){px=x+14;py=y+h-16;} else {px=x+w-104;py=y+20;}}
+    for(let i=0;i<4;i++)pips.push(el("circle",{class:"pip",cx:px+i*ps,cy:py,r:pr},grp));
+    let status=null;
+    if(!L.compact){
+      if(narrow) status=el("text",{class:"status",x:x+12,y:y+h-36,"font-size":10.5},grp);
+      else if(spine) status=el("text",{class:"status",x:x+330,y:y+24,"font-size":10.5},grp);
+    }
+    /* stamp */
+    const sr=L.compact?7:11, scx=L.compact?(strip||spine?x+w-14:x+w-11):x+w-20, scy=L.compact?(strip||spine?y+h/2:y+12):y+20;
+    const stamp=el("g",{class:"stamp"},grp);
+    el("circle",{cx:scx,cy:scy,r:sr},stamp);
+    const s=sr/11; el("path",{d:`M ${scx-5*s} ${scy} L ${scx-1.5*s} ${scy+3.8*s} L ${scx+5.2*s} ${scy-4*s}`,"stroke-width":L.compact?1.8:2.4},stamp);
+    if(spine){
+      const S=L.scale, sg=el("g",{class:"scale"},grp);
+      SCALE.forEach(([lab,fill,ink],i)=>{
+        el("rect",{x:S.x+i*S.w,y:S.y,width:S.w-2,height:S.h,fill:fill,rx:2},sg);
+        if(S.labels)txt(sg,{x:S.x+i*S.w+(S.w-2)/2,y:S.y+S.h/2+S.fs*.36,"text-anchor":"middle","font-size":S.fs,fill:ink},lab);
+      });
+      readings=L.readX.map(([rx,t])=>{const r=el("g",{class:"reading"},grp);
+        if(L.compact){el("circle",{cx:rx,cy:S.y+S.h/2,r:5},r);}
+        else{el("circle",{cx:rx,cy:S.y+S.h+11,r:6},r);txt(r,{x:rx,y:S.y+S.h+33,"text-anchor":"middle","font-size":9.5},t);}
+        return r;});
+    }
+    grp.addEventListener("click",()=>showDetail(k));
+    grp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();showDetail(k);}});
+    GE[k]={grp,pips,status};
+  });
+
+  const regG=el("g",{},svg);
+  regEls=L.regions.map(([x,y,w,h])=>el("rect",{class:"region",x:x,y:y,width:w,height:h,rx:4},regG));
+
+  const R=L.rec;
+  txt(svg,{class:"rec-label",x:R.label[0],y:R.label[1],"font-size":R.label[2]},R.label[3]);
+  recwrap=el("g",{class:"recwrap"},svg);
+  ORDER.forEach((k,i)=>{const x=R.x+i*(R.w+R.gap);const c=el("g",{class:"rchip"},recwrap);
+    el("rect",{x:x,y:R.y,width:R.w,height:R.h,rx:3},c);
+    txt(c,{x:x+R.w/2,y:R.y+R.h/2+R.fs*.36,"text-anchor":"middle","font-size":R.fs},CHIP[k]);RC[k]=c;});
+  const O=L.own;
+  txt(svg,{class:"rec-label",x:O.label[0],y:O.label[1],"font-size":O.label[2]},O.label[3]);
+  el("rect",{class:"own-track",x:O.x,y:O.y,width:O.w,height:O.h},svg);
+  ownFill=el("rect",{class:"own-fill",x:O.x,y:O.y,width:0,height:O.h},svg);
+  if(O.l1)txt(svg,{class:"own-lab",x:O.l1[0],y:O.l1[1],"font-size":O.fs},O.l1[2]);
+  if(O.l2)txt(svg,{class:"own-lab",x:O.l2[0],y:O.l2[1],"text-anchor":"end","font-size":O.fs},O.l2[2]);
+
+  arc=el("path",{class:"arc",d:L.arc,"stroke-width":L.arcW,"marker-end":"url(#arrowHead)"},svg);
+  token=el("g",{id:"token"},svg);
+  el("circle",{class:"halo",r:L.compact?12:20},token);el("circle",{class:"core",r:L.compact?5.5:9},token);
+}
+function setOwner(r){ownFill.setAttribute("width",L.own.w*r);}
+
+/* ---------- screens ---------- */
+const beatsHTML=(items)=>'<ol class="beats" id="beatList">'+items.map((t,i)=>'<li data-b="'+i+'"><i></i><span><b>'+t[0]+'</b>'+t[1]+'</span></li>').join("")+'</ol>';
+const setupHTML=()=>`<p>Three questions for the chief executive, recorded in their own words, read back, corrected and signed.</p>
+  <ol><li class="q">In 18 months, what would the ${C.service} need to be earning, and from whom, for you to call it a success?</li>
+  <li class="q">What do you believe is stopping this service from earning that revenue today?</li>
+  <li class="q">What would have to be true for this service to run without ${C.hasFunder?C.funder+"'s":"grant"} support?</li></ol>
+  <div class="block"><h3>Engagement Charter</h3><p>Records what each party commits, including leadership time, how the work runs, and how decisions are made and recorded. ${C.Funder} reviews it first. It is signed at inception.</p></div>`;
+const ghostSVG=`<svg class="ghost" viewBox="0 0 1200 700" aria-hidden="true"><rect x="10" y="10" width="130" height="600" rx="6"/><rect x="160" y="40" width="280" height="160" rx="6"/><rect x="450" y="40" width="280" height="160" rx="6"/><rect x="740" y="40" width="280" height="160" rx="6"/><rect x="160" y="210" width="280" height="160" rx="6"/><rect x="450" y="210" width="280" height="160" rx="6"/><rect x="740" y="210" width="280" height="160" rx="6"/><rect x="160" y="380" width="425" height="120" rx="6"/><rect x="595" y="380" width="425" height="120" rx="6"/><rect x="160" y="510" width="860" height="100" rx="6"/><rect x="1040" y="10" width="130" height="600" rx="6"/></svg>`;
+const introLine=raw.funder&&raw.org?`Prepared for ${C.Funder} and ${C.Org}.`:"How the work runs.";
+const serviceLine=raw.service?`Commercialising the ${C.service}.`:"Commercialising a grant-funded service.";
+
+const STEPS=[
+ {kind:"scene",name:"Holding screen",scene:()=>`<div class="hold reveal">
+    <p class="eyebrow">${C.programme||"Grant-to-Commercial Viability Canvas™"}</p>
+    <h1 class="s-h1">${introLine}<em>${serviceLine}</em></h1>
+    <div class="status"><i></i>Waiting for presenter</div></div>${ghostSVG}`},
+ {kind:"scene",name:"Why",scene:()=>`<div class="reveal"><p class="eyebrow">Why this work</p>
+    <h1 class="s-h1">Being funded proved the need was real.<em>What changes is who pays.</em></h1>
+    <p class="s-body">Grant funding carried the ${C.service} this far. The next stage asks a different question: who holds the budget, what will they pay, and what does it cost to deliver.</p></div>`},
+ {kind:"scene",name:"The principle",scene:()=>`<div class="reveal"><p class="eyebrow">The principle</p>
+    <h1 class="s-h1 mid">Every decision answers one question.<em>Will someone with a budget pay for this?</em></h1>
+    <p class="s-quote">No service is designed, priced or scaled without evidence of paying demand from a customer with budget authority. The canvas holds every decision in this engagement to that standard.</p></div>`},
+ {kind:"canvas",cs:0,name:"The canvas",kicker:"The canvas",title:["Eleven decisions.","Each one closes on evidence."],
+  html:()=>`<p>Nine decision points on the canvas, one before it opens and one at close.</p><p>Every decision rests on evidence, is signed by the chief executive, and goes on a record ${C.funder} can read.</p>`},
+ {kind:"canvas",cs:1,name:"Set up",kicker:"Set up",title:["It starts with the","people who will sign."],html:setupHTML},
+ {kind:"canvas",cs:2,name:"Reading the canvas",kicker:"Reading the canvas",title:["The layout","carries the logic."],
+  html:()=>`<ul class="sync" id="syncList"><li><strong>Internal.</strong> What the organisation delivers and what it costs.</li>
+  <li><strong>Bridge.</strong> Who pays, and what kind of commercial organisation this is.</li>
+  <li><strong>External.</strong> How value is put to the customer and how the market is entered.</li>
+  <li><strong>Transition.</strong> The model tested with real customers, then extended.</li>
+  <li><strong>Diagnostic spine.</strong> Readiness read at kick-off, the mid-point and the close.</li></ul>`},
+ {kind:"canvas",cs:3,name:"Clearing the Ground",kicker:"Before the canvas opens",title:["First,","clear the ground."],
+  html:()=>`<span class="tag">Coach leads</span><p>Every assumption about what the service does, who benefits and who pays is written down and sorted into what has been tested and what has only been believed.</p><p>The most frequent finding: the people who value a service are rarely the people with the budget to pay for it.</p><p><strong>The kick-off readiness reading is taken here.</strong></p>`},
+ {kind:"canvas",cs:4,name:"Decision Point 01",kicker:"Decision Point 01",title:["Service Reality Audit.","One decision, end to end."],
+  html:()=>`<p class="q">What do we actually deliver, versus what we think we deliver?</p>`+beatsHTML([
+   ["Evidence",`A costed inventory of what the ${C.service} delivers and what each part costs.`],
+   ["Decision","Which parts carry real market demand, and which exist because a grant funds them."],
+   ["CEO sign-off","The chief executive signs. Decision Point 02 stays closed until they do."],
+   ["On record",`The signed decision and its evidence go on the record, and a report goes to ${C.funder}.`]])},
+ {kind:"canvas",cs:5,name:"Decision Point 02",kicker:"Decision Point 02",title:["Nothing is designed","until a paying customer is named."],
+  html:()=>`<span class="tag">Coach leads</span><p>Validation conversations with real buyers produce named customer segments, documented problem urgency and confirmed willingness to engage commercially.</p>${C.market?`<p>For this service, the paying customers are ${C.market}.</p>`:""}<p><strong>Decision Point 03 opens only when 02 holds a named customer.</strong></p>`},
+ {kind:"canvas",cs:6,name:"Decision Points 03 to 06",kicker:"Decision Points 03 to 06",title:["Inside, outside,","inside, outside."],
+  html:()=>`<span class="tag">Coach designs, organisation builds</span><p>The work moves between what the organisation can deliver and what customers will pay for.</p>
+  <ul><li><strong>03</strong> A value proposition tested with the customer.</li><li><strong>04</strong> A financial model with two pricing tiers and break-even, built by the finance lead.</li><li><strong>05</strong> An outreach plan with tested messages.</li><li><strong>06</strong> A commercial identity and a partner map.</li></ul>
+  <p>Each closes on the same four beats. <strong>The mid-point readiness reading follows.</strong></p>`},
+ {kind:"canvas",cs:7,name:"Decision Point 07",kicker:"Decision Point 07",title:["Two rounds with","real paying customers."],
+  html:()=>`<span class="tag">Coach steps back</span><p><strong>Iteration 1</strong> is coach-led, with real clients.</p><p><strong>Iteration 2</strong> is led by ${C.org}, with the coach backstopping and reviewing the evidence.</p><p>Every client engagement is debriefed with the client and documented before the service is revised.</p>`},
+ {kind:"canvas",cs:8,name:"A reopened decision",kicker:"When the evidence changes",title:["A decision","can be reopened."],
+  html:()=>`<span class="tag gold">Illustration</span><p>Iteration 1 shows clients respond to a different price structure. Decision Point 04 reopens.</p><p>The revised pricing is evidenced and signed again. The original decision stays on the record, with the reason it changed.</p><p><strong>Decisions hold until evidence says otherwise, and every change is signed and visible.</strong></p>`},
+ {kind:"canvas",cs:9,name:"Decision Points 08 and 09",kicker:"Decision Points 08 and 09",title:["Beyond the first cohort,","and the closing reading."],
+  html:()=>`<p>Decision Point 08 sets out where the service goes after the engagement, and what enables it.</p><p>The closing reading places ${C.org} on the four-stage scale, across six fit tests:</p>
+  <ul><li>Problem-Provider Fit</li><li>Problem-Solution Fit</li><li>Solution-Problem Owner Fit</li><li>Solution-Pilot Fit</li><li>Solution-Market Fit</li><li>Solution-Scale Channel Fit</li></ul>`},
+ {kind:"canvas",cs:10,name:"Handover",kicker:"At close",title:()=>["Handover.",`${C.Org} presents alone.`],
+  html:()=>`<span class="tag">Organisation presents, coach confirms</span><p>Independence is shown on five elements:</p>
+  <ul><li><strong>Financial model.</strong> The finance lead changes an input and explains the new break-even.</li><li><strong>Value proposition.</strong> Presented to a prospect without notes.</li><li><strong>Outreach.</strong> The pipeline run for four weeks without prompting.</li><li><strong>Client management.</strong> An engagement planned, delivered and debriefed by staff.</li><li><strong>Commercial identity.</strong> Described the same way by every leader.</li></ul><p>A one-page handover record closes the engagement.</p>`},
+ {kind:"scene",name:"What you receive",scene:()=>`<div class="reveal"><p class="eyebrow">What you receive</p>
+    <h1 class="s-h1 mid">What ${C.Funder} receives<em>at every decision point.</em></h1>
+    <div class="cards">
+      <div class="card hl"><b>01</b><p>A report of each signed decision point, sent to your inbox automatically.</p></div>
+      <div class="card"><b>02</b><p>The same record online: what was decided, the evidence, who agreed, who dissented and who signed.</p></div>
+      <div class="card"><b>03</b><p>Readiness read three times, on the same six fit tests.</p></div>
+      <div class="card"><b>04</b><p>Comments on the record, and invitations to working sessions on request.</p></div>
+      <div class="card"><b>05</b><p>Room for your whole team.</p></div>
+      <div class="card"><b>06</b><p>At close, the handover record and close-out report.</p></div>
+    </div></div>`},
+ {kind:"scene",name:"Sample report",scene:()=>`<div class="rep"><div class="reveal"><p class="eyebrow">In your inbox</p>
+    <h1 class="s-h1 mid">This is what<em>arrives in your inbox.</em></h1>
+    <p class="s-body">Generated from the signed record the moment a decision point closes.</p></div>
+    <div class="paper" aria-label="Sample decision point report"><span class="sample">SAMPLE</span>
+      <div class="ph"><span>ClearView · Decision Point Report</span><span>01 / 11</span></div>
+      <h4>Decision Point 01 · Service Reality Audit</h4>
+      <div class="meta">${C.Org} · ${raw.service?cap(C.service):"Service"} · Demo engagement</div>
+      <div class="sec">Decision</div><div class="bar" style="width:96%"></div><div class="bar" style="width:88%"></div><div class="bar" style="width:62%"></div>
+      <div class="sec">Evidence</div><div class="bar" style="width:92%"></div><div class="bar" style="width:79%"></div><div class="bar" style="width:84%"></div>
+      <div class="sec">What opens next</div><div class="bar" style="width:90%"></div><div class="bar" style="width:55%"></div>
+      <div class="sign"><span>Signed · Chief Executive</span><span class="sent">Sent to ${C.funder}</span></div>
+    </div></div>`},
+ {kind:"scene",name:"Timeline",scene:()=>`<div class="reveal"><p class="eyebrow">The engagement</p>
+    <h1 class="s-h1 mid">Six months.<em>Four milestones.</em></h1>
+    <div class="tl"><div class="axis"><span>7 SEP 2026</span><span style="left:50%">DEC 2026</span><span style="left:100%">15 MAR 2027</span></div>
+      <div class="cols">
+        <div class="col"><h3>Inception</h3><p>Inception report, workplan and methodology note.</p></div>
+        <div class="col"><h3>Phase I</h3><p>Service bundles, value propositions and pricing models.</p></div>
+        <div class="col"><h3>Phase II</h3><p>Go-to-market strategy and Iteration 1 lessons.</p></div>
+        <div class="col"><h3>Final</h3><p>Iteration 2 lessons, handover pack and close-out report.</p></div>
+      </div><p class="note">Milestone dates follow the approved workplan.</p></div></div>`},
+ {kind:"scene",name:"Live reveal",scene:()=>`<div class="reveal"><p class="eyebrow">ClearView</p>
+    <h1 class="s-h1">You already have the keys.<em>Here is what they open.</em></h1>
+    <p class="s-body">${C.Funder}'s sign-in details are already in your inbox. This is the ${C.Org} workspace, where every signed decision point appears as it happens.</p>
+    <div><button class="cta" type="button">Open the ${C.Org} workspace →</button></div></div>`},
+ {kind:"scene",name:"Questions",scene:()=>`<div class="reveal"><p class="eyebrow">Over to you</p>
+    <h1 class="s-h1 mid">Three questions<em>for ${C.funder}.</em></h1>
+    <ol class="qlist"><li>${C.close}, what would you need to see to call this engagement a success?</li><li>What has stopped past commercialisation support from lasting?</li><li>What would you need to compare this work across ${C.portfolio}?</li></ol></div>`}
+];
+
+function stateFor(i){
+  const s={signed:new Set(),active:[],pips:{},readings:0,owner:0,v2:false,setup:false,dim:false,reg:-1,rec:false,started:i>=3};
+  const add=(...ks)=>ks.forEach(k=>{s.signed.add(k);s.pips[k]=4;});
+  if(i===1){s.setup=true;s.dim=true;}
+  if(i>=3){add("cg");s.readings=1;s.owner=.08;}
+  if(i>=4){add("d1");s.owner=.15;}
+  if(i>=5){add("d2");s.owner=.22;}
+  if(i>=6){add("d3","d4","d5","d6");s.readings=2;s.owner=.5;}
+  if(i===7){s.pips.d7=2;s.owner=.62;}
+  if(i>=8){add("d7");s.v2=true;s.owner=.72;}
+  if(i>=9){add("d8","d9");s.readings=3;s.owner=.88;}
+  if(i>=10){add("ho");s.owner=1;}
+  if(i>=11)s.rec=true;
+  s.active=({3:["cg"],4:["d1"],5:["d2"],6:["d6"],7:["d7"],8:["d4"],9:["d9"],10:["ho"]})[i]||[];
+  return s;
+}
+function statusText(k,signed,active,started,v2){return signed?(k==="d4"&&v2?"SIGNED V2":"SIGNED"):(active?"OPEN":(started?"LOCKED":""));}
+function render(s){
+  ORDER.forEach(k=>{
+    const e=GE[k], signed=s.signed.has(k), active=s.active.includes(k);
+    e.grp.classList.toggle("signed",signed);
+    e.grp.classList.toggle("active",active);
+    e.grp.classList.remove("reopened","wave");
+    e.grp.classList.toggle("v2",k==="d4"&&s.v2);
+    e.grp.classList.toggle("locked",(s.dim&&!active)||(s.started&&!signed&&!active));
+    setPips(k,s.pips[k]||0);
+    if(e.status)e.status.textContent=statusText(k,signed,active,s.started,s.v2);
+    RC[k].classList.toggle("signed",signed);
+    RC[k].classList.toggle("v2",k==="d4"&&s.v2);
+  });
+  setupEl.classList.toggle("active",s.setup);
+  readings.forEach((r,i)=>r.classList.toggle("on",i<s.readings));
+  setOwner(s.owner);
+  regEls.forEach((r,i)=>r.classList.toggle("on",i===s.reg));
+  recwrap.classList.toggle("glow",s.rec);
+  arc.style.opacity=0;token.style.opacity=0;
+}
+function setPips(k,n){GE[k].pips.forEach((p,i)=>p.classList.toggle("on",i<n));}
+function setStatus(k,t){if(GE[k].status)GE[k].status.textContent=t;}
+
+/* ---------- animation ---------- */
+let run=0;
+class Cancel{}
+function waiter(my){return ms=>new Promise((res,rej)=>setTimeout(()=>my===run?res():rej(new Cancel()),reduced?0:ms));}
+function travel(my,a,b,ms){
+  if(reduced)return Promise.resolve();
+  const p0=ctr(a),p1=ctr(b);token.style.opacity=1;SFX.travel();
+  return new Promise((res,rej)=>{const t0=performance.now();
+    function f(t){if(my!==run){rej(new Cancel());return;}
+      let u=Math.min(1,(t-t0)/ms);u=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+      token.setAttribute("transform",`translate(${p0.x+(p1.x-p0.x)*u},${p0.y+(p1.y-p0.y)*u})`);
+      if(u<1)requestAnimationFrame(f);else{setTimeout(()=>{token.style.opacity=0;},120);res();}}
+    requestAnimationFrame(f);});
+}
+function open(k){const e=GE[k];e.grp.classList.remove("locked");e.grp.classList.add("active");setStatus(k,"OPEN");}
+function sign(k){const e=GE[k];e.grp.classList.add("signed");e.grp.classList.remove("reopened");
+  setStatus(k,e.grp.classList.contains("v2")?"SIGNED V2":"SIGNED");RC[k].classList.add("signed");SFX.sign();}
+function deactivate(k){GE[k].grp.classList.remove("active");}
+async function beats(my,k,ms,sync){
+  const w=waiter(my);
+  for(let i=1;i<=4;i++){setPips(k,i);SFX.beat();
+    if(sync)document.querySelectorAll("#beatList li").forEach((li,j)=>li.classList.toggle("on",j<i));
+    await w(ms);}
+  sign(k);
+}
+const ANIM={
+  2:async my=>{const w=waiter(my);const lis=[...document.querySelectorAll("#syncList li")];
+    for(let i=0;i<5;i++){regEls.forEach((r,j)=>r.classList.toggle("on",j===i));lis.forEach((l,j)=>l.classList.toggle("on",j===i));SFX.step();await w(1500);}
+    regEls.forEach(r=>r.classList.remove("on"));lis.forEach(l=>l.classList.add("on"));},
+  3:async my=>{const w=waiter(my);ORDER.forEach(k=>{GE[k].grp.classList.add("locked");setStatus(k,"LOCKED");});
+    open("cg");await w(500);await beats(my,"cg",420);await w(300);readings[0].classList.add("on");setOwner(.08);},
+  4:async my=>{const w=waiter(my);deactivate("cg");await travel(my,"cg","d1",800);open("d1");await w(400);
+    await beats(my,"d1",1400,true);setOwner(.15);},
+  5:async my=>{const w=waiter(my);deactivate("d1");await travel(my,"d1","d2",700);open("d2");await w(300);await beats(my,"d2",380);setOwner(.22);},
+  6:async my=>{const w=waiter(my);deactivate("d2");let prev="d2";
+    for(const k of ["d3","d4","d5","d6"]){await travel(my,prev,k,650);open(k);await beats(my,k,190);await w(150);if(k!=="d6")deactivate(k);prev=k;
+      setOwner({d3:.3,d4:.38,d5:.45,d6:.5}[k]);}
+    await w(250);readings[1].classList.add("on");},
+  7:async my=>{const w=waiter(my);deactivate("d6");await travel(my,"d6","d7",750);open("d7");await w(300);
+    setPips("d7",1);SFX.beat();await w(500);setPips("d7",2);SFX.beat();setOwner(.62);},
+  8:async my=>{const w=waiter(my);deactivate("d7");arc.style.transition="none";arc.style.opacity=1;
+    const len=arc.getTotalLength();arc.style.strokeDasharray=len;arc.style.strokeDashoffset=len;arc.getBoundingClientRect();
+    arc.style.transition="stroke-dashoffset .9s ease, opacity .4s";arc.style.strokeDashoffset=0;SFX.reopen();await w(1000);
+    const e=GE.d4;e.grp.classList.remove("signed");e.grp.classList.add("reopened","active");setStatus("d4","REOPENED");setPips("d4",0);RC.d4.classList.remove("signed");
+    await w(1300);e.grp.classList.add("v2");RC.d4.classList.add("v2");
+    for(let i=1;i<=4;i++){setPips("d4",i);SFX.beat();await w(420);}
+    sign("d4");await w(500);arc.style.opacity=0;deactivate("d4");
+    open("d7");setPips("d7",3);await w(350);setPips("d7",4);sign("d7");deactivate("d7");setOwner(.72);},
+  9:async my=>{const w=waiter(my);deactivate("d4");await travel(my,"d7","d8",700);open("d8");await beats(my,"d8",260);deactivate("d8");
+    await travel(my,"d8","d9",600);open("d9");await w(300);readings[2].classList.add("on");SFX.step();await w(500);await beats(my,"d9",260);setOwner(.88);},
+  10:async my=>{const w=waiter(my);deactivate("d9");await travel(my,"d9","ho",900);open("ho");await w(300);await beats(my,"ho",380);setOwner(1);
+    await w(400);deactivate("ho");SFX.finale();
+    for(const k of ORDER){GE[k].grp.classList.add("wave");await w(70);}
+    await w(300);ORDER.forEach(k=>GE[k].grp.classList.remove("wave"));}
+};
+
+/* ---------- navigation ---------- */
+const app=document.getElementById("app"), narr=document.getElementById("narr"), scene=document.getElementById("scene"), dots=document.getElementById("dots");
+let cur=0, mode="walk", playTimer=null;
+STEPS.forEach((s,i)=>{const b=document.createElement("button");b.setAttribute("aria-label",(i+1)+": "+s.name);b.title=s.name;b.addEventListener("click",()=>{setMode("walk",true);go(i);});dots.appendChild(b);});
+const pad=n=>String(n).padStart(2,"0");
+function chrome(i){
+  [...dots.children].forEach((d,j)=>{if(j===i)d.setAttribute("aria-current","step");else d.removeAttribute("aria-current");});
+  document.getElementById("prev").disabled=i===0;
+  document.getElementById("next").textContent=i===STEPS.length-1?"Start again":"Next";
+  document.getElementById("stepnum").textContent=`${pad(i+1)} / ${pad(STEPS.length)}`;
+}
+function paint(i){
+  const s=STEPS[i]; chrome(i);
+  if(s.kind==="scene"){app.dataset.kind="scene";scene.innerHTML=s.scene();scene.scrollTop=0;return;}
+  app.dataset.kind="canvas";
+  const t=typeof s.title==="function"?s.title():s.title;
+  narr.innerHTML=`<p class="eyebrow">${s.kicker}<span class="count">${pad(i+1)} / ${pad(STEPS.length)}</span></p><h2>${t[0]}<em>${t[1]}</em></h2>${s.html()}`;
+}
+async function go(i,animate){
+  if(i<0||i>=STEPS.length)return;
+  const S=STEPS[i], prevS=STEPS[i-1];
+  const forward=(animate!==false)&&i===cur+1&&!reduced&&S.kind==="canvas"&&prevS&&prevS.kind==="canvas"&&ANIM[S.cs];
+  const my=++run; cur=i; paint(i);
+  if(S.kind==="canvas"){
+    if(forward){render(stateFor(prevS.cs));
+      try{await ANIM[S.cs](my);}catch(e){if(!(e instanceof Cancel))console.error(e);}
+      if(my!==run)return;
+    }
+    render(stateFor(S.cs)); document.querySelectorAll("#beatList li,#syncList li").forEach(li=>li.classList.add("on"));
+  }
+  if(my===run&&mode==="play")schedule();
+}
+function next(){ SFX.step(); if(cur===STEPS.length-1)go(0,false); else go(cur+1); }
+function prev(){ go(cur-1,false); }
+function schedule(){clearTimeout(playTimer);playTimer=setTimeout(()=>{if(mode==="play")next();},STEPS[cur].kind==="scene"?5000:5200);}
+
+function setMode(m,quiet){
+  mode=m;clearTimeout(playTimer);
+  [["walk","mWalk"],["explore","mExplore"],["play","mPlay"]].forEach(([x,id])=>document.getElementById(id).setAttribute("aria-pressed",String(x===m)));
+  if(quiet)return;
+  if(m==="explore"){run++;app.dataset.kind="canvas";render(stateFor(0));
+    narr.innerHTML=`<p class="eyebrow">Explore</p><h2>Select any<em>decision point.</em></h2><p>Each one shows its central question, what it produces, who leads it, and what ${C.funder} sees on the record.</p><p class="quiet">Select Set Up at the top for the three questions and the charter.</p><button class="back" id="toWalk">Return to the walkthrough</button>`;
+    document.getElementById("toWalk").onclick=backToWalk;}
+  if(m==="play"){go(cur===STEPS.length-1?0:cur,false);}
+}
+function backToWalk(){setMode("walk",true);go(cur,false);}
+function detailFrame(inner){
+  app.dataset.kind="canvas";
+  narr.innerHTML=inner+`<button class="back" id="toWalk">Return to the walkthrough</button>`;
+  document.getElementById("toWalk").onclick=backToWalk;
+  if(L.compact)narr.scrollIntoView({behavior:reduced?"auto":"smooth",block:"start"});
+}
+function showDetail(k){
+  if(mode!=="explore")setMode("explore",true);
+  run++;render(stateFor(0));ORDER.forEach(x=>GE[x].grp.classList.toggle("active",x===k));SFX.step();
+  const g=INFO[k];
+  detailFrame(`<p class="eyebrow">${g.num} · ${g.col}</p><h2>${g.name}</h2><span class="tag">${g.lead}</span>${g.fit?` <span class="fit ${g.fit[1]}">${g.fit[0]}</span>`:""}
+   <div class="block"><h3>Central question</h3><p>${g.q}</p></div>
+   <div class="block"><h3>What it produces</h3><p>${g.out}</p></div>
+   <div class="block"><h3>How it closes</h3><p>Evidence, then a written decision, then the chief executive's signature, then the record.</p></div>
+   <div class="block"><h3>What ${C.funder} receives</h3><p>A report in your inbox once it is signed, and the same record online with the evidence behind it.</p></div>`);
+}
+function showSetup(){
+  if(mode!=="explore")setMode("explore",true);
+  run++;render(stateFor(0));setupEl.classList.add("active");SFX.step();
+  detailFrame(`<p class="eyebrow">Set up</p><h2>Three questions<em>and the charter.</em></h2>${setupHTML()}`);
+}
+
+document.getElementById("next").onclick=()=>{if(mode!=="walk")setMode("walk",true);next();};
+document.getElementById("prev").onclick=()=>{if(mode!=="walk")setMode("walk",true);prev();};
+document.getElementById("mWalk").onclick=backToWalk;
+document.getElementById("mExplore").onclick=()=>setMode("explore");
+document.getElementById("mPlay").onclick=()=>setMode("play");
+
+/* swipe on touch screens */
+let sx0=null,sy0=null;
+[document.getElementById("stage"),scene].forEach(area=>{
+  area.addEventListener("touchstart",e=>{if(e.touches.length!==1)return;sx0=e.touches[0].clientX;sy0=e.touches[0].clientY;},{passive:true});
+  area.addEventListener("touchend",e=>{if(sx0===null)return;const t=e.changedTouches[0],dx=t.clientX-sx0,dy=t.clientY-sy0;sx0=null;
+    if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5){if(mode!=="walk")setMode("walk",true);dx<0?next():prev();}},{passive:true});
+});
+
+try{const r=localStorage.getItem("gtcv-room");if(r==="light"||r==="dark")app.dataset.room=r;}catch(e){}
+document.addEventListener("keydown",e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  const k=e.key, onControl=e.target.closest&&e.target.closest("button,.gate,.setup");
+  if((k==="ArrowRight"||k==="PageDown")||(k===" "&&!onControl)){e.preventDefault();if(mode!=="walk")setMode("walk",true);next();}
+  else if(k==="ArrowLeft"||k==="PageUp"){e.preventDefault();if(mode!=="walk")setMode("walk",true);prev();}
+  else if(k==="Home"){setMode("walk",true);go(0,false);}
+  else if(k==="e"||k==="E")setMode("explore");
+  else if(k==="p"||k==="P")setMode(mode==="play"?"walk":"play");
+  else if(k==="s"||k==="S")setSound(!soundOn);
+  else if(k==="Escape"&&mode!=="walk")backToWalk();
+  else if(k==="l"||k==="L"){app.dataset.room=app.dataset.room==="light"?"dark":"light";try{localStorage.setItem("gtcv-room",app.dataset.room);}catch(err){}}
+  else if(k==="f"||k==="F"){try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen();}catch(err){}}
+});
+
+function applyLayout(){
+  const want=compactQuery.matches?TALL:WIDE;
+  if(L===want)return;
+  build(want);
+  if(mode==="explore"){render(stateFor(0));}else{run++;go(cur,false);}
+}
+compactQuery.addEventListener?compactQuery.addEventListener("change",applyLayout):compactQuery.addListener(applyLayout);
+build(compactQuery.matches?TALL:WIDE);
+if(!reduced){svg.classList.add("intro");setTimeout(()=>svg.classList.remove("intro"),1400);}
+go(0,false);
+window.__gtcv={go:i=>{setMode("walk",true);go(i,false);},count:STEPS.length,names:STEPS.map(s=>s.name)};
+})();
+</script>
+
+</body>
+</html>
