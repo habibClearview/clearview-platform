@@ -99,13 +99,17 @@ describe('the values Habib specified', () => {
 
 describe('the stylesheet is the reference stylesheet', () => {
   it('holds a rule for every rule the reference holds', () => {
-    // The port added one thing, the pairing corner, and changed one thing, the
-    // wrapper's height, which is why those two are counted separately. Anything
-    // else missing means a rule was lost in the copying.
+    // Two of the reference's rules are dropped, because they style html and
+    // body and a wrapper inside an application cannot set those. One rule is
+    // added, which gives the phone its own scrolling middle so that Back and
+    // Next stay on screen. Net, one fewer. Any other difference means a rule
+    // was lost in the copying, and a lost rule is a piece of the design gone.
     const ref = readFileSync(REFERENCE, 'utf8')
     const refCss = ref.split('<style>')[1].split('</style>')[0].replace(/\/\*[\s\S]*?\*\//g, '')
     const count = (s: string) => (s.match(/\{/g) || []).length - (s.match(/@media|@keyframes/g) || []).length
-    expect(count(WALKTHROUGH_CSS)).toBe(count(refCss) - 2) // html and body, which a wrapper cannot set
+    const DROPPED_HTML_AND_BODY = 2
+    const ADDED_PHONE_SCROLL = 1
+    expect(count(WALKTHROUGH_CSS)).toBe(count(refCss) - DROPPED_HTML_AND_BODY + ADDED_PHONE_SCROLL)
   })
 })
 

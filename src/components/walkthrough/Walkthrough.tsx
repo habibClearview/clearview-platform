@@ -165,9 +165,7 @@ export default function Walkthrough({
       <div className="gtcvw" ref={rootRef} data-room="dark" data-kind="scene">
         <header className="top">
           <div className="brand">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="logo cream" alt="Habib Onifade" src="/site/walkthrough-logo-cream.png" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="logo navy" alt="Habib Onifade" src="/site/walkthrough-logo-navy.png" />
             <div className="rule" />
             <div className="name">

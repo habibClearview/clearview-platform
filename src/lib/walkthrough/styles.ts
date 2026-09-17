@@ -22,6 +22,19 @@
 // against the window instead, which is the same height in a full window and the
 // only value that behaves the same way inside a page it does not own.
 //
+// A SECOND ADAPTATION, FOR PHONES, AND THE SAME REASON. The reference lets the
+// whole page grow on a phone and pins its footer with position:sticky. That
+// works on a page of its own. It does not work here, because this application
+// sets overflow-x:hidden on html and body at phone widths, which makes the body
+// itself the scrolling box and leaves a sticky footer sitting at the bottom of
+// the content instead of the bottom of the screen: Back and Next were below the
+// fold on every canvas screen, which is most of the walkthrough.
+//
+// So on a phone the walkthrough is exactly one screen tall and the middle
+// scrolls inside it. The header stays at the top, Back and Next stay at the
+// bottom, and the canvas and the narration scroll between them, which is what
+// the approved design shows. The application's own rule is untouched.
+//
 // The reference loads Poppins from Google. This application already carries
 // Poppins at 400, 500, 600 and 700 in /public/fonts and forbids fetching fonts
 // from anywhere else, so the same font resolves here with nothing fetched.
@@ -225,7 +238,8 @@ export const WALKTHROUGH_CSS = `
 @keyframes rise{from{opacity:.15}to{opacity:1}}
 .gtcvw .intro .gate,.gtcvw .intro .setup{animation:rise .7s ease both}
 @media (max-width: 720px), (orientation: portrait) and (max-width: 1100px){
-.gtcvw{height:auto;min-height:100vh}
+.gtcvw{height:100vh;min-height:100vh}
+.gtcvw .stage{overflow:auto;align-content:start;grid-auto-rows:max-content}
 .gtcvw .top{padding:12px 16px;position:sticky;top:env(safe-area-inset-top,0px);z-index:3}
 .gtcvw .logo{height:40px}
 .gtcvw .brand .name b{font-size:16px}

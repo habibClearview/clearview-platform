@@ -77,7 +77,10 @@ export function mount(root: HTMLElement, ctx: WalkthroughContext): Controller {
   // ── sound, off by default ────────────────────────────────
   let actx: AudioContext | null = null
   let soundOn = false
-  function tone(f: number, dur: number, o: { type?: OscillatorType; gain?: number; at?: number; to?: number } = {}) {
+  /** The shapes the reference's tones use. Written out so the file needs no
+   *  browser type declarations to lint. */
+  type Wave = 'sine' | 'square' | 'sawtooth' | 'triangle'
+  function tone(f: number, dur: number, o: { type?: Wave; gain?: number; at?: number; to?: number } = {}) {
     if (!soundOn || !actx) return
     const { type = 'sine', gain = 0.06, at = 0, to = null } = o as any
     const t = actx.currentTime + at
