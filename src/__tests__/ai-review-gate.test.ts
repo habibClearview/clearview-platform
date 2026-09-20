@@ -17,6 +17,21 @@
 // ============================================================
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'child_process'
+import { readFileSync } from 'fs'
+
+/** The visible answer the script would take from an API response. */
+function textFrom(payload: unknown): string {
+  const out = execFileSync('python3', [
+    '-c',
+    [
+      'import sys, json',
+      "sys.path.insert(0, '.github/scripts')",
+      'import ai_review',
+      'print(json.dumps(ai_review.first_text_block(json.loads(sys.stdin.read()))))',
+    ].join('\n'),
+  ], { input: JSON.stringify(payload), encoding: 'utf8' })
+  return JSON.parse(out.trim())
+}
 
 function verdict(review: string): string {
   const out = execFileSync('python3', [
@@ -59,5 +74,72 @@ describe('reading the verdict the model actually wrote', () => {
 
   it('does not read a passing mention of the word as a verdict', () => {
     expect(verdict('This would be approved if the migration were reversible.')).toBeNull()
+  })
+})
+
+// ============================================================
+// AND A GATE THAT CANNOT FINISH ITS SENTENCE IS THE SAME AGAIN
+//
+// 20 September 2026, twice on one pull request. The model reasons before it
+// answers, and on a long diff the whole budget went on the reasoning: the
+// reply carried one redacted thinking block, no text at all, and stop_reason
+// "max_tokens". The gate blocked a clean change for a reason that had nothing
+// to do with the change, and a person could only re-run it and hope.
+//
+// The budget had already been raised once for this. Raising a number was never
+// the fix, because any budget can be exhausted by a long enough diff and the
+// failure looks identical every time.
+// ============================================================
+describe('finding the answer among the reasoning', () => {
+  it('reads the answer when the model thought first', () => {
+    expect(textFrom({
+      content: [
+        { type: 'thinking', thinking: 'weighing it up', signature: 'x' },
+        { type: 'text', text: 'APPROVED - nothing to flag' },
+      ],
+    })).toBe('APPROVED - nothing to flag')
+  })
+
+  it('reads a plain answer with no reasoning block at all', () => {
+    expect(textFrom({ content: [{ type: 'text', text: 'BLOCKED - data loss' }] }))
+      .toBe('BLOCKED - data loss')
+  })
+
+  it('reports nothing when the model never got to an answer', () => {
+    // This is the response that blocked twice: reasoning only, and redacted.
+    expect(textFrom({
+      stop_reason: 'max_tokens',
+      content: [{ type: 'thinking', thinking: '', signature: 'EsGyAQ' }],
+    })).toBe('')
+  })
+
+  it('reports nothing for an empty answer, rather than passing it off as one', () => {
+    expect(textFrom({ content: [{ type: 'text', text: '   ' }] })).toBe('')
+    expect(textFrom({ content: [] })).toBe('')
+    expect(textFrom({})).toBe('')
+    expect(textFrom('not even an object')).toBe('')
+  })
+})
+
+describe('the gate asks again before it gives up', () => {
+  const script = readFileSync('.github/scripts/ai_review.py', 'utf8')
+
+  it('makes a second attempt with more room when the first ran out', () => {
+    expect(script).toContain('attempts = [')
+    expect(script).toContain('16000')
+    expect(script).toContain('24000')
+    expect(script).toContain("stop == \"max_tokens\"")
+  })
+
+  it('does not retry a real fault, which would only delay the answer', () => {
+    // An HTTP error means something is actually wrong. It blocks at once.
+    expect(script).toContain('API returned HTTP')
+    const httpBranch = script.slice(script.indexOf('except urllib.error.HTTPError'))
+    expect(httpBranch.slice(0, 400)).toContain('fail_closed')
+  })
+
+  it('still fails closed when the second attempt returns nothing either', () => {
+    expect(script).toContain('if not review:')
+    expect(script).toContain('fail_closed(last_problem)')
   })
 })

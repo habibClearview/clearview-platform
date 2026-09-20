@@ -103,6 +103,24 @@ def read_verdict(review):
     return None
 
 
+def first_text_block(payload: object) -> str:
+    """The model's visible answer, or empty when it never got to one.
+
+    The content is a list of blocks and, because this model reasons first, the
+    first block can be a thinking block. So every block is looked at rather
+    than index nought being assumed.
+    """
+    blocks = payload.get("content") if isinstance(payload, dict) else None
+    if not isinstance(blocks, list):
+        return ""
+    for b in blocks:
+        if isinstance(b, dict) and b.get("type") == "text":
+            text = (b.get("text") or "").strip()
+            if text:
+                return text
+    return ""
+
+
 def main() -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -119,54 +137,87 @@ def main() -> None:
         set_output("conclusion", "success")
         return
 
-    body = json.dumps(
+    # RAN OUT OF ROOM BEFORE IT SAID ANYTHING. 20 September 2026, twice on one
+    # pull request. This model thinks before it answers, and on a long diff the
+    # whole budget went on the thinking: the reply came back carrying one
+    # redacted thinking block, no text at all, and stop_reason "max_tokens". The
+    # gate did the right thing and blocked, but it blocked a clean change for a
+    # reason that had nothing to do with the change.
+    #
+    # Raising the number once already failed to fix this, because the number was
+    # never the point: any budget can be exhausted by a long enough diff, and
+    # the failure looks identical each time. So the budget is larger AND the
+    # script now recognises this one specific failure and asks again with more
+    # room and a shorter brief, rather than reporting a fault to a person who
+    # can only re-run it and hope.
+    #
+    # It still fails closed. A second empty answer blocks the merge exactly as
+    # before. The retry removes a false alarm, never a real one.
+    attempts = [
+        {"max_tokens": 16000, "brief": ""},
         {
-            "model": MODEL,
-            # Generous budget: this model can spend output tokens on internal
-            # reasoning before the visible verdict, and on a large diff a small
-            # budget got fully consumed by reasoning — the response then carried
-            # only a (redacted) thinking block and NO text, so the gate failed
-            # closed and blocked a clean PR. 8000 leaves ample room for the
-            # reasoning plus the short APPROVED/BLOCKED review.
-            "max_tokens": 8000,
-            "messages": [{"role": "user", "content": PROMPT + diff}],
-        }
-    ).encode("utf-8")
-
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=body,
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
+            "max_tokens": 24000,
+            "brief": (
+                "\n\nYour previous answer used the whole budget on reasoning and "
+                "returned no verdict. Think briefly, then answer. Keep the whole "
+                "answer under 400 words.\n"
+            ),
         },
-        method="POST",
-    )
+    ]
 
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            payload = json.load(resp)
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", "replace")[:500]
-        fail_closed(f"API returned HTTP {e.code}: {detail}")
-    except Exception as e:  # network / JSON / timeout — all fail closed
-        fail_closed(f"request to the model failed: {e}")
-
-    # The response's content is a list of blocks; with extended thinking the
-    # first block can be a "thinking" block, so find the first "text" block
-    # rather than assuming index 0.
+    payload = None
     review = ""
-    blocks = payload.get("content") if isinstance(payload, dict) else None
-    if isinstance(blocks, list):
-        for b in blocks:
-            if isinstance(b, dict) and b.get("type") == "text":
-                review = (b.get("text") or "").strip()
-                if review:
-                    break
+    last_problem = "the model returned no verdict"
+
+    for attempt in attempts:
+        body = json.dumps(
+            {
+                "model": MODEL,
+                "max_tokens": attempt["max_tokens"],
+                "messages": [{"role": "user", "content": PROMPT + attempt["brief"] + diff}],
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body,
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                payload = json.load(resp)
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")[:500]
+            # An HTTP error is a real fault, not a budget problem. Stop here.
+            fail_closed(f"API returned HTTP {e.code}: {detail}")
+        except Exception as e:  # network / JSON / timeout — all fail closed
+            fail_closed(f"request to the model failed: {e}")
+
+        review = first_text_block(payload)
+        if review:
+            break
+
+        # No verdict. Say precisely why, so a second failure is diagnosable.
+        stop = payload.get("stop_reason") if isinstance(payload, dict) else None
+        usage = payload.get("usage") if isinstance(payload, dict) else None
+        if stop == "max_tokens":
+            last_problem = (
+                f"the model used its whole {attempt['max_tokens']} token budget "
+                f"on reasoning and produced no verdict (usage: {json.dumps(usage)})"
+            )
+            print(f"::warning::AI review produced no verdict ({last_problem}); asking again.")
+            continue
+        last_problem = f"no text block in the API response: {json.dumps(payload)[:400]}"
+        break
 
     if not review:
-        fail_closed(f"no text block in the API response: {json.dumps(payload)[:400]}")
+        fail_closed(last_problem)
 
     write_review(review)
     # Read the verdict robustly. The model is asked to lead with APPROVED/BLOCKED
