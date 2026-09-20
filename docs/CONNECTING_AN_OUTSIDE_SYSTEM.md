@@ -27,8 +27,8 @@ workspace, with at least one business unit, at least one revenue line, and a
 priced catalogue of the things it sells. Without a catalogue there is nothing
 for a sale to point at.
 
-The coach issues an access link from the workspace, under
-**Settings, Field Operators, New Operator**. The link looks like this:
+The coach issues an access link from the workspace, under **Settings**, then
+**Clearview Field**, then **Add Operator**. The link looks like this:
 
 ```
 https://clearview.habibonifade.com/field?token=<TOKEN>
@@ -37,8 +37,8 @@ https://clearview.habibonifade.com/field?token=<TOKEN>
 The part after `token=` is your key. It is tied to **one business unit**. If the
 business records sales under more than one unit, ask for one key per unit.
 
-The key can be withdrawn at any time from the same screen. There is no password
-and no login.
+The key can be given an expiry when it is created, and can be withdrawn at any
+time from the same screen. There is no password and no login.
 
 ### Keeping the key safe
 
