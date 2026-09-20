@@ -2067,3 +2067,39 @@ same stored name and the second would overwrite the first.
   2. Habib's microphone recorded silence for four sessions, then worked. The
      device it opens is now reported into recording_tracks.device_report.
   3. The three questions above.
+
+## 20 September 2026 — the ClearView API
+
+Habib: "I need to develop an API that captures the data set clearview require
+for all the features ... i want an API with best practice on how it is shared
+with people that i need to send it to."
+
+Built and awaiting one SQL migration
+(`supabase/migrations/2026_09_20_api_keys.sql`, which Habib must run because
+there are no database credentials in this session).
+
+Six addresses under `/api/v1/`: read the business, send sales, send costs, send
+a month of totals, send payments, read the worked-out figures.
+
+The key: 256 bits of randomness behind a `cv_live_` prefix, stored only as a
+SHA-256 hash, shown once and never retrievable. Tied to one client and one
+business unit, carries explicit permissions, can expire, can be withdrawn,
+rate limited at 120 calls a minute per key. Accepted from the Authorization
+header only, never the query string.
+
+Two decisions worth remembering:
+
+* **Writes reuse the field path.** Each key owns a hidden field operator row,
+  so everything it sends lands in `field_transactions` and goes through the
+  same aggregation, month-end close and reconciliation as a phone's entries.
+  No second write path, and nothing that reads a figure had to change.
+* **A payment sent through the API is marked self reported** (`provider_id`
+  prefixed `api:`), so it can never be confused with one a provider confirmed
+  to us directly. `/api/v1/results` reports the two separately.
+
+New: the holding pen (`api_inbox`). Anything well-formed that cannot be filed
+is kept with its reason instead of dropped, and the count shows on the coach's
+screen.
+
+Still open: nothing is pushed outward (no webhooks to a funder's system), there
+is no portfolio-wide read, and the coaching record is not exposed.

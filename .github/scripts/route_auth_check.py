@@ -75,7 +75,12 @@ AUTH = re.compile(
     # route that uses it must rate limit before reaching it. That is not
     # something this gate can see, and it is stated here so the next person to
     # add a caller knows it is required rather than optional.
-    r"loadSessionLink|resolveJoinCode|loadShowcaseView"
+    r"loadSessionLink|resolveJoinCode|loadShowcaseView|"
+    # requireApiKey is the single gate every /api/v1 route goes through. It
+    # resolves a machine key by its hash, refuses a revoked or expired one,
+    # rate limits by key, and checks the scope the route names -- all before
+    # the route sees anything. See src/lib/api-gate.ts.
+    r"requireApiKey"
 )
 
 

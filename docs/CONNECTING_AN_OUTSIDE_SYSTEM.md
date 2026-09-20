@@ -1,201 +1,280 @@
-# Connecting an outside system to ClearView
+# The ClearView API
 
-For the developer of a point of sale, clinic, shop or accounting system that
-needs its sales and costs to appear in a ClearView workspace.
+For the developer of a point of sale, clinic, shop, accounting or reporting
+system that needs to exchange figures with a ClearView workspace.
 
-Everything described here is live today. Nothing in this document requires a
-new release.
-
----
-
-## 1. What this interface does
-
-An outside system sends each sale, or each cost, to ClearView as it happens.
-The figures land in the same place the ClearView mobile app puts them, so they
-appear in the workspace, in the month's actuals and in every report, without
-anybody retyping them.
-
-It is a one way interface. Your system tells ClearView what happened. ClearView
-does not reach into your system.
+Everything is under `https://clearview.habibonifade.com/api/v1/`.
 
 ---
 
-## 2. Before you start
+## 1. What you can do
 
-The business must already have a financial model set up in its ClearView
-workspace, with at least one business unit, at least one revenue line, and a
-priced catalogue of the things it sells. Without a catalogue there is nothing
-for a sale to point at.
+| | |
+|---|---|
+| `GET /api/v1/model` | Read the business: its price list, its cost headings, its currency. |
+| `POST /api/v1/sales` | Send sales, as they happen. |
+| `POST /api/v1/costs` | Send costs, as they happen. |
+| `POST /api/v1/actuals` | Send a whole month's totals at once. |
+| `POST /api/v1/payments` | Send payments a channel has confirmed. |
+| `GET /api/v1/results` | Read the worked-out figures and how well evidenced they are. |
 
-The coach issues an access link from the workspace, under **Settings**, then
-**Clearview Field**, then **Add Operator**. The link looks like this:
-
-```
-https://clearview.habibonifade.com/field?token=<TOKEN>
-```
-
-The part after `token=` is your key. It is tied to **one business unit**. If the
-business records sales under more than one unit, ask for one key per unit.
-
-The key can be given an expiry when it is created, and can be withdrawn at any
-time from the same screen. There is no password and no login.
-
-### Keeping the key safe
-
-Hold it on your server, not in a phone app, a browser page or a mobile app
-bundle. Anyone holding the key can write sales into that business unit.
+A business that rings every sale through a till uses `sales` and `costs`. A
+business whose bookkeeper closes a month uses `actuals`. Both end up in the
+same figures, so pick whichever matches how the business actually works. You
+do not need both.
 
 ---
 
-## 3. Step one: ask what you are allowed to write
+## 2. Your key
+
+The coach issues it from the workspace, under **Settings**, then **Connected
+Systems**, then **New key**. It looks like this:
 
 ```
-POST https://clearview.habibonifade.com/api/field/auth
-Content-Type: application/json
-
-{ "token": "<TOKEN>" }
+cv_live_XnT4b2QqL8vK3mZpR7wY1cF6hJ0sD9gA5eU2iO4tN8x
 ```
 
-Comes back with the business unit you are writing to, the currency, and two
-lists:
+**It is shown once and is never stored.** Not by us, not anywhere. If it is
+lost it cannot be looked up; the coach withdraws it and issues another.
 
-- `catalogue`: every product or service the business sells, each with an `id`,
-  a `name`, a `price` and a `unit_label`. This is what a **sale** points at.
-- `cost_lines`: the spending headings this unit files costs under, each with an
-  `id` and a `name`. This is what a **cost** points at.
+Send it every time, in a header:
 
-**Read this first and map it to your own product list.** ClearView will only
-accept a sale that names one of these `id` values. Do this once, store the
-mapping, and refresh it when the business adds a product.
+```
+Authorization: Bearer cv_live_...
+```
 
-A wrong or withdrawn key comes back `401`.
+Never in the URL. A key in a URL is written into every server log, proxy log
+and browser history it passes through, and that is how keys leak in practice.
+Requests that put it there are refused.
+
+### What a key can and cannot reach
+
+- It writes to **one business unit** of **one business**, both fixed when the
+  key is made. Naming a different one in a request does nothing. There is no
+  way to reach a second business.
+- It does only what the coach ticked. Ask for a permission you do not have and
+  you get `403` naming the permission you would need.
+- It can carry an expiry date, and can be withdrawn at any moment. Either way
+  you get `401` with `key_expired` or `key_revoked`, which is your signal to
+  ask for a new one rather than to retry.
+- 120 calls a minute. Beyond that, `429` with a `Retry-After` header. Send
+  fewer, larger batches rather than one call per sale.
+
+### Keeping it safe
+
+Hold it on your server. Not in a phone app, not in a browser page, not in a
+public code repository. Anyone holding it can write into that business's
+figures.
 
 ---
 
-## 4. Step two: send a sale
+## 3. Start here: read the business
 
 ```
-POST https://clearview.habibonifade.com/api/field/sync
-Content-Type: application/json
-
-{
-  "token": "<TOKEN>",
-  "device_id": "clinic-till-1",
-  "transactions": [
-    {
-      "local_id": "your-own-unique-id-for-this-sale",
-      "catalogue_item_id": "<id from step one>",
-      "quantity": 3,
-      "transaction_date": "2026-09-20",
-      "captured_at": "2026-09-20T09:14:22Z",
-      "payment_method": "cash",
-      "notes": "optional"
-    }
-  ]
-}
+GET /api/v1/model
+Authorization: Bearer cv_live_...
 ```
-
-Notes on the fields:
-
-- **You never send a price or an amount.** ClearView takes the price from its
-  own catalogue and works the amount out itself. This is deliberate: a price is
-  set once, by somebody allowed to set it.
-- If a sale genuinely went out at a different price, send `override_price`.
-  ClearView records it and flags it to the coach if it is more than ten per cent
-  off the standard price.
-- If the product has a cost price in the catalogue, ClearView books the cost of
-  that sale automatically. You do not send it.
-- `local_id` is your own reference for that sale. Send the same `local_id`
-  twice and the second one is ignored rather than booked again, so it is safe
-  to retry after a timeout or a dropped connection. **Always send it.**
-- `transaction_date` is the day the sale belongs to. `captured_at` is the exact
-  moment it happened, and it is what lets ClearView match the sale against a
-  payment record later.
-- `payment_method` must be one of `cash`, `credit`, `mobile_money` or `bank`,
-  or left out entirely.
-
-You may send one sale or several hundred in one call.
-
-### Sending a cost
-
-Same call, same list, but name a cost line instead of a catalogue item, and
-send the amount yourself. `transaction_type` must be `cost` or `expense`:
 
 ```json
 {
-  "local_id": "your-own-unique-id",
-  "plan_line_id": "<id from cost_lines in step one>",
-  "transaction_type": "expense",
-  "amount": 45000,
-  "transaction_date": "2026-09-20"
+  "key": { "label": "Clinic till", "business_unit": { "id": "unit_1", "name": "Clinic" },
+           "scopes": ["model.read", "sales.write"], "expires_at": null },
+  "business": { "name": "...", "currency": "UGX", "planning_months": 24 },
+  "catalogue":     [ { "id": "cat_a1", "name": "Deworming dose", "price": 5000, "unit_label": "dose" } ],
+  "revenue_lines": [ { "id": "rev_1", "name": "Consultations" } ],
+  "cost_lines":    [ { "id": "cost_3", "name": "Fuel", "category": "direct_opex" } ]
 }
 ```
+
+**This is the map.** Nothing else in the API accepts a name. A sale names a
+catalogue item by its `id`; a cost names a cost line by its `id`. Map your own
+product and account lists to these once, store the result, and refresh it when
+the business adds something.
+
+---
+
+## 4. Sending sales
+
+```
+POST /api/v1/sales
+Authorization: Bearer cv_live_...
+Content-Type: application/json
+
+{ "sales": [
+  {
+    "external_ref": "till-1-000482",
+    "catalogue_item_id": "cat_a1",
+    "quantity": 3,
+    "occurred_at": "2026-09-20T09:14:22Z",
+    "payment_method": "cash"
+  }
+] }
+```
+
+**You do not send a price or a total.** ClearView takes the price from its own
+price list and works the amount out. If the sale genuinely went out at another
+price, send `unit_price` and it is recorded as a deliberate override; more than
+ten per cent off the list price is flagged to the coach.
+
+If the item carries a cost price, the cost of what was sold is booked
+alongside automatically, at the standard cost, never at whatever it sold for.
+
+`payment_method` must be `cash`, `credit`, `mobile_money` or `bank`, or left
+out.
+
+`external_ref` is your own reference. Send the same one twice and it books
+once, so a retry after a timeout is always safe. **Always send it.**
+
+Up to 500 sales in one call.
+
+### Costs
+
+Same shape, at `POST /api/v1/costs`:
+
+```json
+{ "costs": [
+  { "external_ref": "exp-2291", "cost_line_id": "cost_3", "amount": 45000, "date": "2026-09-20" }
+] }
+```
+
+You send the amount for a cost. You never send the heading it files under:
+that is read off the cost line itself, so a guess cannot put money under the
+wrong heading.
 
 ### What comes back
 
 ```json
 {
-  "success": true,
-  "transactions_synced": 1,
-  "synced_local_ids": ["your-own-unique-id-for-this-sale"],
-  "errors": ["..."],
-  "synced_at": "2026-09-20T09:14:25Z"
+  "accepted": 2,
+  "duplicates": 1,
+  "parked": 1,
+  "accepted_refs": ["till-1-000482", "till-1-000483"],
+  "parked_items": [
+    { "external_ref": "till-1-000484",
+      "reason": "The catalogue item \"cat_zz\" is not in this business unit's price list, or has been switched off. It may be a new product that needs adding and pricing." }
+  ]
 }
 ```
 
-`synced_local_ids` is the list that actually landed. **Clear an entry from your
-own queue only when its `local_id` appears there.** A call can succeed overall
-while one line inside it was rejected, so do not treat `success: true` as
-meaning every line went in.
+- **Clear an item from your own queue when its reference is in
+  `accepted_refs`**, not when the call returns 200. A call can succeed while
+  one line inside it did not.
+- `duplicates` means those were already here. That is normal after a retry and
+  is not an error.
+- **`parked` items are not lost.** Anything we cannot file is held with the
+  reason, and appears on the coach's screen waiting to be sorted out. You do
+  not need to resend a parked item, and resending it parks it only once.
 
 ---
 
-## 5. Step three: check what landed
+## 5. Sending a month instead
+
+For a business whose bookkeeper closes a month rather than a till that rings
+every sale.
 
 ```
-GET https://clearview.habibonifade.com/api/field/history?limit=50
-Authorization: Bearer <TOKEN>
+POST /api/v1/actuals
+
+{ "month": "2026-03",
+  "lines": [ { "line_id": "rev_1", "amount": 4200000 },
+             { "line_id": "cost_3", "amount": 380000 } ] }
 ```
 
-Returns the most recent entries written with this key, newest first. Useful for
-a nightly reconciliation against your own records.
+The month may be written as `2026-03` or as any date inside it.
+
+**Sending the same month again corrects it.** A restated month replaces itself
+rather than adding to itself, because a bookkeeper finding a late invoice is
+normal. A line you leave out of the second send keeps its earlier figure, so
+send the whole month each time. The answer lists every line it wrote.
 
 ---
 
-## 6. What gets rejected, and what to do about it
+## 6. Sending payments
 
-A line is rejected and named in `errors` when:
+```
+POST /api/v1/payments
 
-| Reason | What it means |
-|---|---|
-| Unknown or inactive catalogue item | The `catalogue_item_id` is not in this business unit's catalogue, or it has been switched off. Refresh your mapping from step one. |
-| Missing a valid volume | `quantity` was absent, zero or negative. |
-| Invalid override price | `override_price` was not a number, or was negative. |
-| Cost line does not belong to this business unit | The `plan_line_id` belongs to another unit. |
-| Period has been closed | The entries were saved, but the month they belong to has been closed by the business's Finance Manager. They will not appear in the summary figures until that month is reopened. |
+{ "payments": [
+  { "external_ref": "MP240920.1431.A82910",
+    "channel": "mtn_momo",
+    "amount": 15000,
+    "occurred_at": "2026-09-20T09:15:01Z" }
+] }
+```
 
-A rejected line is **not** stored anywhere. Your system must keep it and retry
-it once the cause is fixed, or the sale is lost. This is the one rough edge in
-the interface as it stands today.
+`external_ref` must be the **channel's own reference** for that payment. It is
+the only way to tell one payment apart from a second one for the same amount,
+and it is what makes a retry safe.
+
+Two things to be clear about:
+
+- **Nothing is matched automatically.** Each payment waits in the business's
+  own payment review screen for a person to pair it with a sale. It counts as
+  verified revenue only once somebody does.
+- **A payment sent here is recorded as self reported.** A payment ClearView
+  receives directly from a provider is evidence from a third party; one sent
+  through this API is a claim by whoever holds the key. Both are stored, and
+  they are always distinguishable afterwards. That distinction is the whole
+  point of the platform and it is not blurred.
 
 ---
 
-## 7. What this interface does not do yet
+## 7. Reading the figures
 
-- **It cannot confirm that money arrived.** A sale sent here is a declared sale.
-  ClearView holds a separate record of money confirmed by a payment provider,
-  and there is no address for an outside system to post payment confirmations
-  to. That is a separate piece of work.
-- **It cannot read the business's reports back out.** It writes only.
-- **There is no holding pen.** An unrecognised product is reported and dropped,
-  rather than parked for somebody to file.
+```
+GET /api/v1/results
+```
+
+Returns every month with revenue, gross profit, EBITDA and closing cash, a flag
+saying whether that month is actual or still planned, and:
+
+```json
+"evidence": {
+  "declared_revenue": 52000000,
+  "verified_revenue": 28600000,
+  "verified_share": 0.55,
+  "unattributed_inbound": 3100000,
+  "of_which_self_reported": 900000
+}
+```
+
+Verified revenue counts **only** payments paired with a recorded sale. Money
+received but not yet paired is reported separately and is never quietly added.
+It is the number that tempts everyone, and counting it as verified would turn
+the verified share from a measurement into a claim.
+
+Nothing here is recalculated for the API. It runs the same engine the workspace
+runs, on the same stored figures, so a number read here and the same number on
+screen cannot disagree.
 
 ---
 
-## 8. A note on what ClearView will never accept from outside
+## 8. Errors
 
-The key carries the business and the business unit. Neither is ever read from
-the request. An outside system cannot write into another business's figures,
-name a price that is not in the catalogue, or reach any part of the workspace
-other than the unit its key belongs to. Every one of those is checked on the
-server on every call.
+Every refusal has the same shape:
+
+```json
+{ "error": "forbidden", "detail": "This key is not allowed to do that. It would need the \"sales.write\" permission, which is granted by the coach when the key is created." }
+```
+
+| Status | Meaning | What to do |
+|---|---|---|
+| `400` | The body was not the shape expected | Read `detail`; it says the shape. |
+| `401` | No key, or the key is withdrawn or expired | Ask the coach for a new key. Do not retry. |
+| `403` | The key lacks that permission | Ask the coach to add it. Do not retry. |
+| `409` | The business has no financial model, or its unit is switched off | Nothing you can fix. Tell the coach. |
+| `413` | More than 500 items in one call | Send smaller batches. |
+| `429` | More than 120 calls a minute | Wait for `Retry-After` seconds. |
+| `500` | Something failed at our end | Nothing was stored. Retry safely. |
+
+A `500` from a write means nothing was saved, so a retry cannot double-book.
+Together with `external_ref`, that makes every write in this API safe to repeat.
+
+---
+
+## 9. What is not here yet
+
+- **Nothing is pushed to you.** You read when you want to; we do not call you.
+- **Only this business's own figures.** There is no portfolio-wide read.
+- **The coaching record is not exposed.** Decisions, gates and canvas work are
+  not readable through the API.
