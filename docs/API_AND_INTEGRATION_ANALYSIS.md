@@ -37,7 +37,7 @@ The platform is not starting from nothing. Three separate ways in and out have
 already been built, each solid, each built for a human being rather than for
 another system.
 
-### The field operator door — machines already write to ClearView
+### The field operator door: machines already write to ClearView
 
 `app/api/field/*` is fourteen endpoints authenticated by an opaque token held by
 a field operator (`field_operator_tokens`, checked in `src/lib/field-auth.ts`
@@ -51,7 +51,7 @@ such an interface needs: a token that can be withdrawn, and safety against the
 same message arriving twice. **It was built for one phone app. It is a general
 pattern.**
 
-### The access grant door — outsiders already read from ClearView
+### The access grant door: outsiders already read from ClearView
 
 `client_access_grants` plus `app/api/access-grant/[token]/route.ts` lets a coach
 issue a link to an investor, a programme officer or a subscriber who has no
@@ -64,7 +64,7 @@ inbox. It is rate limited.
 audit, throttle. The only thing that makes it a human feature rather than a
 machine feature is what comes back: a rendered brief rather than data.
 
-### The payment provider door — half built, and the missing half is small
+### The payment provider door: half built, and the missing half is small
 
 `src/lib/providers/` defines one normalised shape for "money moved"
 (`NormalizedProviderTxn`), with adapters for MTN Uganda and a simulated
