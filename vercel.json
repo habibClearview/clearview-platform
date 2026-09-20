@@ -1,6 +1,13 @@
 {
   "framework": "nextjs",
   "crons": [
-    { "path": "/api/support/sync-playbook", "schedule": "0 6 * * *" }
+    {
+      "path": "/api/support/sync-playbook",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/monthly-snapshot",
+      "schedule": "0 5 * * *"
+    }
   ]
 }
