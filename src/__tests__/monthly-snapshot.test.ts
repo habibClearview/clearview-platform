@@ -159,6 +159,61 @@ describe('a coaching engagement gets a reading too', () => {
   })
 })
 
+describe('a financial engagement is never filed as a coaching one', () => {
+  // THE BUG THIS EXISTS TO STOP. 20 September 2026. The runner decided
+  // between "skipped" and "coaching" by asking whether the whole-platform
+  // load had thrown. That only happens when every client fails at once. One
+  // client whose model cannot be built is dropped quietly by that loader
+  // instead, so a real financial engagement would have been filed as a
+  // coaching engagement, with no reason given, in a table that is never
+  // corrected afterwards. The engagement's own mode has to decide it.
+  //
+  // The rule is tested here on the row builders because the decision is one
+  // line in the runner; what matters is that the two rows are distinguishable
+  // and that a financial engagement without a reading produces the skipped
+  // one, carrying its mode and a reason.
+
+  it('a skipped financial reading keeps its own mode and says why', () => {
+    const row = skippedRow('ikore', '2026-09-01', 'the financial model could not be read this month', 'financial')
+    expect(row.engagement_mode).toBe('financial')
+    expect(row.skipped_reason).toBeTruthy()
+  })
+
+  it('a coaching row can never be mistaken for a failed financial one', () => {
+    const coaching = coachingRow({ id: 'x' }, '2026-09-01', {
+      decisionPointsSigned: 2, decisionPointsTotal: 11, readinessCheckpointsTaken: 1,
+    })
+    expect(coaching.engagement_mode).toBe('canvas')
+    expect(coaching.skipped_reason).toBeNull()
+    // The telling difference: a coaching row reports real progress, a skipped
+    // row reports nothing at all, so a count of signed decision points can
+    // never accidentally include a month that was never read.
+    expect(coaching.decision_points_signed).toBe(2)
+    expect(skippedRow('x', '2026-09-01', 'why', 'financial').decision_points_signed).toBeNull()
+  })
+})
+
+describe('declared, verified and unattributed are three different things', () => {
+  it('keeps them in three columns and never folds one into another', () => {
+    // An earlier version called the sum of every provider transaction
+    // "declared revenue". That is the payment side, not what the business
+    // declared, and money that arrived with no sale to pair it to is neither.
+    const row = financialRow(SNAPSHOT, '2026-09-01', {
+      declaredRevenue: 120_000, verifiedRevenue: 64_000, unattributedRevenue: 9_000,
+    })
+    expect(row.declared_revenue).toBe(120_000)
+    expect(row.verified_revenue).toBe(64_000)
+    expect(row.unattributed_revenue).toBe(9_000)
+  })
+
+  it('records nothing rather than nought when there is no wallet linked', () => {
+    const row = financialRow(SNAPSHOT, '2026-09-01', { declaredRevenue: 120_000 })
+    expect(row.declared_revenue).toBe(120_000)
+    expect(row.verified_revenue).toBeNull()
+    expect(row.unattributed_revenue).toBeNull()
+  })
+})
+
 describe('a month that could not be read says so', () => {
   it('files the reason rather than leaving a hole', () => {
     // A gap and a failure are different facts. A chart that cannot tell them

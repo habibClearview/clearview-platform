@@ -72,9 +72,16 @@ create table if not exists portfolio_snapshots (
   confidence_badges text[],
 
   -- Money that moved, and how much of it a second record agreed with.
+  --
+  -- Declared is the revenue the financial model produces. Verified is the
+  -- payments a provider confirmed and the matching paired with a logged sale.
+  -- Unattributed is money that arrived in the wallet with no sale to pair it
+  -- to: it is neither verified nor declared, and folding it into either would
+  -- overstate one of them. Anything ignored counts nowhere.
   annual_revenue numeric,
   declared_revenue numeric,
   verified_revenue numeric,
+  unattributed_revenue numeric,
 
   -- Fund absorption capacity, in the currency above.
   fac_amount numeric,

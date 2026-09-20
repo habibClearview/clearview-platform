@@ -63,6 +63,7 @@ export interface SnapshotRow {
   annual_revenue: number | null
   declared_revenue: number | null
   verified_revenue: number | null
+  unattributed_revenue: number | null
   fac_amount: number | null
   fac_band: string | null
   revenue_growth_pct: number | null
@@ -104,7 +105,12 @@ export interface CoachingProgress {
 export function financialRow(
   snapshot: ClientSnapshot,
   month: string,
-  extra: { declaredRevenue?: number | null; verifiedRevenue?: number | null; coaching?: CoachingProgress | null } = {},
+  extra: {
+    declaredRevenue?: number | null
+    verifiedRevenue?: number | null
+    unattributedRevenue?: number | null
+    coaching?: CoachingProgress | null
+  } = {},
 ): SnapshotRow {
   const p = snapshot.performance || null
   return {
@@ -125,6 +131,7 @@ export function financialRow(
     annual_revenue: num(snapshot.annualRevenue),
     declared_revenue: num(extra.declaredRevenue),
     verified_revenue: num(extra.verifiedRevenue),
+    unattributed_revenue: num(extra.unattributedRevenue),
     fac_amount: num((snapshot.fac as any)?.amount ?? (snapshot.fac as any)?.capacity),
     fac_band: ((snapshot.fac as any)?.band ?? null) as string | null,
     revenue_growth_pct: num(p?.revenueGrowthPct),
@@ -170,6 +177,7 @@ export function coachingRow(
     ir_score: null, ir_tier: null, readiness_stage: null,
     confidence_score: null, confidence_badges: null,
     annual_revenue: null, declared_revenue: null, verified_revenue: null,
+    unattributed_revenue: null,
     fac_amount: null, fac_band: null,
     revenue_growth_pct: null, cost_ratio_pct: null, gross_margin_pct: null,
     ebitda_margin_pct: null, net_margin_pct: null, rule_of_40: null,

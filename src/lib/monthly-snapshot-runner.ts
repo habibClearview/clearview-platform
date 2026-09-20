@@ -30,19 +30,37 @@ async function coachingProgressFor(admin: SupabaseClient, clientId: string): Pro
   }
 }
 
-/** Declared and verified money for one engagement, where both exist. */
+/**
+ * How much of what the business says it earned a second record agreed with.
+ *
+ * ONE RULE, IN ONE PLACE. The confidence scoring already decides what counts
+ * (src/lib/portfolio-snapshot-loader.ts, buildPeriodSignals): declared is the
+ * revenue the financial model produces, verified is the provider transactions
+ * in state 'matched', and unattributed inbound money is counted separately
+ * rather than folded into either. Anything else is 'ignored' and counts
+ * nowhere. This follows that rule exactly, because two places deciding what
+ * "verified" means is how a figure comes to mean two different things.
+ *
+ * An earlier version of this called the sum of every provider transaction
+ * "declared revenue". That is the payment side, not what the business
+ * declared, and it would have put a wrong number into a record that is never
+ * corrected afterwards.
+ */
 async function verifiedMoneyFor(admin: SupabaseClient, clientId: string) {
   const { data } = await admin
     .from('provider_transactions')
     .select('amount, reconciliation_state')
     .eq('client_id', clientId)
   const rows = (data || []) as { amount: number; reconciliation_state: string }[]
-  if (rows.length === 0) return { declaredRevenue: null, verifiedRevenue: null }
-  const verified = rows
-    .filter((r) => r.reconciliation_state === 'matched')
-    .reduce((a, r) => a + (Number(r.amount) || 0), 0)
-  const all = rows.reduce((a, r) => a + (Number(r.amount) || 0), 0)
-  return { declaredRevenue: all, verifiedRevenue: verified }
+  if (rows.length === 0) return { verifiedRevenue: null, unattributedRevenue: null }
+  let matched = 0
+  let unattributed = 0
+  rows.forEach((r) => {
+    const amount = Number(r.amount) || 0
+    if (r.reconciliation_state === 'matched') matched += amount
+    else if (r.reconciliation_state === 'unattributed_inbound') unattributed += amount
+  })
+  return { verifiedRevenue: matched, unattributedRevenue: unattributed }
 }
 
 /**
@@ -85,9 +103,26 @@ export async function takeMonthlySnapshot(admin: SupabaseClient, month = monthKe
       const snap = snapshotsById[id]
       if (snap) {
         const money = await verifiedMoneyFor(admin, id)
-        rows.push(financialRow(snap, month, { ...money, coaching }))
-      } else if (client?.engagement_mode === 'financial' && financialFailure) {
-        rows.push(skippedRow(id, month, financialFailure, 'financial'))
+        rows.push(financialRow(snap, month, {
+          declaredRevenue: snap.annualRevenue ?? null,
+          verifiedRevenue: money.verifiedRevenue,
+          unattributedRevenue: money.unattributedRevenue,
+          coaching,
+        }))
+      } else if (client?.engagement_mode === 'financial') {
+        // A FINANCIAL ENGAGEMENT WITH NO READING IS A FAILURE, NOT A COACHING
+        // ENGAGEMENT. This first branched on whether the whole-platform load
+        // had thrown, which only happens when every client fails at once. One
+        // client whose model cannot be built is dropped quietly by that loader
+        // instead, so a real financial engagement would have been filed as a
+        // coaching one, with no reason given, in a table that is never
+        // corrected afterwards. The engagement's own mode decides this, and
+        // nothing else does.
+        rows.push(skippedRow(
+          id, month,
+          financialFailure || 'the financial model could not be read this month',
+          'financial',
+        ))
       } else {
         rows.push(coachingRow(client, month, coaching, !!client?.portfolio_consent_named))
       }
