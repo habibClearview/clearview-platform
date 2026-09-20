@@ -31,6 +31,9 @@ export interface Parked {
 
 export interface SaleInput {
   external_ref?: unknown
+  /** The code THEIR system uses for the product. The normal way to name one. */
+  external_item_id?: unknown
+  /** ClearView's own id. Still accepted, for anything already built on it. */
   catalogue_item_id?: unknown
   quantity?: unknown
   unit_price?: unknown
@@ -118,12 +121,20 @@ export function decideSale(
   const park = (reason: string): SaleDecision =>
     ({ row: null, parked: { external_ref: ref, payload: input, reason }, priceAlert: null })
 
-  const itemId = typeof input.catalogue_item_id === 'string' ? input.catalogue_item_id : ''
-  if (!itemId) return park('No catalogue_item_id was sent, so there is no way to tell what was sold.')
+  // Their own product code first, because that is what a system that never
+  // mapped anything to us will send, and mapping by hand is the friction this
+  // whole design exists to remove. Our own id still works for anything already
+  // built against it.
+  const externalId = typeof input.external_item_id === 'string' ? input.external_item_id : ''
+  const ourId = typeof input.catalogue_item_id === 'string' ? input.catalogue_item_id : ''
+  if (!externalId && !ourId) {
+    return park('No product was named. Send external_item_id carrying your own product code, which is what a price list sent to ClearView records against each product.')
+  }
 
-  const item = catalogue.get(itemId)
+  const item = (externalId ? catalogue.get(externalId) : undefined) || (ourId ? catalogue.get(ourId) : undefined)
   if (!item) {
-    return park(`The catalogue item "${itemId}" is not in this business unit's price list, or has been switched off. It may be a new product that needs adding and pricing.`)
+    const named = externalId || ourId
+    return park(`The product "${named}" is not in this business unit's price list, or has been switched off. If it is new, send the price list again and it will be added.`)
   }
 
   const quantity = positiveNumber(input.quantity)

@@ -8,6 +8,10 @@
     {
       "path": "/api/monthly-snapshot",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/catalogue-pull",
+      "schedule": "0 3 * * *"
     }
   ]
 }

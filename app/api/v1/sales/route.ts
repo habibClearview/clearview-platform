@@ -43,15 +43,20 @@ export async function POST(req: NextRequest) {
   try {
     const { data: catalogueRows } = await supabase
       .from('field_catalogue')
-      .select('id, name, price, plan_line_id, unit_label, cost_price, cogs_plan_line_id')
+      .select('id, external_id, name, price, plan_line_id, unit_label, cost_price, cogs_plan_line_id')
       .eq('client_id', key.client_id)
       .eq('business_unit_id', key.business_unit_id)
       .eq('active', true)
       .eq('needs_price', false)
 
-    const catalogue = new Map<string, CatalogueItem>(
-      (catalogueRows || []).map((c: any) => [c.id, c as CatalogueItem]),
-    )
+    // Reachable by the code their own system uses AND by ours, so a sender
+    // that imported a price list never has to learn our ids, and anything
+    // already built against our ids keeps working.
+    const catalogue = new Map<string, CatalogueItem>()
+    for (const c of (catalogueRows || []) as any[]) {
+      catalogue.set(c.id, c as CatalogueItem)
+      if (c.external_id) catalogue.set(c.external_id, c as CatalogueItem)
+    }
 
     const today = new Date().toISOString().slice(0, 10)
     const rows: any[] = []
@@ -84,6 +89,8 @@ export async function POST(req: NextRequest) {
       // using the STANDARD cost, never the price it happened to sell at.
       // Identical to the phone's behaviour, and reusing the same function so
       // the two cannot diverge.
+      // row.catalogue_item_id is OUR id, set by decideSale from whichever
+      // code the sender used, so this always finds the item it priced.
       const source = catalogue.get(row.catalogue_item_id as string)!
       const cogs = buildAutoCogsRow(source, row.quantity as number, row.local_id as string | null)
       if (cogs) {

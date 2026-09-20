@@ -41,6 +41,7 @@ export const VISIBLE_PREFIX_LENGTH = KEY_PREFIX.length + 6
  */
 export const SCOPES = [
   'model.read',      // the business: units, revenue lines, cost lines, catalogue
+  'catalogue.write', // send a price list and let ClearView build the catalogue
   'sales.write',     // individual sales, as they happen
   'costs.write',     // individual costs, as they happen
   'actuals.write',   // monthly totals per line, the bookkeeper's route
@@ -63,6 +64,7 @@ export function cleanScopes(value: unknown): Scope[] {
 /** Plain words for a coach issuing a key, so the screen never shows a code. */
 export const SCOPE_LABELS: Record<Scope, string> = {
   'model.read': 'Read the price list and the cost headings',
+  'catalogue.write': 'Send their price list and keep ours up to date',
   'sales.write': 'Send sales as they happen',
   'costs.write': 'Send costs as they happen',
   'actuals.write': 'Send monthly totals',

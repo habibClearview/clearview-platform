@@ -11,6 +11,7 @@ Everything is under `https://clearview.habibonifade.com/api/v1/`.
 
 | | |
 |---|---|
+| `POST /api/v1/catalogue` | **Send your price list. ClearView builds its catalogue from it.** |
 | `GET /api/v1/model` | Read the business: its price list, its cost headings, its currency. |
 | `POST /api/v1/sales` | Send sales, as they happen. |
 | `POST /api/v1/costs` | Send costs, as they happen. |
@@ -68,28 +69,81 @@ figures.
 
 ---
 
-## 3. Start here: read the business
+## 3. Start here: send your price list
+
+**There is no mapping step.** Do not pair your products with ours by hand.
+Send us your product list and we build the catalogue from it, keeping your own
+product code against each item. After that, sales arrive under your codes.
+
+```
+POST /api/v1/catalogue
+Authorization: Bearer cv_live_...
+Content-Type: application/json
+
+[
+  { "sku": "VET-0091", "name": "Deworming dose", "price": 5000, "unit": "dose" },
+  { "sku": "VET-0104", "name": "Consultation",   "price": 15000, "type": "service" }
+]
+```
+
+**Send whatever your system exports.** Column names are matched by meaning, not
+by spelling:
+
+| We need | Any of these will do |
+|---|---|
+| The product code | `sku`, `code`, `id`, `item_code`, `product_code`, `item_number`, `product_id`, `barcode`, `ref` |
+| The name | `name`, `product_name`, `item_name`, `description`, `title` |
+| The price | `price`, `unit_price`, `selling_price`, `sale_price`, `rate` |
+| What it cost you | `cost_price`, `cost`, `buying_price`, `purchase_price` |
+| The unit | `unit`, `uom`, `unit_of_measure`, `pack_size` |
+
+Capitals, spaces, hyphens and underscores are all ignored, so `Item Code`,
+`item_code` and `itemcode` are the same column. A list wrapped as
+`{"items": [...]}`, `{"products": [...]}` or `{"data": [...]}` is read too.
+Prices written as `"1,500"` or `"UGX 1500"` are read correctly.
+
+If your export has no code column at all, the product name is used as the code.
+
+### Send the whole list every time
+
+It is worked out as a difference:
+
+- A product we have not seen is **created**.
+- A price that changed is **updated**.
+- A product you stop sending is **switched off**, never deleted, so its sales
+  history stays readable and one bad export does not lose anything.
+- A product whose price we could not read is created but **cannot be sold**
+  until somebody in the workspace prices it. Better a visible gap than a
+  product quietly selling for nothing.
+- A product a coach has filed under a particular revenue line **stays there**.
+  Imports update its price and leave the filing alone.
+
+```json
+{ "read": 412, "created": 9, "updated": 31, "switched_off": 2,
+  "unchanged": 370, "needing_a_price": 1, "problems": [] }
+```
+
+### Or let ClearView come and get it
+
+If your product list is readable at a fixed https address, you do not need to
+send anything at all. The coach records the address once, under **Settings**,
+**Connected Systems**, and ClearView reads it every night.
+
+If your system is not on the internet, a coach can export the list and paste it
+into the same screen. Same rules, same result.
+
+---
+
+## 3a. Reading the business
 
 ```
 GET /api/v1/model
 Authorization: Bearer cv_live_...
 ```
 
-```json
-{
-  "key": { "label": "Clinic till", "business_unit": { "id": "unit_1", "name": "Clinic" },
-           "scopes": ["model.read", "sales.write"], "expires_at": null },
-  "business": { "name": "...", "currency": "UGX", "planning_months": 24 },
-  "catalogue":     [ { "id": "cat_a1", "name": "Deworming dose", "price": 5000, "unit_label": "dose" } ],
-  "revenue_lines": [ { "id": "rev_1", "name": "Consultations" } ],
-  "cost_lines":    [ { "id": "cost_3", "name": "Fuel", "category": "direct_opex" } ]
-}
-```
-
-**This is the map.** Nothing else in the API accepts a name. A sale names a
-catalogue item by its `id`; a cost names a cost line by its `id`. Map your own
-product and account lists to these once, store the result, and refresh it when
-the business adds something.
+Returns the business unit, the currency, the catalogue as ClearView now holds
+it, the revenue lines and the cost headings. Useful for checking what an import
+produced, and for finding the `id` of a cost heading.
 
 ---
 
@@ -103,13 +157,17 @@ Content-Type: application/json
 { "sales": [
   {
     "external_ref": "till-1-000482",
-    "catalogue_item_id": "cat_a1",
+    "external_item_id": "VET-0091",
     "quantity": 3,
     "occurred_at": "2026-09-20T09:14:22Z",
     "payment_method": "cash"
   }
 ] }
 ```
+
+`external_item_id` is **your own product code**, the one you sent in your price
+list. You never need to know ClearView's ids. (ClearView's own
+`catalogue_item_id` is still accepted, for anything already built on it.)
 
 **You do not send a price or a total.** ClearView takes the price from its own
 price list and works the amount out. If the sale genuinely went out at another
@@ -151,7 +209,7 @@ wrong heading.
   "accepted_refs": ["till-1-000482", "till-1-000483"],
   "parked_items": [
     { "external_ref": "till-1-000484",
-      "reason": "The catalogue item \"cat_zz\" is not in this business unit's price list, or has been switched off. It may be a new product that needs adding and pricing." }
+      "reason": "The product \"VET-0199\" is not in this business unit's price list, or has been switched off. If it is new, send the price list again and it will be added." }
   ]
 }
 ```

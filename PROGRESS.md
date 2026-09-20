@@ -2103,3 +2103,38 @@ screen.
 
 Still open: nothing is pushed outward (no webhooks to a funder's system), there
 is no portfolio-wide read, and the coaching record is not exposed.
+
+### Correction, same day: ClearView reads their list instead of being sent ours
+
+Habib: "what is supposed to happen is that clearview pulls these details from
+the existing system - the cataloque and price list is likely on their systems -
+can clearview not update the cataloque on thier clearview workspace by
+collating from the system they have already - this is all very useless".
+
+He was right. The API as first built made an outside system name every sale by
+ClearView's own catalogue id, so somebody had to pair every product in their
+system with one of ours before a single sale could be sent. For a veterinary
+business with several hundred drug lines that is days of work, repeated every
+time they add a product. The list already exists in their software.
+
+Three ways in, all using the same import rules:
+
+* `POST /api/v1/catalogue` — their system sends its price list.
+* A nightly scheduled read (`/api/catalogue-pull`, 03:00) from an address a
+  coach records once. This is the pulling half.
+* A paste-in box on the Connected Systems screen, for software that sits on one
+  computer behind a counter with nothing the internet can reach. That is most
+  small businesses, and telling them to build an endpoint means it never
+  happens.
+
+Column names are matched by meaning rather than spelling, so sku / code /
+item_number are one thing and price / unit_price / selling_price are another.
+Each catalogue item keeps the code the other system uses (`external_id`), and
+sales now arrive as `external_item_id`, so **nothing is mapped by hand**.
+
+An import never deletes: a product that stops appearing is switched off. It
+never moves an item a coach has filed under a particular revenue line. A
+product whose price could not be read is created unsellable rather than free.
+
+Still open: this reads price lists, not sales history. A system that can
+publish its past sales has no address to send them to in bulk yet.
