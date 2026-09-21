@@ -262,7 +262,8 @@ POST /api/v1/payments
 
 `external_ref` must be the **channel's own reference** for that payment. It is
 the only way to tell one payment apart from a second one for the same amount,
-and it is what makes a retry safe.
+and it is what makes a retry safe. It only has to be unique within this
+business, so your own invoice or statement numbering is fine.
 
 Two things to be clear about:
 
@@ -320,7 +321,7 @@ Every refusal has the same shape:
 | `400` | The body was not the shape expected | Read `detail`; it says the shape. |
 | `401` | No key, or the key is withdrawn or expired | Ask the coach for a new key. Do not retry. |
 | `403` | The key lacks that permission | Ask the coach to add it. Do not retry. |
-| `409` | The business has no financial model, or its unit is switched off | Nothing you can fix. Tell the coach. |
+| `409` | The business has no financial model, or the unit your key writes to has been switched off | Nothing you can fix. Tell the coach. |
 | `413` | More than 500 items in one call | Send smaller batches. |
 | `429` | More than 120 calls a minute | Wait for `Retry-After` seconds. |
 | `500` | Something failed at our end | Nothing was stored. Retry safely. |

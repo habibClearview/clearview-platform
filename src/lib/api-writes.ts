@@ -335,3 +335,17 @@ export function decideActuals(
 
   return { month, values, parked }
 }
+
+/**
+ * The channel name to show a person for a stored payment.
+ *
+ * A payment sent through the API carries "api:<client>:<channel>" so the pair
+ * it is made unique by is unique per business. Nobody looking at a payment
+ * needs to see that, so this turns it back into the channel they named. A
+ * payment from a real provider webhook is returned exactly as stored.
+ */
+export function displayChannel(providerId: string): string {
+  if (!providerId.startsWith('api:')) return providerId
+  const parts = providerId.split(':')
+  return parts.length >= 3 ? parts.slice(2).join(':') : parts.slice(1).join(':')
+}

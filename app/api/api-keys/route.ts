@@ -23,6 +23,28 @@ import { getAdminClient } from '@/lib/auth/api-authz'
 import { resolveFieldAdminActor, actorMayAccessClient, actorMayManageTeam } from '@/lib/auth/field-admin-authz'
 import { generateKey, cleanScopes } from '@/lib/api-keys'
 
+/**
+ * The signed-in user's id, for the audit trail on a key.
+ *
+ * The shared field-admin actor carries a role and a client but not the user's
+ * own id, and widening it would change a type every field admin route depends
+ * on. So the id is read here, from the same token that was just verified.
+ * Answers null rather than throwing: a key whose issuer could not be recorded
+ * is still a key that should be issued, and a null column says plainly that we
+ * do not know rather than naming the wrong person.
+ */
+async function signedInUserId(supabase: any, req: NextRequest): Promise<string | null> {
+  const header = req.headers.get('authorization') || ''
+  const token = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : ''
+  if (!token) return null
+  try {
+    const { data } = await supabase.auth.getUser(token)
+    return data?.user?.id ?? null
+  } catch {
+    return null
+  }
+}
+
 export const dynamic = 'force-dynamic'
 
 /** Keys for one client. Never includes a key itself. */
@@ -87,6 +109,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Only a coach or the business owner may issue a key' }, { status: 403 })
     }
 
+    // Which business units this client actually has. A key pointed at a unit
+    // that does not exist would be created happily and then refuse every call
+    // it ever made, which is a confusing way to find out about a typo.
+    const { data: config } = await supabase
+      .from('generic_model_config')
+      .select('business_units')
+      .eq('client_id', clientId)
+      .maybeSingle()
+    const units = ((config?.business_units as any[]) || [])
+    if (!units.some((u) => u?.id === businessUnitId && u?.active)) {
+      return NextResponse.json({
+        error: 'That business unit does not exist for this business, or has been switched off.',
+      }, { status: 400 })
+    }
+
+    const issuedBy = await signedInUserId(supabase, req)
+
     // The operator that will own every write this key makes.
     const { data: operator, error: opErr } = await supabase
       .from('field_operators')
@@ -120,10 +159,7 @@ export async function POST(req: NextRequest) {
         key_prefix: prefix,
         key_hash: hash,
         scopes,
-        // created_by is left unset. The shared actor this route authenticates
-        // with carries a role and a client, not the signed-in user's id, and
-        // widening it is a change to code every field admin route depends on.
-        // The column stays for when that id is available here.
+        created_by: issuedBy,
         expires_at: expiresAt,
       })
       .select('id, label, key_prefix, business_unit_id, scopes, created_at, expires_at')
@@ -174,7 +210,7 @@ export async function DELETE(req: NextRequest) {
 
     const { error } = await supabase
       .from('api_keys')
-      .update({ revoked_at: new Date().toISOString() })
+      .update({ revoked_at: new Date().toISOString(), revoked_by: await signedInUserId(supabase, req) })
       .eq('id', id)
     if (error) throw error
 

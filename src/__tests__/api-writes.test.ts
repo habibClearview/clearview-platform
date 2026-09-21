@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   decideSale, decideCost, decideActuals, monthKey, isoDate, isoMoment,
-  cleanPaymentMethod, externalRef, positiveNumber,
+  cleanPaymentMethod, externalRef, positiveNumber, displayChannel,
   type CatalogueItem, type PlanLine,
 } from '@/lib/api-writes'
 
@@ -259,5 +259,23 @@ describe('reading what was sent', () => {
   it('will not accept infinity as a quantity', () => {
     expect(positiveNumber(Infinity)).toBeNull()
     expect(positiveNumber('4')).toBe(4)
+  })
+})
+
+describe('showing a payment channel back to a person', () => {
+  it('shows the channel they named, not the internal string', () => {
+    expect(displayChannel('api:ikore_2026:mtn_momo')).toBe('mtn_momo')
+  })
+
+  it('leaves a real provider payment exactly as it is stored', () => {
+    expect(displayChannel('mtn_ug_momo')).toBe('mtn_ug_momo')
+  })
+
+  it('copes with an older two-part value rather than returning nothing', () => {
+    expect(displayChannel('api:bank')).toBe('bank')
+  })
+
+  it('keeps a channel that itself contains a colon', () => {
+    expect(displayChannel('api:client1:bank:eu')).toBe('bank:eu')
   })
 })

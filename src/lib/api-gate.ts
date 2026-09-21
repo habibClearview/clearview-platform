@@ -125,3 +125,40 @@ export function itemsFrom(body: any, field: string): any[] | null {
 
 /** How many items one call may carry. Beyond this the answer is a refusal. */
 export const MAX_BATCH = 500
+
+/**
+ * Whether the business unit this key writes to is still switched on.
+ *
+ * GET /api/v1/model checked this and the write paths did not, so a coach who
+ * switched a whole business unit off, expecting that to cut the connection,
+ * would have found sales still posting for as long as any individual product
+ * stayed active. Switching a unit off has to mean the same thing everywhere,
+ * or it means nothing.
+ *
+ * Takes the config row when the caller already loaded it, so a route that
+ * needs the plan lines anyway does not read the same row twice.
+ */
+export async function unitIsActive(
+  supabase: any,
+  clientId: string,
+  unitId: string,
+  loaded?: { business_units?: unknown } | null,
+): Promise<boolean> {
+  let row = loaded
+  if (!row) {
+    const { data } = await supabase
+      .from('generic_model_config')
+      .select('business_units')
+      .eq('client_id', clientId)
+      .maybeSingle()
+    row = data
+  }
+  const units = (row?.business_units as any[]) || []
+  return units.some((u) => u?.id === unitId && u?.active)
+}
+
+/** The same refusal wherever that check fails. */
+export function unitUnavailable() {
+  return apiError(409, 'unit_unavailable',
+    'The business unit this key writes to has been switched off. Ask the coach who issued the key.')
+}

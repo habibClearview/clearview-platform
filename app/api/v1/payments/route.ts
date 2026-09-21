@@ -26,7 +26,7 @@
 // made would be the one failure this platform cannot recover from.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiKey, noteKeyUse, readJson, itemsFrom, apiError, MAX_BATCH } from '@/lib/api-gate'
+import { requireApiKey, noteKeyUse, readJson, itemsFrom, apiError, MAX_BATCH, unitIsActive, unitUnavailable } from '@/lib/api-gate'
 import { externalRef, finiteNumber, isoMoment } from '@/lib/api-writes'
 import { park } from '@/lib/api-inbox'
 
@@ -60,9 +60,10 @@ export async function POST(req: NextRequest) {
   try {
     const { data: config } = await supabase
       .from('generic_model_config')
-      .select('currency')
+      .select('currency, business_units')
       .eq('client_id', key.client_id)
       .maybeSingle()
+    if (!await unitIsActive(supabase, key.client_id, key.business_unit_id, config)) return unitUnavailable()
     const defaultCurrency = (config?.currency as string) || 'UGX'
 
     const rows: any[] = []
@@ -100,9 +101,22 @@ export async function POST(req: NextRequest) {
 
       rows.push({
         client_id: key.client_id,
-        // Prefixed so a payment asserted through this API is never mistaken
-        // for one a provider confirmed to us directly. See the note above.
-        provider_id: `api:${channel}`,
+        // THE CLIENT IS IN THE CHANNEL NAME ON PURPOSE.
+        //
+        // provider_transactions is unique on (provider_id, external_ref), and
+        // that index is global rather than per client. A channel named by the
+        // caller is not client specific -- two businesses both send "bank" --
+        // and a self reported reference is whatever their own system counts
+        // with, very often a plain invoice number. So two businesses would
+        // collide on ("api:bank", "1001"), and because the write ignores
+        // duplicates the second business's payment would be dropped with no
+        // error and still reported back as accepted. Silent loss of a real
+        // payment, on the one figure this platform sells.
+        //
+        // Carrying the client makes the pair unique per business, which is
+        // what the index needed all along. The api: prefix still marks it as
+        // self reported.
+        provider_id: `api:${key.client_id}:${channel}`,
         external_ref: ref,
         amount,
         currency: typeof item?.currency === 'string' && item.currency ? item.currency : defaultCurrency,

@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { displayChannel } from '@/lib/api-writes'
 
 const C = {
   navy: 'var(--cv-navy)', card: 'var(--cv-card)', border: 'var(--cv-border-soft)',
@@ -139,7 +140,7 @@ export default function PaymentReviewQueue({ clientId }: PaymentReviewQueueProps
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.85rem 1.1rem', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontWeight: 700, color: C.navy, fontFamily: 'var(--cv-font-mono)' }}>{(t.currency || 'UGX')} {(Number(t.amount) || 0).toLocaleString()}</div>
-                    <div style={{ color: C.slate, fontSize: '0.8rem' }}>{t.provider_id} · {new Date(t.occurred_at).toLocaleString()}</div>
+                    <div style={{ color: C.slate, fontSize: '0.8rem' }}>{displayChannel(t.provider_id)} · {new Date(t.occurred_at).toLocaleString()}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button disabled={busyId === t.id} onClick={() => openMatchPicker(t)} style={btn(C.cyan)}>{openId === t.id ? 'Cancel' : 'Match to a sale'}</button>

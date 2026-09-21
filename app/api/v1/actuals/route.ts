@@ -26,7 +26,7 @@
 // figure, which is why the answer names every line it wrote.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiKey, noteKeyUse, readJson, apiError, MAX_BATCH } from '@/lib/api-gate'
+import { requireApiKey, noteKeyUse, readJson, apiError, MAX_BATCH, unitIsActive, unitUnavailable } from '@/lib/api-gate'
 import { decideActuals, monthKey, PlanLine } from '@/lib/api-writes'
 import { park } from '@/lib/api-inbox'
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   try {
     const { data: config } = await supabase
       .from('generic_model_config')
-      .select('plan_lines')
+      .select('plan_lines, business_units')
       .eq('client_id', key.client_id)
       .maybeSingle()
 
@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       return apiError(409, 'no_model',
         'This business has no financial model set up yet, so there are no lines to file figures against.')
     }
+    if (!await unitIsActive(supabase, key.client_id, key.business_unit_id, config)) return unitUnavailable()
 
     const lines = new Map<string, PlanLine>(
       ((config.plan_lines as any[]) || []).map((l: any) => [l.id, l as PlanLine]),

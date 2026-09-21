@@ -14,7 +14,7 @@
 // keep in step, and they would drift.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiKey, noteKeyUse, readJson, itemsFrom, apiError, MAX_BATCH } from '@/lib/api-gate'
+import { requireApiKey, noteKeyUse, readJson, itemsFrom, apiError, MAX_BATCH, unitIsActive, unitUnavailable } from '@/lib/api-gate'
 import { decideSale, CatalogueItem } from '@/lib/api-writes'
 import { buildAutoCogsRow } from '@/lib/field-cogs'
 import { park } from '@/lib/api-inbox'
@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    if (!await unitIsActive(supabase, key.client_id, key.business_unit_id)) return unitUnavailable()
+
     const { data: catalogueRows } = await supabase
       .from('field_catalogue')
       .select('id, external_id, name, price, plan_line_id, unit_label, cost_price, cogs_plan_line_id')
@@ -90,9 +92,12 @@ export async function POST(req: NextRequest) {
       // Identical to the phone's behaviour, and reusing the same function so
       // the two cannot diverge.
       // row.catalogue_item_id is OUR id, set by decideSale from whichever
-      // code the sender used, so this always finds the item it priced.
-      const source = catalogue.get(row.catalogue_item_id as string)!
-      const cogs = buildAutoCogsRow(source, row.quantity as number, row.local_id as string | null)
+      // code the sender used, so this finds the item it priced. Checked
+      // rather than asserted: if a later change to decideSale ever broke that,
+      // asserting would throw a 500 over the whole batch, and the sale itself
+      // is already valid without its cost entry.
+      const source = catalogue.get(row.catalogue_item_id as string)
+      const cogs = source ? buildAutoCogsRow(source, row.quantity as number, row.local_id as string | null) : null
       if (cogs) {
         rows.push({
           client_id: key.client_id,

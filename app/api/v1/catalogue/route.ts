@@ -18,7 +18,7 @@
 // sending is switched off rather than deleted, so its sales history survives.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiKey, noteKeyUse, readJson, apiError } from '@/lib/api-gate'
+import { requireApiKey, noteKeyUse, readJson, apiError, unitIsActive, unitUnavailable } from '@/lib/api-gate'
 import { parseCatalogue, planCatalogueImport, type ExistingItem } from '@/lib/catalogue-import'
 import { applyCataloguePlan, defaultRevenueLineFor } from '@/lib/catalogue-import-runner'
 
@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    if (!await unitIsActive(supabase, key.client_id, key.business_unit_id)) return unitUnavailable()
+
     const planLineId = await defaultRevenueLineFor(supabase, key.client_id, key.business_unit_id)
     if (!planLineId) {
       return apiError(409, 'no_revenue_line',
