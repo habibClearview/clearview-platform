@@ -8,6 +8,7 @@ import { mostRecentTokenUse } from '@/lib/field-auth'
 import { supabase } from '@/lib/supabase'
 import ActiveSessionsButton from '@/components/auth/ActiveSessionsButton'
 import { authedFetch } from '@/lib/authed-fetch'
+import ApiKeysPanel from './ApiKeysPanel'
 import {
   fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, type YearAggregation, type YearGroup,
   runGenericModel, defaultGenericConfig,
@@ -8332,7 +8333,7 @@ function ApprovalsAndSpendTab({clientId,config,cc,P,marketEvents,onMarketEventsC
 }
 // ── SETTINGS & ADMIN TAB (Settings + Scenarios + Team merged, toggle) ──
 function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave,theme,setThemeMode}) {
-  const [mode, setMode] = useState<'settings'|'scenarios'|'team'|'catalogue'|'field'>('settings')
+  const [mode, setMode] = useState<'settings'|'scenarios'|'team'|'catalogue'|'field'|'api'>('settings')
   return (
     <div>
       <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.4rem',flexWrap:'wrap'}}>
@@ -8341,12 +8342,14 @@ function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave,theme,se
         <button style={subtabPill(mode==='team')} onClick={()=>setMode('team')}>Team</button>
         <button style={subtabPill(mode==='catalogue')} onClick={()=>setMode('catalogue')}>Catalogue</button>
         <button style={subtabPill(mode==='field')} onClick={()=>setMode('field')}>Clearview Field</button>
+        <button style={subtabPill(mode==='api')} onClick={()=>setMode('api')}>Connected Systems</button>
       </div>
       {mode==='settings' && <SettingsTab config={config} P={P} onSave={onSave} theme={theme} setThemeMode={setThemeMode}/>}
       {mode==='scenarios' && <ScenariosTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
       {mode==='team' && <TeamTab clientId={clientId} config={config} P={P}/>}
       {mode==='catalogue' && <><CatalogueManager clientId={clientId} config={config} P={P}/><SegmentManager clientId={clientId} config={config} P={P}/></>}
       {mode==='field' && <FieldOperatorManager clientId={clientId} config={config} P={P}/>}
+      {mode==='api' && <ApiKeysPanel clientId={clientId} businessUnits={config.business_units}/>}
     </div>
   )
 }

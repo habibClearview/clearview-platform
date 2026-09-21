@@ -2067,3 +2067,74 @@ same stored name and the second would overwrite the first.
   2. Habib's microphone recorded silence for four sessions, then worked. The
      device it opens is now reported into recording_tracks.device_report.
   3. The three questions above.
+
+## 20 September 2026 — the ClearView API
+
+Habib: "I need to develop an API that captures the data set clearview require
+for all the features ... i want an API with best practice on how it is shared
+with people that i need to send it to."
+
+Built and awaiting one SQL migration
+(`supabase/migrations/2026_09_20_api_keys.sql`, which Habib must run because
+there are no database credentials in this session).
+
+Six addresses under `/api/v1/`: read the business, send sales, send costs, send
+a month of totals, send payments, read the worked-out figures.
+
+The key: 256 bits of randomness behind a `cv_live_` prefix, stored only as a
+SHA-256 hash, shown once and never retrievable. Tied to one client and one
+business unit, carries explicit permissions, can expire, can be withdrawn,
+rate limited at 120 calls a minute per key. Accepted from the Authorization
+header only, never the query string.
+
+Two decisions worth remembering:
+
+* **Writes reuse the field path.** Each key owns a hidden field operator row,
+  so everything it sends lands in `field_transactions` and goes through the
+  same aggregation, month-end close and reconciliation as a phone's entries.
+  No second write path, and nothing that reads a figure had to change.
+* **A payment sent through the API is marked self reported** (`provider_id`
+  prefixed `api:`), so it can never be confused with one a provider confirmed
+  to us directly. `/api/v1/results` reports the two separately.
+
+New: the holding pen (`api_inbox`). Anything well-formed that cannot be filed
+is kept with its reason instead of dropped, and the count shows on the coach's
+screen.
+
+Still open: nothing is pushed outward (no webhooks to a funder's system), there
+is no portfolio-wide read, and the coaching record is not exposed.
+
+### Correction, same day: ClearView reads their list instead of being sent ours
+
+Habib: "what is supposed to happen is that clearview pulls these details from
+the existing system - the cataloque and price list is likely on their systems -
+can clearview not update the cataloque on thier clearview workspace by
+collating from the system they have already - this is all very useless".
+
+He was right. The API as first built made an outside system name every sale by
+ClearView's own catalogue id, so somebody had to pair every product in their
+system with one of ours before a single sale could be sent. For a veterinary
+business with several hundred drug lines that is days of work, repeated every
+time they add a product. The list already exists in their software.
+
+Three ways in, all using the same import rules:
+
+* `POST /api/v1/catalogue` — their system sends its price list.
+* A nightly scheduled read (`/api/catalogue-pull`, 03:00) from an address a
+  coach records once. This is the pulling half.
+* A paste-in box on the Connected Systems screen, for software that sits on one
+  computer behind a counter with nothing the internet can reach. That is most
+  small businesses, and telling them to build an endpoint means it never
+  happens.
+
+Column names are matched by meaning rather than spelling, so sku / code /
+item_number are one thing and price / unit_price / selling_price are another.
+Each catalogue item keeps the code the other system uses (`external_id`), and
+sales now arrive as `external_item_id`, so **nothing is mapped by hand**.
+
+An import never deletes: a product that stops appearing is switched off. It
+never moves an item a coach has filed under a particular revenue line. A
+product whose price could not be read is created unsellable rather than free.
+
+Still open: this reads price lists, not sales history. A system that can
+publish its past sales has no address to send them to in bulk yet.
