@@ -113,3 +113,29 @@ describe('a business behind on its bookkeeping', () => {
     expect(text).toMatch(/\d/)
   })
 })
+
+// ============================================================
+// The month-by-month block must not leave the coach's own login.
+//
+// It carries combined revenue for each calendar month. A segment grant can be
+// narrow enough to hold one business, and that business's monthly sales would
+// then be readable by whoever holds the link. Nothing on the public page draws
+// it, so it is withheld at the route.
+// ============================================================
+import fs from 'fs'
+import path from 'path'
+
+describe('the external access route', () => {
+  const route = fs.readFileSync(
+    path.resolve(__dirname, '../../app/api/access-grant/[token]/route.ts'), 'utf8',
+  )
+
+  it('strips the month-by-month block before answering a token holder', () => {
+    expect(route).toContain('const { monthly: _withheld, ...shared } = data')
+    expect(route).toContain('data: shared')
+  })
+
+  it('never answers a token holder with the whole view object', () => {
+    expect(route).not.toMatch(/viewAvailable:\s*true,\s*scopeDescription,\s*data\s*\}/)
+  })
+})
