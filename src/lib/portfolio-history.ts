@@ -37,6 +37,7 @@ export interface SnapshotRow {
   client_id: string
   ref_code: string
   snapshot_month: string
+  currency?: string | null
   engagement_mode?: string | null
   sector?: string | null
   country?: string | null
@@ -224,7 +225,16 @@ export function aboveLenderComfort(rows: SnapshotRow[]): number {
 export function slippedBackByMonth(
   rows: SnapshotRow[], months: string[], filter: HistoryFilter = {},
 ): SeriesPoint[] {
-  const kept = rows.filter((r) => matches(r, filter) && !r.skipped_reason)
+  // THE READINESS FILTER IS DELIBERATELY IGNORED HERE.
+  //
+  // Filtering to one stage keeps only the months an engagement sat at that
+  // stage, so it can never be seen below its own best and the answer is always
+  // zero. A reader would take that as "nobody went backwards" when it actually
+  // means "not measurable with this filter", which is the worse of the two
+  // mistakes. A fall is only visible across stages, so this series is drawn
+  // from the other three filters and says so on the page.
+  const { readinessStage: _ignored, ...crossStage } = filter
+  const kept = rows.filter((r) => matches(r, crossStage) && !r.skipped_reason)
   const best: Record<string, number> = {}
   const counts: Record<string, number> = {}
 
@@ -295,4 +305,58 @@ export function reading(m: Movement, goodDirection: 'up' | 'down'): 'up' | 'down
   if (rel < 0.03) return 'flat'
   const better = goodDirection === 'up' ? m.diff > 0 : m.diff < 0
   return better ? 'up' : 'down'
+}
+
+// ------------------------------------------------------------
+// Money is never added across currencies
+// ------------------------------------------------------------
+
+/**
+ * The currency most of these engagements report in.
+ *
+ * A portfolio spanning Nigeria, Kenya and Uganda holds naira, shillings and
+ * shillings again, and adding them produces a number that means nothing while
+ * looking perfectly reasonable. The rest of this platform reports money per
+ * currency and never blends; so does this.
+ *
+ * Ties are settled alphabetically so the same portfolio always reports in the
+ * same currency rather than flipping between two of equal size.
+ */
+export function dominantCurrency(rows: SnapshotRow[]): string | null {
+  const counts: Record<string, number> = {}
+  for (const r of rows) {
+    const c = typeof r.currency === 'string' ? r.currency.trim().toUpperCase() : ''
+    if (!c) continue
+    counts[c] = (counts[c] || 0) + 1
+  }
+  const found = Object.keys(counts).sort()
+  if (found.length === 0) return null
+  return found.reduce((best, c) => (counts[c] > counts[best] ? c : best), found[0])
+}
+
+/** Every currency present, most common first, for saying what was left out. */
+export function currenciesPresent(rows: SnapshotRow[]): string[] {
+  const counts: Record<string, number> = {}
+  for (const r of rows) {
+    const c = typeof r.currency === 'string' ? r.currency.trim().toUpperCase() : ''
+    if (!c) continue
+    counts[c] = (counts[c] || 0) + 1
+  }
+  return Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b))
+}
+
+/**
+ * The rows that may be added together: one currency only.
+ *
+ * A row with no currency recorded is kept, because the overwhelming majority
+ * of this platform is single-currency per engagement and dropping an unlabelled
+ * row would silently shrink a total. A row labelled with a different currency
+ * is excluded, because including it would silently corrupt one.
+ */
+export function sameCurrency(rows: SnapshotRow[], currency: string | null): SnapshotRow[] {
+  if (!currency) return rows
+  return rows.filter((r) => {
+    const c = typeof r.currency === 'string' ? r.currency.trim().toUpperCase() : ''
+    return !c || c === currency
+  })
 }

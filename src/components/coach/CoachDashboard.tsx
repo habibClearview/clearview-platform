@@ -1601,7 +1601,8 @@ function PortfolioIntelligenceHub({clients,programmes}){
           </div>
           <div className="cv-grid-4">
             <PerfDist label="Gross margin" summary={perfSum.grossMargin} unit="%" note="pricing &amp; cost control"/>
-            <PerfDist label="Net margin" summary={perfSum.netMargin} unit="%"/>
+            <PerfDist label="Net margin" summary={perfSum.netMargin} unit="%" note="after everything"/>
+            <PerfDist label="Return on investment" summary={perfSum.roi} unit="%" note="net profit ÷ capital at risk"/>
           </div>
         </div>
       )}
@@ -1610,15 +1611,9 @@ function PortfolioIntelligenceHub({clients,programmes}){
         <div style={card}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Business quality &amp; durability</div>
           <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.9rem'}}>
-            Whether growth is economically real: what each business keeps from a sale, what it earns on the
-            capital at risk, and whether it could service a loan. Distributions across the {hasFilter?'segment':'portfolio'}; cut by sector below.
+            The same ratios, cut by sector. Every sector on the platform, whichever programme its businesses
+            belong to, so a sector can be read against the others rather than only against itself.
           </p>
-          <div className="cv-grid-4" style={{marginBottom:'0.7rem'}}>
-            <PerfDist label="Gross margin" summary={perfSum.grossMargin} unit="%" note="pricing &amp; cost control"/>
-            <PerfDist label="Return on investment" summary={perfSum.roi} unit="%" note="net profit ÷ capital at risk"/>
-            <PerfDist label="Net margin" summary={perfSum.netMargin} unit="%" note="after everything"/>
-            <PerfDist label="Debt coverage (DSCR)" summary={perfSum.dscr} unit="×" decimals={1} note={`${perfSum.bankableCount} could service a loan`}/>
-          </div>
 
           {data.performanceBySector&&data.performanceBySector.length>0&&(
             <div style={{marginTop:'1.1rem'}}>
@@ -1649,7 +1644,6 @@ function PortfolioIntelligenceHub({clients,programmes}){
                       <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.ebitdaMargin,'%')}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.netMargin,'%')}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.roi,'%')}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.burnMultiple,'×',1)}</td>
                     </tr>
                   </tbody>
                 </table>

@@ -9,6 +9,7 @@ import {
   matches, monthsIn, monthLabel, median, total, groupByMonth, readCount,
   buildSeries, verifiedShare, atMarketReadyOrAbove, aboveLenderComfort,
   slippedBackByMonth, stageCounts, movement, reading,
+  dominantCurrency, currenciesPresent, sameCurrency,
   MIN_FOR_PUBLICATION, STAGE_ORDER, type SnapshotRow,
 } from '@/lib/portfolio-history'
 
@@ -324,5 +325,78 @@ describe('whether a movement is good news', () => {
 
   it('says it does not know rather than guessing, when there is one reading', () => {
     expect(reading({ from: null, to: 5, diff: null, pct: null, months: 0 }, 'up')).toBe('unknown')
+  })
+})
+
+describe('slipping back, and the readiness filter', () => {
+  const months = ['2026-01', '2026-02']
+  const climbedThenFell = [
+    row({ snapshot_month: '2026-01-01', readiness_stage: 'near_ready' }),
+    row({ snapshot_month: '2026-02-01', readiness_stage: 'development_stage' }),
+  ]
+
+  it('still sees a fall when the view is filtered to one readiness stage', () => {
+    // Filtering to a stage keeps only the months spent at it, so the fall
+    // would be invisible and the answer would read as a confident zero.
+    const s = slippedBackByMonth(climbedThenFell, months, { readinessStage: 'development_stage' })
+    expect(s.map((p) => p.value)).toEqual([0, 1])
+  })
+
+  it('still honours the other filters', () => {
+    const s = slippedBackByMonth(climbedThenFell, months, { sector: 'Dairy' })
+    expect(s.map((p) => p.value)).toEqual([null, null])
+  })
+
+  it('gives the same answer filtered by stage as unfiltered', () => {
+    const withFilter = slippedBackByMonth(climbedThenFell, months, { readinessStage: 'near_ready' })
+    const without = slippedBackByMonth(climbedThenFell, months)
+    expect(withFilter.map((p) => p.value)).toEqual(without.map((p) => p.value))
+  })
+})
+
+describe('money is never added across currencies', () => {
+  const mixed = [
+    row({ client_id: 'a', currency: 'UGX', declared_revenue: 100 }),
+    row({ client_id: 'b', currency: 'UGX', declared_revenue: 200 }),
+    row({ client_id: 'c', currency: 'KES', declared_revenue: 5 }),
+    row({ client_id: 'd', currency: 'NGN', declared_revenue: 9 }),
+  ]
+
+  it('reports in the currency most of them keep their books in', () => {
+    expect(dominantCurrency(mixed)).toBe('UGX')
+  })
+
+  it('lists every currency present, most common first', () => {
+    expect(currenciesPresent(mixed)).toEqual(['UGX', 'KES', 'NGN'])
+  })
+
+  it('leaves the other currencies out rather than adding them in', () => {
+    const kept = sameCurrency(mixed, 'UGX')
+    expect(total(kept.map((r) => r.declared_revenue))).toBe(300)
+  })
+
+  it('keeps a row whose currency was never recorded, rather than shrinking the total', () => {
+    const rows = [row({ currency: 'UGX', declared_revenue: 100 }),
+                  row({ client_id: 'b', currency: null, declared_revenue: 50 })]
+    expect(total(sameCurrency(rows, 'UGX').map((r) => r.declared_revenue))).toBe(150)
+  })
+
+  it('reads a currency the same however it was typed', () => {
+    expect(dominantCurrency([row({ currency: ' ugx ' })])).toBe('UGX')
+  })
+
+  it('answers nothing when no currency was ever recorded', () => {
+    expect(dominantCurrency([row({ currency: null })])).toBeNull()
+    expect(currenciesPresent([row({ currency: null })])).toEqual([])
+  })
+
+  it('keeps every row when there is no currency to report in', () => {
+    const rows = [row({ currency: null }), row({ client_id: 'b', currency: null })]
+    expect(sameCurrency(rows, null)).toHaveLength(2)
+  })
+
+  it('settles a tie the same way every time', () => {
+    const tied = [row({ client_id: 'a', currency: 'KES' }), row({ client_id: 'b', currency: 'UGX' })]
+    expect(dominantCurrency(tied)).toBe(dominantCurrency([...tied].reverse()))
   })
 })

@@ -219,12 +219,13 @@ function moveLabel(ind: Indicator, m: Move, currency: string): string {
 export interface PortfolioBoardProps {
   view: BoardView
   filter: Record<string, string>
+  /** Used only until the record answers with the currency it actually holds. */
   currency: string
   /** How many businesses the current (single-reading) view covers. */
   snapshotCount: number
 }
 
-export default function PortfolioBoard({ view, filter, currency, snapshotCount }: PortfolioBoardProps) {
+export default function PortfolioBoard({ view, filter, currency: fallbackCurrency, snapshotCount }: PortfolioBoardProps) {
   const [history, setHistory] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -258,6 +259,10 @@ export default function PortfolioBoard({ view, filter, currency, snapshotCount }
   }, [history])
 
   const ordered = VIEW_ORDER[view].map((k) => BY_KEY[k]).filter(Boolean)
+  // Money is reported in the currency most of these businesses keep their
+  // books in, never added across currencies.
+  const currency: string = history?.currency || fallbackCurrency
+  const otherCurrencies: string[] = ((history?.currencies as string[]) || []).filter((c) => c !== currency)
 
   function pointsFor(key: string): Point[] {
     return (history?.series?.[key] as Point[]) || []
@@ -270,7 +275,9 @@ export default function PortfolioBoard({ view, filter, currency, snapshotCount }
       for (let i = pts.length - 1; i >= 0; i--) if (pts[i].value !== null) return pts[i].value as number
       return null
     }
-    const n = history.engagementsLatest || snapshotCount
+    // ?? not ||: zero engagements read in the latest month is a real answer,
+    // and substituting a different population count would misstate it.
+    const n = history.engagementsLatest ?? snapshotCount
     const ready = latest('marketReady'), slip = latest('slipped')
     const ver = latest('verified'), comfort = latest('aboveComfort'), rdy = latest('readiness')
     const nice = (v: number | null) => v === null ? '—' : Math.round(v).toLocaleString('en-GB')
@@ -481,6 +488,13 @@ export default function PortfolioBoard({ view, filter, currency, snapshotCount }
         Percentages are medians across the businesses in view, never averages, so one large business cannot move
         them. <b>n&lt;5</b> marks a month withheld because fewer than five businesses were read that month and a
         reader could otherwise work out who they are. A dash means no reading was filed.
+        {otherCurrencies.length > 0 && (
+          <> Money is shown in <b>{currency}</b> only. {otherCurrencies.length === 1 ? 'One other currency is' : `${otherCurrencies.length} other currencies are`} held
+          in this view ({otherCurrencies.join(', ')}) and {otherCurrencies.length === 1 ? 'it is' : 'they are'} left out of
+          the money figures rather than added to them, because a total across currencies means nothing.</>
+        )}
+        {' '}Businesses that slipped back are counted across every readiness stage, so a stage filter narrows who
+        is counted but never hides a fall.
       </p>
     </div>
   )

@@ -22,7 +22,8 @@ import { getAdminClient } from '@/lib/auth/api-authz'
 import {
   groupByMonth, monthsIn, buildSeries, stageCounts, slippedBackByMonth,
   verifiedShare, atMarketReadyOrAbove, aboveLenderComfort, median, total,
-  readCount, type SnapshotRow, type HistoryFilter,
+  readCount, dominantCurrency, currenciesPresent, sameCurrency,
+  type SnapshotRow, type HistoryFilter,
 } from '@/lib/portfolio-history'
 
 export const dynamic = 'force-dynamic'
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
       .from('portfolio_snapshots')
       .select('client_id, ref_code, snapshot_month, engagement_mode, sector, country, programme_id, ' +
               'readiness_stage, ir_score, confidence_score, declared_revenue, verified_revenue, ' +
-              'unattributed_revenue, fac_amount, gross_margin_pct, ebitda_margin_pct, net_margin_pct, ' +
+              'unattributed_revenue, fac_amount, currency, gross_margin_pct, ebitda_margin_pct, net_margin_pct, ' +
               'revenue_growth_pct, cost_ratio_pct, dscr_min, decision_points_signed, ' +
               'decision_points_total, skipped_reason')
       .order('snapshot_month', { ascending: true })
@@ -67,6 +68,17 @@ export async function POST(req: NextRequest) {
     const months = monthsIn(financial).slice(-MAX_MONTHS)
     const grouped = groupByMonth(financial, filter)
 
+    // MONEY IS NEVER ADDED ACROSS CURRENCIES. A portfolio spanning Nigeria,
+    // Kenya and Uganda holds naira and two different shillings, and a total
+    // across them means nothing while looking perfectly reasonable. Every
+    // money series below is built from the rows reporting in one currency;
+    // percentages, counts and scores carry no currency and use them all.
+    const inView = Object.values(grouped).flat()
+    const currency = dominantCurrency(inView)
+    const currencies = currenciesPresent(inView)
+    const moneyGrouped: typeof grouped = {}
+    for (const [month, rows] of Object.entries(grouped)) moneyGrouped[month] = sameCurrency(rows, currency)
+
     // Everything that could be filtered on, taken from the whole record rather
     // than the filtered slice, so choosing one sector does not empty the list
     // of the others.
@@ -77,9 +89,9 @@ export async function POST(req: NextRequest) {
     }
 
     const series: Record<string, unknown> = {
-      revenue: buildSeries(grouped, months, (r) => total(r.map((x) => x.declared_revenue))),
-      verified: buildSeries(grouped, months, verifiedShare),
-      unattributed: buildSeries(grouped, months, (r) => total(r.map((x) => x.unattributed_revenue))),
+      revenue: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.declared_revenue))),
+      verified: buildSeries(moneyGrouped, months, verifiedShare),
+      unattributed: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.unattributed_revenue))),
       readiness: buildSeries(grouped, months, (r) => median(r.map((x) => x.ir_score))),
       confidence: buildSeries(grouped, months, (r) => median(r.map((x) => x.confidence_score))),
       grossMargin: buildSeries(grouped, months, (r) => median(r.map((x) => x.gross_margin_pct))),
@@ -87,7 +99,7 @@ export async function POST(req: NextRequest) {
       netMargin: buildSeries(grouped, months, (r) => median(r.map((x) => x.net_margin_pct))),
       revenueGrowth: buildSeries(grouped, months, (r) => median(r.map((x) => x.revenue_growth_pct))),
       costRatio: buildSeries(grouped, months, (r) => median(r.map((x) => x.cost_ratio_pct))),
-      absorbable: buildSeries(grouped, months, (r) => total(r.map((x) => x.fac_amount))),
+      absorbable: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.fac_amount))),
       // Counts of the population identify nobody, so they are not suppressed.
       engagements: buildSeries(grouped, months, (r) => r.length, false),
       marketReady: buildSeries(grouped, months, atMarketReadyOrAbove, false),
@@ -99,6 +111,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       months,
       series,
+      // What the money figures are reported in, and what was left out of them.
+      currency,
+      currencies,
       stages: stageCounts(grouped, months),
       options,
       // What the record actually holds, so the page can say so rather than
