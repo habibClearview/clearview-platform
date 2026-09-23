@@ -80,6 +80,7 @@ import MonthTable from './MonthTable'
 import StageLadder from './StageLadder'
 import LineChart from './LineChart'
 import DownloadSection from './DownloadSection'
+import { MIN_FOR_PUBLICATION } from '@/lib/portfolio-history'
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────
 const C = {
@@ -1469,12 +1470,28 @@ function PortfolioIntelligenceHub({clients,programmes}){
   // filed each month. The sections on stages, evidence and capital are month by
   // month in the agreed presentation, and this is where those months come from.
   const [history,setHistory]=useState(null)
+  const [historyError,setHistoryError]=useState('')
+  // A filter changed twice in quick succession used to let the slower answer
+  // land last, so the months on screen could belong to a filter nobody had
+  // selected. Only the newest request is allowed to write.
+  const historyReq=useRef(0)
   const loadHistory=useCallback((f)=>{
+    const mine=++historyReq.current
+    setHistoryError('')
     supabase.auth.getSession().then(({data:{session}})=>{
       fetch('/api/portfolio-history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requesterToken:session?.access_token,filter:f})})
         .then(r=>r.json())
-        .then(json=>{ if(!json.error) setHistory(json) })
-        .catch(()=>{})
+        .then(json=>{
+          if(mine!==historyReq.current)return
+          if(json.error){setHistoryError(json.error);return}
+          setHistory(json)
+        })
+        .catch(e=>{
+          if(mine!==historyReq.current)return
+          // Silence here read as "no month has been filed yet", which is a
+          // different thing from "this did not load".
+          setHistoryError(e.message||'The month-by-month record could not be loaded.')
+        })
     })
   },[])
   useEffect(()=>{loadHistory(filter)},[])
@@ -1842,7 +1859,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
                 // A sector of fewer than five businesses is named but its
                 // ratios are withheld, because at that size a reader could
                 // work out which business is which.
-                const thin=row.count<5
+                const thin=row.count<MIN_FOR_PUBLICATION
                 const g=row.summary.revenueGrowth
                 const growth=g&&g.median!==null?g.median:null
                 const ready=row.overview.readinessPipeline.investment_ready+row.overview.readinessPipeline.near_ready

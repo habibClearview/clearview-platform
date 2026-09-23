@@ -88,25 +88,26 @@ export async function POST(req: NextRequest) {
       programmeIds: Array.from(new Set(all.map((r) => r.programme_id).filter(Boolean))).sort(),
     }
 
-    // NOT SUPPRESSED HERE. 23 September 2026. buildSeries withholds a month
-    // read from fewer than five businesses so a shared, anonymised view cannot
-    // identify one of them from a small sample. This route is the coach's own
-    // view of the coach's own clients, behind the super_coach gate: there is
-    // nobody here to protect them from, and applying it blanked the page. The
-    // rule still belongs on anything shared outside, and MIN_FOR_PUBLICATION
-    // stays exported for that.
+    // THE SMALL-SAMPLE RULE STAYS ON. A month read from fewer than five
+    // businesses is withheld, so nobody can work out an individual business
+    // from an aggregate. It was briefly switched off here because a coach with
+    // three clients saw nothing; review was right that a gate asserted in a
+    // comment is not a control, and the test in
+    // src/__tests__/portfolio-history-gate.test.ts now pins the gate instead.
+    // Turning this off is a separate decision with its own evidence, not a
+    // side effect of a presentation change.
     const series: Record<string, unknown> = {
-      revenue: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.declared_revenue)), false),
-      verified: buildSeries(moneyGrouped, months, verifiedShare, false),
-      unattributed: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.unattributed_revenue)), false),
-      readiness: buildSeries(grouped, months, (r) => median(r.map((x) => x.ir_score)), false),
-      confidence: buildSeries(grouped, months, (r) => median(r.map((x) => x.confidence_score)), false),
-      grossMargin: buildSeries(grouped, months, (r) => median(r.map((x) => x.gross_margin_pct)), false),
-      ebitdaMargin: buildSeries(grouped, months, (r) => median(r.map((x) => x.ebitda_margin_pct)), false),
-      netMargin: buildSeries(grouped, months, (r) => median(r.map((x) => x.net_margin_pct)), false),
-      revenueGrowth: buildSeries(grouped, months, (r) => median(r.map((x) => x.revenue_growth_pct)), false),
-      costRatio: buildSeries(grouped, months, (r) => median(r.map((x) => x.cost_ratio_pct)), false),
-      absorbable: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.fac_amount)), false),
+      revenue: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.declared_revenue))),
+      verified: buildSeries(moneyGrouped, months, verifiedShare),
+      unattributed: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.unattributed_revenue))),
+      readiness: buildSeries(grouped, months, (r) => median(r.map((x) => x.ir_score))),
+      confidence: buildSeries(grouped, months, (r) => median(r.map((x) => x.confidence_score))),
+      grossMargin: buildSeries(grouped, months, (r) => median(r.map((x) => x.gross_margin_pct))),
+      ebitdaMargin: buildSeries(grouped, months, (r) => median(r.map((x) => x.ebitda_margin_pct))),
+      netMargin: buildSeries(grouped, months, (r) => median(r.map((x) => x.net_margin_pct))),
+      revenueGrowth: buildSeries(grouped, months, (r) => median(r.map((x) => x.revenue_growth_pct))),
+      costRatio: buildSeries(grouped, months, (r) => median(r.map((x) => x.cost_ratio_pct))),
+      absorbable: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.fac_amount))),
       // Counts of the population identify nobody, so they are not suppressed.
       engagements: buildSeries(grouped, months, (r) => r.length, false),
       marketReady: buildSeries(grouped, months, atMarketReadyOrAbove, false),
