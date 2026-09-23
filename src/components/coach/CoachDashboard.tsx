@@ -76,6 +76,8 @@ import { GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, grantStatus, generateAccessToken
 import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
 import PortfolioBoard, { BOARD_VIEWS, type BoardView } from './PortfolioBoard'
 import PlanVsActual from './PlanVsActual'
+import MonthTable from './MonthTable'
+import StageLadder from './StageLadder'
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────
 const C = {
@@ -1460,11 +1462,47 @@ function PortfolioIntelligenceHub({clients,programmes}){
   },[])
   useEffect(()=>{load(filter)},[])
 
+  // THE RECORDED MONTH-BY-MONTH RECORD. Separate from the live snapshot above:
+  // that one recomputes every model as it stands today, this one reads what was
+  // filed each month. The sections on stages, evidence and capital are month by
+  // month in the agreed presentation, and this is where those months come from.
+  const [history,setHistory]=useState(null)
+  const loadHistory=useCallback((f)=>{
+    supabase.auth.getSession().then(({data:{session}})=>{
+      fetch('/api/portfolio-history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requesterToken:session?.access_token,filter:f})})
+        .then(r=>r.json())
+        .then(json=>{ if(!json.error) setHistory(json) })
+        .catch(()=>{})
+    })
+  },[])
+  useEffect(()=>{loadHistory(filter)},[])
+
+  // The recorded record, shaped for the month-by-month tables. A series the
+  // record does not carry comes back as a row of dashes rather than an empty
+  // table, so a reader can see what the product reports on from the first
+  // month it is filed.
+  const historyMonths=(history&&history.months?history.months:[]).map(m=>{
+    const d=history.series&&history.series.readiness&&history.series.readiness.find(p=>p.month===m)
+    return d&&d.label?d.label:m
+  })
+  const historyCurrency=history&&history.currency?history.currency:null
+  const seriesValues=useCallback((key)=>{
+    const s=history&&history.series?history.series[key]:null
+    if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
+    return s.map(p=>p&&typeof p.value==='number'?p.value:null)
+  },[history])
+  const stageSeries=useCallback((stage)=>{
+    const s=history&&history.stages?history.stages[stage]:null
+    if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
+    return s.map(p=>p&&typeof p.value==='number'?p.value:null)
+  },[history])
+
   function applyFilter(next){
     const merged={...filter,...next}
     Object.keys(merged).forEach(k=>{if(!merged[k])delete merged[k]})
     setFilter(merged)
     load(merged)
+    loadHistory(merged)
   }
 
   if(loading)return<div style={{...card,textAlign:'center',padding:'2rem',color:C.slate}}>Loading portfolio intelligence...</div>
@@ -1577,62 +1615,68 @@ function PortfolioIntelligenceHub({clients,programmes}){
         <PlanVsActual points={data.monthly?.points||[]} currency={data.monthly?.currency||currencies[0]||'UGX'}/>
       </div>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>The four stages, and movement between them</div>
-      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Where each business sits today, and the seven dimensions behind the score that moves it between stages.</p>
-      <div className="cv-grid-4" style={{marginBottom:'0.9rem',gap:'0.6rem'}}>
-        <GlanceKPI label="Avg Liquidity Readiness" value={`${Math.round(view.avgLRSScore)}/100`} sub="seven dimensions" color={C.purple}/>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.7rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'1.8rem 0 0.2rem'}}>Movement</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>The four stages, and movement between them</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        Every enterprise sits at one of four stages. <b>Slipped back</b> means an enterprise is now at a lower
+        stage than the highest it has reached. It is the figure a narrative report never contains.
+      </p>
+      <div style={{marginBottom:'0.9rem'}}>
+        <StageLadder stages={[
+          {step:'Stage 1',name:'Grant dependent',colour:C.amber,count:view.readinessPipeline.pre_investment,pct:view.readinessPipelinePct.pre_investment,
+           meaning:'Sales do not cover running costs. Grant money pays for core operations. There may be customers, but not enough to survive without support.'},
+          {step:'Stage 2',name:'Commercially aware',colour:C.cyan,count:view.readinessPipeline.development_stage,pct:view.readinessPipelinePct.development_stage,
+           meaning:'Has paying customers and knows its margins. Still needs grant money for part of its core costs, but can say what it earns and what things cost.'},
+          {step:'Stage 3',name:'Market ready',colour:C.teal,count:view.readinessPipeline.near_ready,pct:view.readinessPipelinePct.near_ready,
+           meaning:'Covers operating costs from sales. Keeps records a lender would accept, and could service a loan.'},
+          {step:'Stage 4',name:'Commercially viable',colour:C.green,count:view.readinessPipeline.investment_ready,pct:view.readinessPipelinePct.investment_ready,
+           meaning:'Profitable and growing without grant support, and has raised or could raise commercial finance in its own name.'},
+        ]}/>
       </div>
-      <div style={card}>
-        <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
-          {pipelineEntries.map(([stage,color])=>(
-            <div key={stage} style={{flex:'1 1 140px',borderLeft:`4px solid ${color}`,padding:'0.5rem 0.8rem',background:'var(--cv-tint-cyan)',borderRadius:4}}>
-              <div style={{fontSize:'1.3rem',fontWeight:700,color}}>{view.readinessPipeline[stage]}</div>
-              <div style={{fontSize: '1.01rem',color:C.slate}}>{READINESS_STAGE_LABELS[stage]} · {Math.round(view.readinessPipelinePct[stage])}%</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <MonthTable
+        months={historyMonths}
+        empty="No month has been filed yet, so there is no movement between stages to show. A reading is filed for every business at each month end, and this fills in from the first one."
+        rows={[
+          {label:'Grant dependent',fmt:'count',values:stageSeries('pre_investment'),good:'down'},
+          {label:'Commercially aware',fmt:'count',values:stageSeries('development_stage')},
+          {label:'Market ready',fmt:'count',values:stageSeries('near_ready'),good:'up'},
+          {label:'Commercially viable',fmt:'count',values:stageSeries('investment_ready'),good:'up'},
+          {label:'Slipped back',fmt:'count',values:seriesValues('slipped'),good:'down',note:'now lower than the highest stage it has reached'},
+          {label:'Median readiness score',fmt:'score',values:seriesValues('readiness'),good:'up',note:'out of 30'},
+        ]}/>
 
-      <div style={card}>
-        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.4rem'}}>
-          Seven-dimension average{hasFilter?' — this segment vs. portfolio':''}
-        </div>
-        {view.mostCommonWeakDimension&&<div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Weakest dimension: <b style={{color:C.red}}>{LRS_DIM_LABELS[view.mostCommonWeakDimension]}</b></div>}
-        <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
-          {Object.entries(view.dimensionAverages).map(([dim,avg])=>{
-            const portfolioAvg=portfolio.dimensionAverages[dim]
-            return(
-              <div key={dim} style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-                <div style={{width:150,fontSize: '1.01rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
-                <div style={{flex:1,background:'var(--cv-tint-cyan)',borderRadius:4,height:14,position:'relative'}}>
-                  <div style={{width:`${Math.max(2,avg)}%`,background:C.teal,height:'100%',borderRadius:4}}/>
-                  {hasFilter&&<div style={{position:'absolute',left:`${Math.max(0,portfolioAvg-0.5)}%`,top:-2,width:2,height:18,background:'var(--cv-header)'}} title={`Portfolio average: ${Math.round(portfolioAvg)}`}/>}
-                </div>
-                <div style={{width:40,fontSize: '1.01rem',color:C.slate,textAlign:'right'}}>{Math.round(avg)}</div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.7rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'1.8rem 0 0.2rem'}}>Evidence</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>How much of what they declare, the money confirms</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        A sale counts as verified only once a payment record has been matched to it. Money that arrived but was
+        never matched to a sale is counted separately and never quietly added in.
+      </p>
+      <MonthTable
+        months={historyMonths}
+        empty="No month has been filed yet, so there is nothing to confirm against. This fills in from the first month end."
+        rows={[
+          {label:'Verified share of revenue',fmt:'pct',values:seriesValues('verified'),good:'up',note:'matched to a specific recorded sale'},
+          {label:'Declared revenue',fmt:'money',values:seriesValues('revenue'),good:'up',note:historyCurrency?`totalled in ${historyCurrency}`:undefined},
+          {label:'Arrived but never matched',fmt:'money',values:seriesValues('unattributed'),good:'down',note:'counted separately, never added in'},
+          {label:'Median data confidence',fmt:'score',values:seriesValues('confidence'),good:'up',note:'out of 100'},
+        ]}/>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>How much of what they declare, the money confirms</div>
-      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>A figure counts as confirmed only where a payment record can be matched to a specific recorded sale.</p>
-      <div style={card}>
-        <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end',height:100}}>
-          {view.verificationDistribution.map(b=>{
-            const maxCount=Math.max(1,...view.verificationDistribution.map(x=>x.count))
-            return(
-              <div key={b.label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'0.3rem'}}>
-                <div style={{fontSize: '1.01rem',color:C.navy,fontWeight:600}}>{b.count}</div>
-                <div style={{width:'100%',height:`${Math.max(4,(b.count/maxCount)*70)}px`,background:C.cyan,borderRadius:'3px 3px 0 0'}}/>
-                <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>{b.label}</div>
-              </div>
-            )
-          })}
-        </div>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.7rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'1.8rem 0 0.2rem'}}>Capital</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What these enterprises could take on</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        Capacity, not money anyone has lent. Worked out per enterprise from its own cash position and existing
+        obligations, then added up. Never blended across currencies.
+      </p>
+      <div style={{marginBottom:'0.9rem'}}>
+        <MonthTable
+          months={historyMonths}
+          empty="No month has been filed yet, so there is no month-by-month capacity to show."
+          rows={[
+            {label:'Total capacity',fmt:'money',values:seriesValues('absorbable'),good:'up',note:historyCurrency?`added up in ${historyCurrency}`:undefined},
+            {label:'At market ready or above',fmt:'count',values:seriesValues('marketReady'),good:'up'},
+            {label:'Could service new debt at 1.5×',fmt:'count',values:seriesValues('aboveComfort'),good:'up'},
+          ]}/>
       </div>
-
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>What these enterprises could take on</div>
       <div style={card}>
         <div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Average of what each business could absorb TODAY, by type -- not a hypothetical "if all were investment-ready" ceiling. Shown separately per currency; never blended across currencies.</div>
         {currencies.length===0?(
