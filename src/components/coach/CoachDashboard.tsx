@@ -453,7 +453,7 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,clients,progra
                 <option value="">All readiness stages</option>
                 {Object.entries(READINESS_STAGE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
               </select>
-              <div style={{width:'100%',fontSize:'0.78rem',color:C.slate}}>A programme filter shows exactly the businesses that programme is paying for -- combine it with sector/country/stage to narrow further, or leave those on "All" to get the whole programme.</div>
+              <div style={{width:'100%',fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>A programme filter shows exactly the businesses that programme is paying for -- combine it with sector/country/stage to narrow further, or leave those on "All" to get the whole programme.</div>
             </div>
           )}
           <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem'}}>
@@ -1519,7 +1519,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
         <button onClick={()=>window.print()} title="Opens your browser's print dialog -- choose 'Save as PDF' to download a styled PDF of exactly this view" style={{fontSize: '1.01rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>⬇ PDF</button>
         <button disabled={downloading} onClick={()=>downloadBrief(filter)} style={{fontSize: '1.01rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>{downloading?'Generating…':'⬇ Word Summary'}</button>
         <button onClick={()=>setShowAccess(true)} style={{fontSize: '1.01rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>🔗 External Access</button>
-        <div style={{width:'100%',fontSize:'0.78rem',color:C.slate}}>To send a subscribed client (e.g. a donor programme like CSJ) an analysis of just <b>their own clients</b>: pick their <b>programme</b> above, then <b>External Access → Create Link</b> — the link is pre-scoped to exactly that client's businesses.</div>
+        <div style={{width:'100%',fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>To send a subscribed client (e.g. a donor programme like CSJ) an analysis of just <b>their own clients</b>: pick their <b>programme</b> above, then <b>External Access → Create Link</b> — the link is pre-scoped to exactly that client's businesses.</div>
         {downloadError&&<div style={{width:'100%',fontSize:'0.78rem',color:C.red}}>{downloadError}</div>}
       </div>
       {showAccess&&<ExternalAccessPanel portfolioFilter={hasFilter?filter:undefined} clients={clients} programmes={programmes} onClose={()=>setShowAccess(false)}/>}
@@ -1540,7 +1540,19 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
-      <PortfolioBoard view={boardView} filter={filter} currency={currencies[0]||'UGX'} snapshotCount={snapshotCount}/>
+      <PortfolioBoard
+        view={boardView}
+        monthly={data.monthly}
+        businesses={view.totalBusinesses}
+        fallbackCurrency={currencies[0]||'UGX'}
+        current={{
+          readiness: view.avgIRScore ?? null,
+          marketReady: (view.readinessPipeline.investment_ready||0)+(view.readinessPipeline.near_ready||0),
+          verified: null,
+          dscr: perfSum&&perfSum.dscr&&perfSum.dscr.median!==null?perfSum.dscr.median:null,
+          confidence: view.avgConfidenceScore ?? null,
+        }}
+      />
 
       {hasFilter&&(
         <DrillConnector>↓ filtered to {[filter.programmeId&&(programmesById[filter.programmeId]?.name||'a programme'),filter.sector,filter.country,filter.readinessStage&&READINESS_STAGE_LABELS[filter.readinessStage]].filter(Boolean).join(' · ')} ↓</DrillConnector>
@@ -1558,31 +1570,26 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
-      {/* Trust & coverage — why the numbers can be trusted */}
+      {/* The four figures that stood here -- businesses, readiness, confidence --
+          are on the board above with their movement, so repeating them as
+          averages with no trend was showing the same thing twice. What is left
+          is the one score the board does not carry and the two claims about
+          the method, which are statements about the product rather than
+          readings of the portfolio. */}
       <div className="cv-grid-4" style={{marginBottom:'1.25rem',gap:'0.6rem'}}>
+        <GlanceKPI label="Avg Liquidity Readiness" value={`${Math.round(view.avgLRSScore)}/100`} sub="seven dimensions" color={C.purple}/>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{snapshotCount} model{snapshotCount===1?'':'s'}</div>
-          <div style={{fontSize:'0.78rem',color:C.slate}}>Full standardised financial models, not survey estimates.</div>
-        </div>
-        <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>90%+</div>
-          <div style={{fontSize:'0.78rem',color:C.slate}}>have no credit-agency rating — the coverage gap we fill.</div>
+          <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>Full standardised financial models, not survey estimates.</div>
         </div>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Independent</div>
-          <div style={{fontSize:'0.78rem',color:C.slate}}>Model-derived; no payment relationship with the business rated.</div>
+          <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>Model-derived, with no payment relationship with the business rated.</div>
         </div>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Median-based</div>
-          <div style={{fontSize:'0.78rem',color:C.slate}}>One outlier can't distort a benchmark; only present values are counted.</div>
+          <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>One outlier cannot distort a benchmark; only present values are counted.</div>
         </div>
-      </div>
-
-      <div className="cv-grid-4" style={{marginBottom:'1.25rem'}}>
-        <GlanceKPI label="Businesses" value={String(view.totalBusinesses)} sub={hasFilter?`of ${portfolio.totalBusinesses} portfolio-wide`:'on platform'} color={C.navy}/>
-        <GlanceKPI label="Avg Investment Readiness" value={`${Math.round(view.avgIRScore)}/30`} sub="current scores" color={C.teal}/>
-        <GlanceKPI label="Avg Verification Confidence" value={`${Math.round(view.avgConfidenceScore)}/100`} sub="current period" color={C.cyan}/>
-        <GlanceKPI label="Avg Liquidity Readiness" value={`${Math.round(view.avgLRSScore)}/100`} sub="seven dimensions" color={C.purple}/>
       </div>
 
       {perfSum&&(
@@ -1743,7 +1750,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
               <div key={b.label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'0.3rem'}}>
                 <div style={{fontSize: '1.01rem',color:C.navy,fontWeight:600}}>{b.count}</div>
                 <div style={{width:'100%',height:`${Math.max(4,(b.count/maxCount)*70)}px`,background:C.cyan,borderRadius:'3px 3px 0 0'}}/>
-                <div style={{fontSize:'0.78rem',color:C.slate}}>{b.label}</div>
+                <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>{b.label}</div>
               </div>
             )
           })}
@@ -1900,7 +1907,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
                 const t=openProfile.fac[key]
                 return(
                   <div key={key} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.5rem 0.7rem'}}>
-                    <div style={{fontSize:'0.78rem',color:C.slate}}>{label}</div>
+                    <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>{label}</div>
                     <div style={{fontSize: '1.01rem',fontWeight:700,color:C.navy}}>{t.capacity===null?'n/a':fmtPortfolioMoney(t.capacity,openProfile.currency)}</div>
                   </div>
                 )

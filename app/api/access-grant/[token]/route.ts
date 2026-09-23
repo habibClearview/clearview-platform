@@ -151,7 +151,18 @@ async function serveGrantView(admin: ReturnType<typeof getAdminClient>, grant: a
     const parts = [f.sector, f.country, f.readinessStage].filter(Boolean)
     if (parts.length > 0) scopeDescription = `Segment: ${parts.join(' · ')}`
   }
-  return NextResponse.json({ scopeType: grant.scope_type, viewAvailable: true, scopeDescription, data })
+  // The month-by-month block stays behind the coach's own login.
+  //
+  // 23 September 2026. It carries combined revenue for each calendar month.
+  // A segment grant can be narrow enough to hold a single business, and that
+  // business's monthly sales would then be readable by whoever holds the link,
+  // even though nothing on the public page draws them. Nothing out here needs
+  // it -- the public view and the Word brief both read the aggregates above --
+  // so it is not sent. If the month-by-month record is ever wanted on a shared
+  // link, it needs the small-sample rule in src/lib/portfolio-history.ts
+  // applied to it first.
+  const { monthly: _withheld, ...shared } = data
+  return NextResponse.json({ scopeType: grant.scope_type, viewAvailable: true, scopeDescription, data: shared })
 }
 
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {

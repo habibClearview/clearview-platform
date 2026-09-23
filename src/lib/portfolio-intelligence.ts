@@ -106,6 +106,12 @@ export interface ClientSnapshot {
   businessUnits: BusinessUnitContribution[]  // active units with real revenue, by contribution share
   consentToBeNamed: boolean
   performance?: SnapshotPerformance | null  // currency-neutral ratios for portfolio benchmarking (optional: older snapshots/fixtures may omit it)
+  /**
+   * This client's own month-by-month record, taken straight from its financial
+   * model. Optional because fixtures and older cached snapshots predate it.
+   * See src/lib/portfolio-monthly.ts.
+   */
+  monthly?: { period: string; revenue: number | null; grossProfit: number | null; ebitda: number | null }[]
 }
 
 export interface SegmentFilter {
