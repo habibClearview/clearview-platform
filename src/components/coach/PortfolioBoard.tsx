@@ -180,6 +180,19 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
   const others = (monthly?.currencies || []).filter((c) => c !== currency)
   const monthCount = points.length
 
+  // Where a portfolio spans currencies, some months' revenue totals cover
+  // fewer businesses than the reporting count. Naming those months is the
+  // difference between a footnote nobody reads and one that answers the
+  // question a reader is actually asking.
+  const shortMonths = points.filter((p) => p.nRevenue < p.n).map((p) => p.label)
+  const revenueShortfall = shortMonths.length === 0
+    ? null
+    : shortMonths.length === points.length
+      ? 'every month shown'
+      : shortMonths.length > 3
+        ? `${shortMonths.length} of the months shown`
+        : shortMonths.join(' and ')
+
   const measures: Measure[] = useMemo(() => {
     const revenue = points.map((p) => p.revenue)
     const gross = points.map((p) => p.grossMargin)
@@ -187,7 +200,7 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
     return [
       { key: 'reporting', name: 'Businesses reporting', fmt: 'count', good: 'up', series: points.map((p) => p.n), latest: null, neutral: true,
         what: 'How many businesses had recorded their actual figures for that month when this page was drawn.',
-        how: 'Counted from the months each business has entered against its plan. A business that has not yet closed a month is not counted for that month, and its sales are not in that month’s total.',
+        how: 'Counted from the months each business has entered against its plan. A business that has not yet closed a month is not counted for that month, and its sales are not in that month’s total. Where the portfolio holds more than one currency, this counts every business with a reading, while the revenue total covers only those keeping their books in the currency named below it.',
         looks: 'Steady at the full number. Where it dips in the most recent month it usually means bookkeeping is behind, not that trading stopped, which is why the change below is measured on the same businesses in both months.' },
       { key: 'revenue', name: 'Combined revenue', fmt: 'money', good: 'up', series: revenue, latest: null, lfl: monthly?.lfl ?? null,
         what: 'What these businesses actually sold that month, added together.',
@@ -227,7 +240,23 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
   // One place decides what a measure's change is and what verdict it carries,
   // so the cards, the table and the headline can never disagree.
   const readingFor = (m: Measure) => {
-    if (m.lfl && m.lfl.diff !== null) {
+    // A measure carrying a like-for-like comparison never falls back to a
+    // straight first-against-last on the raw series. That series adds up a
+    // changing set of businesses, and comparing its ends is the very fault
+    // this page was fixed for: where no business reported in both months
+    // there is no comparison to make, and the page says so rather than
+    // inventing one.
+    if (m.lfl) {
+      const latest = m.series ? (m.series[m.series.length - 1] ?? null) : m.latest
+      if (m.lfl.diff === null) {
+        return {
+          ch: { from: null, to: latest, diff: null, pct: null, months: 0 },
+          rd: { word: 'Latest reading', colour: C.slate, dim: 'var(--cv-amber-dim)' },
+          headline: latest,
+          note: null as string | null,
+          noCompare: true,
+        }
+      }
       const rd = m.neutral
         ? { word: 'Count', colour: C.slate, dim: 'var(--cv-amber-dim)' }
         : readingOf(m.lfl.diff, m.lfl.from, m.good)
@@ -235,10 +264,11 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
         ch: { from: m.lfl.from, to: m.lfl.to, diff: m.lfl.diff, pct: null, months: m.lfl.months },
         rd,
         /** The latest month as it actually stands, which is what people turned over. */
-        headline: m.series ? (m.series[m.series.length - 1] ?? m.lfl.to) : m.lfl.to,
+        headline: latest ?? m.lfl.to,
         note: m.lfl.restricted
           ? `like for like, the ${m.lfl.businesses} ${m.lfl.businesses === 1 ? 'business' : 'businesses'} reporting in both months`
           : `over ${m.lfl.months} month${m.lfl.months === 1 ? '' : 's'}`,
+        noCompare: false,
       }
     }
     const ch = m.series ? changeAcross(m.series) : { from: null, to: m.latest, diff: null, pct: null, months: 0 }
@@ -249,6 +279,7 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
       ch, rd,
       headline: ch.to,
       note: ch.diff === null ? null : `over ${ch.months} month${ch.months === 1 ? '' : 's'}`,
+      noCompare: false,
     }
   }
 
@@ -318,7 +349,7 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
         {CARDS[view].map((key) => {
           const m = byKey[key] as Measure
           if (!m) return null
-          const { ch, rd, headline: big, note } = readingFor(m)
+          const { ch, rd, headline: big, note, noCompare } = readingFor(m)
           return (
             <div key={key} style={{ background: C.card, border: `1px solid ${C.border}`,
                                     borderTop: `3px solid ${ACCENT[key] || C.teal}`, borderRadius: 10,
@@ -332,7 +363,8 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
               <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.86rem', fontWeight: 700,
                              color: rd.colour, lineHeight: 1.45 }}>
                 {ch.diff === null
-                  ? <span style={{ color: C.faint, fontWeight: 400 }}>{m.series ? 'no earlier month' : 'latest reading'}</span>
+                  ? <span style={{ color: C.faint, fontWeight: 400 }}>
+                      {noCompare ? 'no business reported in both months' : m.series ? 'no earlier month' : 'latest reading'}</span>
                   : <>{changeText(m.fmt, ch.diff, currency)}
                       {note && <span style={{ color: C.faint, fontWeight: 400, marginLeft: 5 }}>{note}</span>}</>}
               </span>
@@ -362,7 +394,7 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
           </thead>
           <tbody>
             {ordered.map((m, rowIndex) => {
-              const { ch, rd, headline: big } = readingFor(m)
+              const { ch, rd, headline: big, noCompare } = readingFor(m)
               const zebra = rowIndex % 2 === 1 ? C.alt : C.card
               return (
                 <tr key={m.key}>
@@ -390,7 +422,8 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
                   <td className="pb-pin" style={{ ...td, left: 318, zIndex: 2,
                                                   background: 'var(--cv-cyan-dim)', fontWeight: 700, color: rd.colour }}>
                     {ch.diff === null ? <span style={{ color: C.faint, fontWeight: 400 }}>
-                      {m.series ? 'no earlier month' : 'latest only'}</span> : changeText(m.fmt, ch.diff, currency)}
+                      {noCompare ? 'not comparable' : m.series ? 'no earlier month' : 'latest only'}</span>
+                      : changeText(m.fmt, ch.diff, currency)}
                   </td>
                   <td className="pb-pin" style={{ ...td, left: 436, zIndex: 2, textAlign: 'left', background: zebra,
                                                   boxShadow: '4px 0 6px -4px rgba(0,0,0,0.18)' }}>
@@ -453,7 +486,9 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
         businesses that had reported by then, so the change is measured on the businesses that reported in both the
         first month and the last, and a business whose bookkeeping is behind cannot read as a fall in trading.
         {others.length > 0 && <> Money is shown in <b>{currency}</b> only; {others.join(' and ')} {others.length === 1 ? 'is' : 'are'} held
-        in this view and left out of the totals, because a sum across currencies means nothing.</>}
+        in this view and left out of the totals, because a sum across currencies means nothing. For that reason the businesses
+        reporting row can count more businesses than the revenue total covers{revenueShortfall === null ? '' : `, as it does in ${revenueShortfall}`}; the
+        margins are ratios, carry no currency, and use every reading.</>}
       </p>
     </div>
   )

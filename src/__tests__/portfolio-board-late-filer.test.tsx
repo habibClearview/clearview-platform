@@ -139,3 +139,74 @@ describe('the external access route', () => {
     expect(route).not.toMatch(/viewAvailable:\s*true,\s*scopeDescription,\s*data\s*\}/)
   })
 })
+
+// ============================================================
+// Review asked whether stripping the top-level block is enough, since each
+// client snapshot now carries its own months and the anonymised profiles are
+// built from those snapshots. buildAnonymisedProfile writes an explicit object
+// and never spreads the snapshot, so it does not. This asserts that rather
+// than trusting it, across the whole serialised payload at any depth.
+// ============================================================
+describe('the external payload', () => {
+  const profileBuilder = fs.readFileSync(
+    path.resolve(__dirname, '../../src/lib/portfolio-intelligence.ts'), 'utf8',
+  )
+
+  it('builds anonymised profiles without spreading the snapshot', () => {
+    const body = profileBuilder.slice(profileBuilder.indexOf('export function buildAnonymisedProfile'))
+      .slice(0, profileBuilder.slice(profileBuilder.indexOf('export function buildAnonymisedProfile')).indexOf('\n}') + 2)
+    expect(body).not.toContain('...snapshot')
+    expect(body).not.toContain('monthly')
+  })
+
+  it('carries no month-by-month record at any depth', () => {
+    const data: any = {
+      portfolio: {}, segment: null, snapshotCount: 2,
+      profiles: [{ refCode: 'A1', sector: 'Agriculture', performance: { dscr: 1.2 } }],
+      monthly: { months: ['2026-01'], points: [{ month: '2026-01', revenue: 900 }], businesses: 1 },
+      filterOptions: { sectors: [], countries: [], programmeIds: [] },
+    }
+    // The same destructure the route performs.
+    const { monthly: _withheld, ...shared } = data
+    expect(JSON.stringify(shared)).not.toContain('"monthly"')
+    expect(JSON.stringify(shared)).not.toContain('900')
+  })
+})
+
+describe('when nobody reported in both months', () => {
+  it('says so instead of comparing a changing set of businesses', () => {
+    // One business has only the earliest month, the other only the latest.
+    // Comparing the two totals would announce a rise that no business had.
+    const { monthly, text } = board([
+      { clientId: 'early', currency: 'UGX', months: [
+        { period: '2025-10-01', revenue: 900, grossProfit: 340, ebitda: 150 }] },
+      { clientId: 'late', currency: 'UGX', months: [
+        { period: '2026-08-01', revenue: 2480, grossProfit: 1040, ebitda: 610 }] },
+    ] as any)
+    expect(monthly.lfl!.diff).toBeNull()
+    expect(monthly.lfl!.businesses).toBe(0)
+    expect(text).toContain('no business reported in both months')
+    expect(text).not.toContain('IMPROVING')
+    expect(text).not.toContain('FALLING BACK')
+  })
+})
+
+describe('a portfolio holding more than one currency', () => {
+  it('counts every reading but totals only one currency, and says which months', () => {
+    const clients = [
+      { clientId: 'ugx', currency: 'UGX', months: [
+        { period: '2026-01-01', revenue: 100, grossProfit: 40, ebitda: 20 },
+        { period: '2026-02-01', revenue: 120, grossProfit: 50, ebitda: 25 }] },
+      { clientId: 'kes', currency: 'KES', months: [
+        { period: '2026-02-01', revenue: 9000, grossProfit: 3000, ebitda: 1000 }] },
+    ]
+    const months = monthsAcross(clients)
+    const points = aggregateMonthly(clients, months, 'UGX')
+    expect(points[0].n).toBe(1)
+    expect(points[0].nRevenue).toBe(1)
+    // February has two readings but only one of them is in UGX.
+    expect(points[1].n).toBe(2)
+    expect(points[1].nRevenue).toBe(1)
+    expect(points[1].revenue).toBe(120)
+  })
+})

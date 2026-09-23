@@ -47,6 +47,12 @@ export interface MonthlyPoint {
   label: string
   /** Businesses with an actual reading that month. */
   n: number
+  /**
+   * Businesses behind the revenue total, which can be fewer than `n`: money is
+   * added within one currency only, while the margins are ratios and use every
+   * reading. On a single-currency portfolio the two are always equal.
+   */
+  nRevenue: number
   revenue: number | null
   grossMargin: number | null
   ebitdaMargin: number | null
@@ -181,6 +187,7 @@ export function aggregateMonthly(
       month,
       label: labelOf(month),
       n: readings.length,
+      nRevenue: revenues.length,
       revenue: revenues.length ? revenues.reduce((s, v) => s + v, 0) : null,
       grossMargin: median(grossMargins),
       ebitdaMargin: median(ebitdaMargins),
