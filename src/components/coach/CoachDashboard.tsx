@@ -1510,7 +1510,6 @@ function PortfolioIntelligenceHub({clients,programmes}){
     if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
     return s.map(p=>p&&typeof p.value==='number'?p.value:null)
   },[history])
-  const planPoints=((data.monthly&&data.monthly.points)||[]).filter(p=>p.plannedRevenue!==null&&p.revenue!==null)
   const moneyShort=useCallback((v)=>{
     if(v===null||!Number.isFinite(v))return '—'
     const a=Math.abs(v)
@@ -1519,30 +1518,6 @@ function PortfolioIntelligenceHub({clients,programmes}){
     if(a>=1e3)return Math.round(v/1e3)+'k'
     return String(Math.round(v))
   },[])
-  // WHAT THE PRINTED PAGE CARRIES. The same readings the screen above shows,
-  // at quarterly columns so a first page holds them, so the download can never
-  // disagree with the page somebody read before pressing it.
-  const paperPoints=((data.monthly&&data.monthly.points)||[])
-  const paperMonths=paperPoints.length
-    ? `${paperPoints[0].label} to ${paperPoints[paperPoints.length-1].label}`
-    : 'No month recorded yet'
-  const paperCols=(()=>{
-    if(paperPoints.length===0)return []
-    const step=Math.max(1,Math.ceil(paperPoints.length/6))
-    const idx=[]
-    for(let i=0;i<paperPoints.length;i+=step)idx.push(i)
-    if(idx[idx.length-1]!==paperPoints.length-1)idx.push(paperPoints.length-1)
-    return idx
-  })()
-  const paperColumns=paperCols.map(i=>paperPoints[i].label)
-  const pctText=(v)=>v===null||v===undefined||!Number.isFinite(v)?'—':Math.round(v)+'%'
-  const paperRows=paperPoints.length===0?[]:[
-    {label:'Combined revenue',cells:paperCols.map(i=>{const v=paperPoints[i].revenue;return v===null?'—':moneyShort(v)})},
-    {label:'Median gross margin',cells:paperCols.map(i=>pctText(paperPoints[i].grossMargin))},
-    {label:'Median operating margin',cells:paperCols.map(i=>pctText(paperPoints[i].ebitdaMargin))},
-    {label:'Businesses reporting',cells:paperCols.map(i=>String(paperPoints[i].n))},
-    {label:'Delivered against plan',cells:paperCols.map(i=>pctText(paperPoints[i].achievedPct))},
-  ]
   // THE SPECIMEN'S FIGURES ARE INVENTED, AND NOTHING ON THE PLATFORM FEEDS
   // THEM. They exist so the shape of the instrument can be read before anybody
   // commits to collecting it. They are never mixed with a real reading.
@@ -1582,6 +1557,35 @@ function PortfolioIntelligenceHub({clients,programmes}){
       filter.readinessStage&&READINESS_STAGE_LABELS[filter.readinessStage]].filter(Boolean)
     return parts.length?parts.join(' · '):'Every business on the platform'
   })()
+
+  // ANYTHING THAT READS `data` LIVES BELOW THE GUARDS. `data` is null until the
+  // first fetch lands, and these ran above the loading return, so the whole tab
+  // threw on its very first render before it had anything to draw.
+  const planPoints=((data.monthly&&data.monthly.points)||[]).filter(p=>p.plannedRevenue!==null&&p.revenue!==null)
+  // WHAT THE PRINTED PAGE CARRIES. The same readings the screen above shows,
+  // at quarterly columns so a first page holds them, so the download can never
+  // disagree with the page somebody read before pressing it.
+  const paperPoints=((data.monthly&&data.monthly.points)||[])
+  const paperMonths=paperPoints.length
+    ? `${paperPoints[0].label} to ${paperPoints[paperPoints.length-1].label}`
+    : 'No month recorded yet'
+  const paperCols=(()=>{
+    if(paperPoints.length===0)return []
+    const step=Math.max(1,Math.ceil(paperPoints.length/6))
+    const idx=[]
+    for(let i=0;i<paperPoints.length;i+=step)idx.push(i)
+    if(idx[idx.length-1]!==paperPoints.length-1)idx.push(paperPoints.length-1)
+    return idx
+  })()
+  const paperColumns=paperCols.map(i=>paperPoints[i].label)
+  const pctText=(v)=>v===null||v===undefined||!Number.isFinite(v)?'—':Math.round(v)+'%'
+  const paperRows=paperPoints.length===0?[]:[
+    {label:'Combined revenue',cells:paperCols.map(i=>{const v=paperPoints[i].revenue;return v===null?'—':moneyShort(v)})},
+    {label:'Median gross margin',cells:paperCols.map(i=>pctText(paperPoints[i].grossMargin))},
+    {label:'Median operating margin',cells:paperCols.map(i=>pctText(paperPoints[i].ebitdaMargin))},
+    {label:'Businesses reporting',cells:paperCols.map(i=>String(paperPoints[i].n))},
+    {label:'Delivered against plan',cells:paperCols.map(i=>pctText(paperPoints[i].achievedPct))},
+  ]
 
   const paperKpis=[
     {value:String(view.totalBusinesses),label:'Businesses in this view'},
