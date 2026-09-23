@@ -1510,12 +1510,6 @@ function PortfolioIntelligenceHub({clients,programmes}){
     if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
     return s.map(p=>p&&typeof p.value==='number'?p.value:null)
   },[history])
-  const scopeLabel=(()=>{
-    const parts=[filter.programmeId&&(programmesById[filter.programmeId]?.name||'A programme'),filter.sector,filter.country,
-      filter.readinessStage&&READINESS_STAGE_LABELS[filter.readinessStage]].filter(Boolean)
-    return parts.length?parts.join(' · '):'Every business on the platform'
-  })()
-
   const planPoints=((data.monthly&&data.monthly.points)||[]).filter(p=>p.plannedRevenue!==null&&p.revenue!==null)
   const moneyShort=useCallback((v)=>{
     if(v===null||!Number.isFinite(v))return '—'
@@ -1549,13 +1543,6 @@ function PortfolioIntelligenceHub({clients,programmes}){
     {label:'Businesses reporting',cells:paperCols.map(i=>String(paperPoints[i].n))},
     {label:'Delivered against plan',cells:paperCols.map(i=>pctText(paperPoints[i].achievedPct))},
   ]
-  const paperKpis=[
-    {value:String(view.totalBusinesses),label:'Businesses in this view'},
-    {value:`${Math.round(view.avgIRScore)}/30`,label:'Median investment readiness'},
-    {value:String((view.readinessPipeline.investment_ready||0)+(view.readinessPipeline.near_ready||0)),label:'At market ready or above'},
-    {value:`${Math.round(view.avgLRSScore)}/100`,label:'Average liquidity readiness'},
-  ]
-
   // THE SPECIMEN'S FIGURES ARE INVENTED, AND NOTHING ON THE PLATFORM FEEDS
   // THEM. They exist so the shape of the instrument can be read before anybody
   // commits to collecting it. They are never mixed with a real reading.
@@ -1587,6 +1574,22 @@ function PortfolioIntelligenceHub({clients,programmes}){
   const view=hasFilter&&segment?segment.segment:portfolio
   const currencies=Object.keys(portfolio.currentFundAbsorption)
   const programmesById=Object.fromEntries((programmes||[]).map(p=>[p.id,p]))
+
+  // The printed page and its cover line are built here, beside the view they
+  // describe, because both read it.
+  const scopeLabel=(()=>{
+    const parts=[filter.programmeId&&(programmesById[filter.programmeId]?.name||'A programme'),filter.sector,filter.country,
+      filter.readinessStage&&READINESS_STAGE_LABELS[filter.readinessStage]].filter(Boolean)
+    return parts.length?parts.join(' · '):'Every business on the platform'
+  })()
+
+  const paperKpis=[
+    {value:String(view.totalBusinesses),label:'Businesses in this view'},
+    {value:`${Math.round(view.avgIRScore)}/30`,label:'Median investment readiness'},
+    {value:String((view.readinessPipeline.investment_ready||0)+(view.readinessPipeline.near_ready||0)),label:'At market ready or above'},
+    {value:`${Math.round(view.avgLRSScore)}/100`,label:'Average liquidity readiness'},
+  ]
+
   const pipelineEntries=[['investment_ready',C.green],['near_ready',C.cyan],['development_stage',C.amber],['pre_investment',C.red]]
   // Performance summary for the current view (segment when filtered, else whole
   // portfolio). Guarded because an older cached API response, or the empty-
