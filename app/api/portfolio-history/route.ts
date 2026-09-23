@@ -88,6 +88,14 @@ export async function POST(req: NextRequest) {
       programmeIds: Array.from(new Set(all.map((r) => r.programme_id).filter(Boolean))).sort(),
     }
 
+    // THE SMALL-SAMPLE RULE STAYS ON. A month read from fewer than five
+    // businesses is withheld, so nobody can work out an individual business
+    // from an aggregate. It was briefly switched off here because a coach with
+    // three clients saw nothing; review was right that a gate asserted in a
+    // comment is not a control, and the test in
+    // src/__tests__/portfolio-history-gate.test.ts now pins the gate instead.
+    // Turning this off is a separate decision with its own evidence, not a
+    // side effect of a presentation change.
     const series: Record<string, unknown> = {
       revenue: buildSeries(moneyGrouped, months, (r) => total(r.map((x) => x.declared_revenue))),
       verified: buildSeries(moneyGrouped, months, verifiedShare),

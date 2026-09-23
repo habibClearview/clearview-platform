@@ -76,6 +76,11 @@ import { GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, grantStatus, generateAccessToken
 import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
 import PortfolioBoard, { BOARD_VIEWS, type BoardView } from './PortfolioBoard'
 import PlanVsActual from './PlanVsActual'
+import MonthTable from './MonthTable'
+import StageLadder from './StageLadder'
+import LineChart from './LineChart'
+import DownloadSection from './DownloadSection'
+import { MIN_FOR_PUBLICATION } from '@/lib/portfolio-history'
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────
 const C = {
@@ -1460,11 +1465,104 @@ function PortfolioIntelligenceHub({clients,programmes}){
   },[])
   useEffect(()=>{load(filter)},[])
 
+  // THE RECORDED MONTH-BY-MONTH RECORD. Separate from the live snapshot above:
+  // that one recomputes every model as it stands today, this one reads what was
+  // filed each month. The sections on stages, evidence and capital are month by
+  // month in the agreed presentation, and this is where those months come from.
+  const [history,setHistory]=useState(null)
+  const [historyError,setHistoryError]=useState('')
+  // A filter changed twice in quick succession used to let the slower answer
+  // land last, so the months on screen could belong to a filter nobody had
+  // selected. Only the newest request is allowed to write.
+  const historyReq=useRef(0)
+  const loadHistory=useCallback((f)=>{
+    const mine=++historyReq.current
+    setHistoryError('')
+    supabase.auth.getSession().then(({data:{session}})=>{
+      fetch('/api/portfolio-history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requesterToken:session?.access_token,filter:f})})
+        .then(r=>r.json())
+        .then(json=>{
+          if(mine!==historyReq.current)return
+          if(json.error){setHistoryError(json.error);return}
+          setHistory(json)
+        })
+        .catch(e=>{
+          if(mine!==historyReq.current)return
+          // Silence here read as "no month has been filed yet", which is a
+          // different thing from "this did not load".
+          setHistoryError(e.message||'The month-by-month record could not be loaded.')
+        })
+    })
+  },[])
+  useEffect(()=>{loadHistory(filter)},[])
+
+  // The recorded record, shaped for the month-by-month tables. A series the
+  // record does not carry comes back as a row of dashes rather than an empty
+  // table, so a reader can see what the product reports on from the first
+  // month it is filed.
+  const historyMonths=(history&&history.months?history.months:[]).map(m=>{
+    const d=history.series&&history.series.readiness&&history.series.readiness.find(p=>p.month===m)
+    return d&&d.label?d.label:m
+  })
+  const historyCurrency=history&&history.currency?history.currency:null
+  const seriesValues=useCallback((key)=>{
+    const s=history&&history.series?history.series[key]:null
+    if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
+    return s.map(p=>p&&typeof p.value==='number'?p.value:null)
+  },[history])
+  const planPoints=((data.monthly&&data.monthly.points)||[]).filter(p=>p.plannedRevenue!==null&&p.revenue!==null)
+  const moneyShort=useCallback((v)=>{
+    if(v===null||!Number.isFinite(v))return '—'
+    const a=Math.abs(v)
+    if(a>=1e9)return (v/1e9).toFixed(1)+'bn'
+    if(a>=1e6)return (v/1e6).toFixed(1)+'m'
+    if(a>=1e3)return Math.round(v/1e3)+'k'
+    return String(Math.round(v))
+  },[])
+  // WHAT THE PRINTED PAGE CARRIES. The same readings the screen above shows,
+  // at quarterly columns so a first page holds them, so the download can never
+  // disagree with the page somebody read before pressing it.
+  const paperPoints=((data.monthly&&data.monthly.points)||[])
+  const paperMonths=paperPoints.length
+    ? `${paperPoints[0].label} to ${paperPoints[paperPoints.length-1].label}`
+    : 'No month recorded yet'
+  const paperCols=(()=>{
+    if(paperPoints.length===0)return []
+    const step=Math.max(1,Math.ceil(paperPoints.length/6))
+    const idx=[]
+    for(let i=0;i<paperPoints.length;i+=step)idx.push(i)
+    if(idx[idx.length-1]!==paperPoints.length-1)idx.push(paperPoints.length-1)
+    return idx
+  })()
+  const paperColumns=paperCols.map(i=>paperPoints[i].label)
+  const pctText=(v)=>v===null||v===undefined||!Number.isFinite(v)?'—':Math.round(v)+'%'
+  const paperRows=paperPoints.length===0?[]:[
+    {label:'Combined revenue',cells:paperCols.map(i=>{const v=paperPoints[i].revenue;return v===null?'—':moneyShort(v)})},
+    {label:'Median gross margin',cells:paperCols.map(i=>pctText(paperPoints[i].grossMargin))},
+    {label:'Median operating margin',cells:paperCols.map(i=>pctText(paperPoints[i].ebitdaMargin))},
+    {label:'Businesses reporting',cells:paperCols.map(i=>String(paperPoints[i].n))},
+    {label:'Delivered against plan',cells:paperCols.map(i=>pctText(paperPoints[i].achievedPct))},
+  ]
+  // THE SPECIMEN'S FIGURES ARE INVENTED, AND NOTHING ON THE PLATFORM FEEDS
+  // THEM. They exist so the shape of the instrument can be read before anybody
+  // commits to collecting it. They are never mixed with a real reading.
+  const specimenMonths=(historyMonths.length>=6?historyMonths:['Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26']).slice(-12)
+  const specimenFarmers=specimenMonths.map((_,i)=>4100+i*180)
+  const specimenPaid=specimenMonths.map((_,i)=>2480000+i*126000)
+  const specimenJobs=specimenMonths.map((_,i)=>312+i*9)
+
+  const stageSeries=useCallback((stage)=>{
+    const s=history&&history.stages?history.stages[stage]:null
+    if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
+    return s.map(p=>p&&typeof p.value==='number'?p.value:null)
+  },[history])
+
   function applyFilter(next){
     const merged={...filter,...next}
     Object.keys(merged).forEach(k=>{if(!merged[k])delete merged[k]})
     setFilter(merged)
     load(merged)
+    loadHistory(merged)
   }
 
   if(loading)return<div style={{...card,textAlign:'center',padding:'2rem',color:C.slate}}>Loading portfolio intelligence...</div>
@@ -1476,6 +1574,22 @@ function PortfolioIntelligenceHub({clients,programmes}){
   const view=hasFilter&&segment?segment.segment:portfolio
   const currencies=Object.keys(portfolio.currentFundAbsorption)
   const programmesById=Object.fromEntries((programmes||[]).map(p=>[p.id,p]))
+
+  // The printed page and its cover line are built here, beside the view they
+  // describe, because both read it.
+  const scopeLabel=(()=>{
+    const parts=[filter.programmeId&&(programmesById[filter.programmeId]?.name||'A programme'),filter.sector,filter.country,
+      filter.readinessStage&&READINESS_STAGE_LABELS[filter.readinessStage]].filter(Boolean)
+    return parts.length?parts.join(' · '):'Every business on the platform'
+  })()
+
+  const paperKpis=[
+    {value:String(view.totalBusinesses),label:'Businesses in this view'},
+    {value:`${Math.round(view.avgIRScore)}/30`,label:'Median investment readiness'},
+    {value:String((view.readinessPipeline.investment_ready||0)+(view.readinessPipeline.near_ready||0)),label:'At market ready or above'},
+    {value:`${Math.round(view.avgLRSScore)}/100`,label:'Average liquidity readiness'},
+  ]
+
   const pipelineEntries=[['investment_ready',C.green],['near_ready',C.cyan],['development_stage',C.amber],['pre_investment',C.red]]
   // Performance summary for the current view (segment when filtered, else whole
   // portfolio). Guarded because an older cached API response, or the empty-
@@ -1571,68 +1685,111 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>What they planned, against what they achieved</div>
-      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Every business sets a monthly plan. This is what they sold against it, for the months where both figures exist.</p>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Trading</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What they planned, against what they achieved</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        Purple is what these businesses forecast for a month before it happened. Teal is what they achieved.
+        The gap is the only honest way to judge whether a forward plan is worth reading.
+      </p>
+      {planPoints.length>0&&(
+        <div style={{marginBottom:'0.9rem'}}>
+          <LineChart
+            title="Planned and achieved monthly revenue as two lines, with the shortfall shaded between them."
+            months={planPoints.map(p=>p.label)}
+            axisLabel={`${data.monthly?.currency||currencies[0]||'UGX'} PER MONTH`}
+            shadeBetween={[0,1]}
+            format={(v)=>moneyShort(v)}
+            series={[
+              {values:planPoints.map(p=>p.plannedRevenue),colour:C.purple,width:2.2,dashed:true,name:'Planned for that month'},
+              {values:planPoints.map(p=>p.revenue),colour:C.teal,width:2.8,dots:true,name:'Achieved'},
+            ]}/>
+        </div>
+      )}
       <div style={card}>
         <PlanVsActual points={data.monthly?.points||[]} currency={data.monthly?.currency||currencies[0]||'UGX'}/>
       </div>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>The four stages, and movement between them</div>
-      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Where each business sits today, and the seven dimensions behind the score that moves it between stages.</p>
-      <div className="cv-grid-4" style={{marginBottom:'0.9rem',gap:'0.6rem'}}>
-        <GlanceKPI label="Avg Liquidity Readiness" value={`${Math.round(view.avgLRSScore)}/100`} sub="seven dimensions" color={C.purple}/>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Movement</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>The four stages, and movement between them</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        Every enterprise sits at one of four stages. <b>Slipped back</b> means an enterprise is now at a lower
+        stage than the highest it has reached. It is the figure a narrative report never contains.
+      </p>
+      <div style={{marginBottom:'0.9rem'}}>
+        <StageLadder stages={[
+          {step:'Stage 1',name:'Grant dependent',colour:C.amber,count:view.readinessPipeline.pre_investment,pct:view.readinessPipelinePct.pre_investment,
+           meaning:'Sales do not cover running costs. Grant money pays for core operations. There may be customers, but not enough to survive without support.'},
+          {step:'Stage 2',name:'Commercially aware',colour:C.cyan,count:view.readinessPipeline.development_stage,pct:view.readinessPipelinePct.development_stage,
+           meaning:'Has paying customers and knows its margins. Still needs grant money for part of its core costs, but can say what it earns and what things cost.'},
+          {step:'Stage 3',name:'Market ready',colour:C.teal,count:view.readinessPipeline.near_ready,pct:view.readinessPipelinePct.near_ready,
+           meaning:'Covers operating costs from sales. Keeps records a lender would accept, and could service a loan.'},
+          {step:'Stage 4',name:'Commercially viable',colour:C.green,count:view.readinessPipeline.investment_ready,pct:view.readinessPipelinePct.investment_ready,
+           meaning:'Profitable and growing without grant support, and has raised or could raise commercial finance in its own name.'},
+        ]}/>
       </div>
-      <div style={card}>
-        <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
-          {pipelineEntries.map(([stage,color])=>(
-            <div key={stage} style={{flex:'1 1 140px',borderLeft:`4px solid ${color}`,padding:'0.5rem 0.8rem',background:'var(--cv-tint-cyan)',borderRadius:4}}>
-              <div style={{fontSize:'1.3rem',fontWeight:700,color}}>{view.readinessPipeline[stage]}</div>
-              <div style={{fontSize: '1.01rem',color:C.slate}}>{READINESS_STAGE_LABELS[stage]} · {Math.round(view.readinessPipelinePct[stage])}%</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <MonthTable
+        months={historyMonths}
+        empty="No month has been filed yet, so there is no movement between stages to show. A reading is filed for every business at each month end, and this fills in from the first one."
+        rows={[
+          {label:'Grant dependent',fmt:'count',values:stageSeries('pre_investment'),good:'down'},
+          {label:'Commercially aware',fmt:'count',values:stageSeries('development_stage')},
+          {label:'Market ready',fmt:'count',values:stageSeries('near_ready'),good:'up'},
+          {label:'Commercially viable',fmt:'count',values:stageSeries('investment_ready'),good:'up'},
+          {label:'Slipped back',fmt:'count',values:seriesValues('slipped'),good:'down',note:'now lower than the highest stage it has reached'},
+          {label:'Median readiness score',fmt:'score',values:seriesValues('readiness'),good:'up',note:'out of 30'},
+        ]}/>
 
-      <div style={card}>
-        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.4rem'}}>
-          Seven-dimension average{hasFilter?' — this segment vs. portfolio':''}
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Evidence</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>How much of what they declare, the money confirms</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        A sale counts as verified only once a payment record has been matched to it. Money that arrived but was
+        never matched to a sale is counted separately and never quietly added in.
+      </p>
+      {historyMonths.length>0&&seriesValues('verified').some(v=>v!==null)&&(
+        <div style={{marginBottom:'0.9rem'}}>
+          <LineChart
+            title="Verified share of declared revenue month by month, every month labelled."
+            months={historyMonths}
+            suffix="%"
+            series={[{values:seriesValues('verified'),colour:C.green,width:2.8,dots:true,area:true,labelEvery:true}]}/>
         </div>
-        {view.mostCommonWeakDimension&&<div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Weakest dimension: <b style={{color:C.red}}>{LRS_DIM_LABELS[view.mostCommonWeakDimension]}</b></div>}
-        <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
-          {Object.entries(view.dimensionAverages).map(([dim,avg])=>{
-            const portfolioAvg=portfolio.dimensionAverages[dim]
-            return(
-              <div key={dim} style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-                <div style={{width:150,fontSize: '1.01rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
-                <div style={{flex:1,background:'var(--cv-tint-cyan)',borderRadius:4,height:14,position:'relative'}}>
-                  <div style={{width:`${Math.max(2,avg)}%`,background:C.teal,height:'100%',borderRadius:4}}/>
-                  {hasFilter&&<div style={{position:'absolute',left:`${Math.max(0,portfolioAvg-0.5)}%`,top:-2,width:2,height:18,background:'var(--cv-header)'}} title={`Portfolio average: ${Math.round(portfolioAvg)}`}/>}
-                </div>
-                <div style={{width:40,fontSize: '1.01rem',color:C.slate,textAlign:'right'}}>{Math.round(avg)}</div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      )}
+      <MonthTable
+        months={historyMonths}
+        empty="No month has been filed yet, so there is nothing to confirm against. This fills in from the first month end."
+        rows={[
+          {label:'Verified share of revenue',fmt:'pct',values:seriesValues('verified'),good:'up',note:'matched to a specific recorded sale'},
+          {label:'Declared revenue',fmt:'money',values:seriesValues('revenue'),good:'up',note:historyCurrency?`totalled in ${historyCurrency}`:undefined},
+          {label:'Arrived but never matched',fmt:'money',values:seriesValues('unattributed'),good:'down',note:'counted separately, never added in'},
+          {label:'Median data confidence',fmt:'score',values:seriesValues('confidence'),good:'up',note:'out of 100'},
+        ]}/>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>How much of what they declare, the money confirms</div>
-      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>A figure counts as confirmed only where a payment record can be matched to a specific recorded sale.</p>
-      <div style={card}>
-        <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end',height:100}}>
-          {view.verificationDistribution.map(b=>{
-            const maxCount=Math.max(1,...view.verificationDistribution.map(x=>x.count))
-            return(
-              <div key={b.label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'0.3rem'}}>
-                <div style={{fontSize: '1.01rem',color:C.navy,fontWeight:600}}>{b.count}</div>
-                <div style={{width:'100%',height:`${Math.max(4,(b.count/maxCount)*70)}px`,background:C.cyan,borderRadius:'3px 3px 0 0'}}/>
-                <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>{b.label}</div>
-              </div>
-            )
-          })}
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Capital</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What these enterprises could take on</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        Capacity, not money anyone has lent. Worked out per enterprise from its own cash position and existing
+        obligations, then added up. Never blended across currencies.
+      </p>
+      {historyMonths.length>0&&seriesValues('absorbable').some(v=>v!==null)&&(
+        <div style={{marginBottom:'0.9rem'}}>
+          <LineChart
+            title="Capacity these businesses could take on, month by month."
+            months={historyMonths}
+            axisLabel={historyCurrency?`${historyCurrency} OF CAPACITY`:'CAPACITY'}
+            format={(v)=>moneyShort(v)}
+            series={[{values:seriesValues('absorbable'),colour:C.teal,width:2.8,dots:true,name:'Total capacity'}]}/>
         </div>
+      )}
+      <div style={{marginBottom:'0.9rem'}}>
+        <MonthTable
+          months={historyMonths}
+          empty="No month has been filed yet, so there is no month-by-month capacity to show."
+          rows={[
+            {label:'Total capacity',fmt:'money',values:seriesValues('absorbable'),good:'up',note:historyCurrency?`added up in ${historyCurrency}`:undefined},
+            {label:'At market ready or above',fmt:'count',values:seriesValues('marketReady'),good:'up'},
+            {label:'Could service new debt at 1.5×',fmt:'count',values:seriesValues('aboveComfort'),good:'up'},
+          ]}/>
       </div>
-
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>What these enterprises could take on</div>
       <div style={card}>
         <div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Average of what each business could absorb TODAY, by type -- not a hypothetical "if all were investment-ready" ceiling. Shown separately per currency; never blended across currencies.</div>
         {currencies.length===0?(
@@ -1652,119 +1809,94 @@ function PortfolioIntelligenceHub({clients,programmes}){
         ))}
       </div>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>The farmers, agents and retailers behind these enterprises</div>
-      {/* Impact & inclusion — roadmap (not yet collected; no fabricated figures) */}
-      <div style={card}>
-        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.3rem',flexWrap:'wrap'}}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>The reach behind the numbers</div>
-          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Network</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>The farmers, agents and retailers behind these enterprises</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        <b>Not collected yet.</b> It needs one file from each business, after which it is tracked every month
+        like everything else. Below is the same instrument with invented figures, so the shape of what it will
+        report can be read before anybody commits to collecting it.
+      </p>
+      {/* SPECIMEN, AND SAID SO IN THREE PLACES. The dashed border, the tag and
+          the caption all say the figures are invented, because a reader who
+          takes one of these numbers into a funder conversation would be
+          quoting something nobody has measured. */}
+      <div style={{border:`1px dashed ${C.purple}`,borderRadius:10,background:'var(--cv-card)',padding:'1rem'}}>
+        <span style={{display:'inline-block',fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',color:C.purple,border:`1px solid ${C.purple}`,padding:'3px 9px',borderRadius:4,marginBottom:'0.7rem'}}>Specimen · invented figures</span>
+        <LineChart
+          title="Farmers bought from and value paid to them, month by month. Invented figures."
+          months={specimenMonths}
+          format={(v)=>moneyShort(v)}
+          series={[
+            {values:specimenFarmers,colour:C.green,width:2.6,dots:true,name:'Farmers bought from'},
+            {values:specimenPaid,colour:C.cyan,width:2.4,dashed:true,name:'Value paid to farmers'},
+          ]}/>
+        <div style={{marginTop:'0.9rem'}}>
+          <MonthTable
+            months={specimenMonths}
+            empty="—"
+            rows={[
+              {label:'Smallholder farmers bought from',fmt:'count',values:specimenFarmers,good:'up',note:'counted once each, so a farmer selling to two businesses is not counted twice'},
+              {label:'Value paid to farmers',fmt:'money',values:specimenPaid,good:'up',note:'from purchase records, not estimated from yields'},
+              {label:'Jobs created or sustained',fmt:'count',values:specimenJobs,good:'up',note:'payroll records, permanent and seasonal added'},
+            ]}/>
         </div>
-        <p style={{fontSize: '1.01rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem'}}>
-          The reach a donor or impact investor weighs — smallholder farmers and farmer groups reached, and the share of
-          <b> women</b> and <b>youth</b> spelled out by where it sits: <b>supply chain</b>, <b>customers</b>, or <b>workforce</b>.
-          Captured per enterprise via a short per-period return, then rolled up and cut by sector, geography and size.
-          Not yet collected — shown here so the structure is ready.
+        <p style={{margin:'0.7rem 0 0',fontSize:'0.9rem',color:C.faint,lineHeight:1.6}}>
+          Every figure in this block is invented. No business on the platform has reported any of it. It maps
+          to <b>IRIS+</b> for supply chain and client counts by gender and age, the <b>2X Criteria</b> for
+          gender, and <b>SDGs 1, 5 and 8</b>.
         </p>
-        <div style={{fontSize: '1.01rem',color:C.slate,background:'var(--cv-tint-cyan)',borderRadius:8,padding:'0.7rem 0.9rem'}}>
-          Maps to <b>IRIS+</b> (supply-chain &amp; client counts by gender/age), the <b>2X Criteria</b> (gender), and <b>SDGs 1 / 5 / 8</b>.
-        </div>
       </div>
 
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>How each sector is performing, and who is already there</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>The same ratios cut by sector, so a sector can be read against the others rather than only against itself.</p>
-      {perfSum&&(
-        <div style={card}>
-          <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.9rem'}}>
-            The same ratios, cut by sector. Every sector on the platform, whichever programme its businesses
-            belong to, so a sector can be read against the others rather than only against itself.
-          </p>
-
-          {data.performanceBySector&&data.performanceBySector.length>0&&(
-            <div style={{marginTop:'1.1rem'}}>
-              <div style={{fontFamily:'var(--cv-font)',fontSize: '1.01rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Quality ratios by sector</div>
-              <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.6rem'}}>Every sector on the platform, whichever programme its businesses belong to. Each figure is the middle business in that sector, so one large one cannot move it.</p>
-              <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:680}}>
-                  <thead>
-                    <tr>{['Sector','Businesses','Gross margin','EBITDA margin','Net margin','Return on investment'].map((h,i)=>(
-                      <th key={h} style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
-                    ))}</tr>
-                  </thead>
-                  <tbody>
-                    {data.performanceBySector.map((row:any)=>(
-                      <tr key={row.sector} style={{borderTop:'1px solid var(--cv-border-soft)'}}>
-                        <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{row.sector}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.count}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:C.navy}}>{med(row.summary.grossMargin,'%')}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.ebitdaMargin,'%')}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.netMargin,'%')}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.roi,'%')}</td>
-                      </tr>
-                    ))}
-                    <tr style={{borderTop:`2px solid ${C.cyan}`,background:'var(--cv-tint-cyan)',fontWeight:700}}>
-                      <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>Portfolio median</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum.total}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.grossMargin,'%')}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.ebitdaMargin,'%')}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.netMargin,'%')}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.roi,'%')}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.6rem',background:'var(--cv-tint-amber)',borderLeft:`3px solid ${C.amber}`,borderRadius:6,padding:'0.6rem 0.8rem'}}>
-                Every figure here comes from the financial model each business already runs. Nothing on this table waits on anything being collected.
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-
       {data.performanceBySector&&data.performanceBySector.length>0&&(
-        <div style={card}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Benchmarked by segment</div>
-          <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.7rem'}}>Every factor cut by sector, ranked strongest-first. The portfolio row is the baseline. Peer comparisons within this portfolio, not external industry norms.</p>
-          <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:640}}>
-              <thead>
-                <tr>{['Sector','Biz','Ready','LRS','Growth','Cost','Cover','EBITDA','Weakest'].map((h,i)=>(
-                  <th key={h} style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
-                ))}</tr>
-              </thead>
-              <tbody>
-                {[...data.performanceBySector].sort((a:any,b:any)=>(b.overview.avgLRSScore||0)-(a.overview.avgLRSScore||0)).map((row:any)=>{
-                  const g=row.summary.revenueGrowth
-                  return(
-                  <tr key={row.sector} style={{borderTop:'1px solid var(--cv-border-soft)'}}>
-                    <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{row.sector}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.count}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.overview.readinessPipeline.investment_ready}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:C.navy}}>{Math.round(row.overview.avgLRSScore)}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{g&&g.median!==null?`${g.median>0?'+':''}${g.median}%`:'—'}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.costRatio,'%')}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.dscr,'×',1)}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.ebitdaMargin,'%')}</td>
-                    <td style={{padding:'7px 10px',textAlign:'left',color:C.slate}}>{row.overview.mostCommonWeakDimension?LRS_DIM_LABELS[row.overview.mostCommonWeakDimension]:'—'}</td>
-                  </tr>
-                )})}
-                <tr style={{borderTop:`2px solid ${C.cyan}`,background:'var(--cv-tint-cyan)',fontWeight:700}}>
-                  <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>Portfolio</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{portfolio.totalBusinesses}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{portfolio.readinessPipeline.investment_ready}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{Math.round(portfolio.avgLRSScore)}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum&&perfSum.revenueGrowth.median!==null?`${perfSum.revenueGrowth.median>0?'+':''}${perfSum.revenueGrowth.median}%`:'—'}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum?med(perfSum.costRatio,'%'):'—'}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum?med(perfSum.dscr,'×',1):'—'}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum?med(perfSum.ebitdaMargin,'%'):'—'}</td>
-                  <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{portfolio.mostCommonWeakDimension?LRS_DIM_LABELS[portfolio.mostCommonWeakDimension]:'—'}</td>
+        <div style={{overflowX:'auto',border:`1px solid ${'var(--cv-border)'}`,borderRadius:10,background:'var(--cv-card)'}}>
+          <table style={{borderCollapse:'separate',borderSpacing:0,width:'100%',fontSize:'0.88rem',minWidth:880}}>
+            <thead>
+              <tr>{['Sector','Businesses','Median margin','Data confidence','Revenue change','Readiness','Weakest dimension','Reading'].map((h,i)=>(
+                <th key={h} style={{background:'var(--cv-header)',color:'rgba(255,255,255,0.72)',fontFamily:'var(--cv-font-mono)',fontSize:'0.68rem',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',padding:'8px 7px',textAlign:i===0||i===6||i===7?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {[...data.performanceBySector].sort((a,b)=>(b.overview.avgLRSScore||0)-(a.overview.avgLRSScore||0)).map((row,ri)=>{
+                // A sector of fewer than five businesses is named but its
+                // ratios are withheld, because at that size a reader could
+                // work out which business is which.
+                const thin=row.count<MIN_FOR_PUBLICATION
+                const g=row.summary.revenueGrowth
+                const growth=g&&g.median!==null?g.median:null
+                const ready=row.overview.readinessPipeline.investment_ready+row.overview.readinessPipeline.near_ready
+                let word='Served', ink=C.slate, dim='var(--cv-amber-dim)'
+                if(thin){word=`Only ${row.count}`}
+                else if(ready===0){word='Nobody market ready';ink=C.red;dim='var(--cv-red-dim)'}
+                else if(ready>=Math.ceil(row.count/2)){word='Strongest here';ink=C.green;dim='rgba(46,125,50,0.12)'}
+                const zebra=ri%2===1?'var(--cv-alt)':'var(--cv-card)'
+                const td={padding:'8px 7px',borderBottom:'1px solid var(--cv-border-soft)',textAlign:'right',fontFamily:'var(--cv-font-mono)',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',background:zebra,color:C.slate}
+                return(
+                <tr key={row.sector}>
+                  <td style={{...td,textAlign:'left',fontFamily:'var(--cv-font)',fontWeight:600,color:C.navy,whiteSpace:'normal'}}>{row.sector}</td>
+                  <td style={td}>{row.count}</td>
+                  <td style={{...td,fontWeight:700,color:C.navy}}>{thin?'—':med(row.summary.grossMargin,'%')}</td>
+                  <td style={td}>{thin?'—':Math.round(row.overview.avgConfidenceScore)}</td>
+                  <td style={{...td,color:growth===null||thin?C.faint:(growth>0?C.green:growth<0?C.red:C.slate)}}>
+                    {thin||growth===null?'—':`${growth>0?'▲ +':growth<0?'▼ ':''}${growth}%`}
+                  </td>
+                  <td style={td}>{Math.round(row.overview.avgLRSScore)}</td>
+                  <td style={{...td,textAlign:'left',fontFamily:'var(--cv-font)',whiteSpace:'normal'}}>{row.overview.mostCommonWeakDimension?LRS_DIM_LABELS[row.overview.mostCommonWeakDimension]:'—'}</td>
+                  <td style={{...td,textAlign:'left'}}>
+                    <span style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',padding:'3px 8px',borderRadius:4,whiteSpace:'nowrap',color:ink,background:dim}}>{word}</span>
+                  </td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
+              )})}
+            </tbody>
+          </table>
         </div>
       )}
-
+      <p style={{fontSize:'0.9rem',color:C.faint,lineHeight:1.6,margin:'0.7rem 0 0',maxWidth:'80ch'}}>
+        Every business on the platform, grouped by sector, whichever programme it belongs to and whether or
+        not it belongs to one. A sector with fewer than five businesses keeps its name and count, and its
+        ratios are withheld, because at that size a reader could work out which business is which.
+      </p>
 
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>Each enterprise, every month</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Anonymised by default. A business shows its real name only once its owner has consented.</p>
@@ -1818,6 +1950,21 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>The download</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What comes out as a PDF</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        Same figures, same months, same definitions, on paper. Below is the first page at roughly its real
+        size. Word carries the identical content; the monthly tables also come as CSV.
+      </p>
+      <DownloadSection
+        scopeLabel={scopeLabel}
+        businesses={view.totalBusinesses}
+        monthsCovered={paperMonths}
+        issued={new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
+        fileLabel={`ClearView_${scopeLabel.replace(/[^A-Za-z0-9]+/g,'_')}_${BOARD_VIEWS.find(v=>v.id===boardView)?.label||'Portfolio'}`}
+        kpis={paperKpis}
+        columns={paperColumns}
+        rows={paperRows}/>
 
       {/* The methodology block that stood here listed every factor in one
           place, in the platform's own vocabulary, and told a reader nothing.
