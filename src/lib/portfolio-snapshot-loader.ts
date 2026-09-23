@@ -16,7 +16,8 @@ import { periodForMonthIndex } from './month-end-close'
 import { combinedActual } from './actuals'
 import {
   clientMonthsFrom, aggregateMonthly, monthsAcross, reportingCurrency, currenciesOf,
-  type ClientMonthly, type MonthlyPoint,
+  likeForLikeRevenue,
+  type ClientMonthly, type MonthlyPoint, type LikeForLike,
 } from './portfolio-monthly'
 import { assessConfidence } from './confidence'
 import { buildPeriodSignals } from './verification-display'
@@ -281,6 +282,8 @@ export interface PortfolioViewData {
     currency: string | null
     currencies: string[]
     businesses: number
+    /** Revenue then against revenue now, same businesses in both months. */
+    lfl: LikeForLike | null
   }
 }
 
@@ -316,6 +319,10 @@ export function buildPortfolioViewData(snapshots: ClientSnapshot[], filter: Segm
       currency: monthlyCurrency,
       currencies: currenciesOf(monthlyClients),
       businesses: monthlyClients.length,
+      // Revenue then against revenue now, counting only the businesses that
+      // reported in both months. Without it a business that has not yet filed
+      // the latest month reads as the portfolio halving.
+      lfl: likeForLikeRevenue(monthlyClients, monthKeys, monthlyCurrency),
     },
     filterOptions: {
       sectors: distinctValues(s => s.sector),

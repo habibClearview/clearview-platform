@@ -206,3 +206,70 @@ export function changeAcross(values: (number | null)[]): Change {
   const from = a.v as number, to = b.v as number
   return { from, to, diff: to - from, pct: from === 0 ? null : ((to - from) / from) * 100, months: b.i - a.i }
 }
+
+export interface LikeForLike {
+  from: number | null
+  to: number | null
+  diff: number | null
+  months: number
+  /** Businesses counted, being those with a reading in both months. */
+  businesses: number
+  /** True when a business was dropped because it reported in only one of the two months. */
+  restricted: boolean
+  fromLabel: string
+  toLabel: string
+}
+
+/**
+ * Revenue then against revenue now, counting only the businesses that reported
+ * in both months.
+ *
+ * 23 September 2026. Without this the board read a portfolio of three
+ * businesses as halving, because one of them had not yet filed the latest
+ * month. A total across a changing set of businesses is not a trend, it is a
+ * register of who has done their bookkeeping, and a programme director reading
+ * it as a collapse would be reading exactly what the page showed them.
+ *
+ * So the comparison is like for like: the earliest and latest months in view,
+ * restricted to the businesses present in both. Where every business reported
+ * in both, this is simply the total, and `restricted` is false.
+ */
+export function likeForLikeRevenue(
+  clients: ClientMonthly[], months: string[], currency: string | null,
+): LikeForLike | null {
+  if (months.length < 2) return null
+  const first = months[0], last = months[months.length - 1]
+
+  const eligible = clients.filter((c) => {
+    const cur = (c.currency || '').trim().toUpperCase()
+    return !currency || !cur || cur === currency
+  })
+
+  const revenueIn = (c: ClientMonthly, key: string): number | null => {
+    const m = c.months.find((x) => monthKeyOf(x.period) === key)
+    if (!m || m.revenue === null || !Number.isFinite(m.revenue)) return null
+    return m.revenue
+  }
+
+  const both = eligible
+    .map((c) => ({ a: revenueIn(c, first), b: revenueIn(c, last) }))
+    .filter((x): x is { a: number; b: number } => x.a !== null && x.b !== null)
+
+  const anyInEither = eligible.filter((c) => revenueIn(c, first) !== null || revenueIn(c, last) !== null).length
+
+  if (both.length === 0) {
+    return {
+      from: null, to: null, diff: null, months: months.length - 1,
+      businesses: 0, restricted: anyInEither > 0,
+      fromLabel: labelOf(first), toLabel: labelOf(last),
+    }
+  }
+
+  const from = both.reduce((s, x) => s + x.a, 0)
+  const to = both.reduce((s, x) => s + x.b, 0)
+  return {
+    from, to, diff: to - from, months: months.length - 1,
+    businesses: both.length, restricted: both.length < anyInEither,
+    fromLabel: labelOf(first), toLabel: labelOf(last),
+  }
+}

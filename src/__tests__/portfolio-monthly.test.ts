@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   clientMonthsFrom, monthsAcross, aggregateMonthly, reportingCurrency,
-  currenciesOf, changeAcross, monthKeyOf, labelOf,
+  currenciesOf, changeAcross, monthKeyOf, labelOf, likeForLikeRevenue,
   type ClientMonthly,
 } from '@/lib/portfolio-monthly'
 
@@ -169,5 +169,76 @@ describe('the change across a record', () => {
 
   it('does not divide by a starting figure of nil', () => {
     expect(changeAcross([0, 5]).pct).toBeNull()
+  })
+})
+
+describe('likeForLikeRevenue', () => {
+  const mk = (id: string, currency: string, rows: [string, number][]) => ({
+    clientId: id, currency,
+    months: rows.map(([period, revenue]) => ({ period, revenue, grossProfit: null, ebitda: null })),
+  })
+
+  it('returns null when there is only one month to compare', () => {
+    const c = [mk('a', 'UGX', [['2026-01-01', 100]])]
+    expect(likeForLikeRevenue(c, ['2026-01'], 'UGX')).toBeNull()
+  })
+
+  it('counts every business when they all reported in both months', () => {
+    const clients = [
+      mk('a', 'UGX', [['2026-01-01', 100], ['2026-02-01', 120]]),
+      mk('b', 'UGX', [['2026-01-01', 200], ['2026-02-01', 260]]),
+    ]
+    const r = likeForLikeRevenue(clients, ['2026-01', '2026-02'], 'UGX')!
+    expect(r.from).toBe(300)
+    expect(r.to).toBe(380)
+    expect(r.diff).toBe(80)
+    expect(r.businesses).toBe(2)
+    expect(r.restricted).toBe(false)
+  })
+
+  it('leaves out a business that reported in only one of the two months', () => {
+    const clients = [
+      mk('a', 'UGX', [['2026-01-01', 100], ['2026-02-01', 120]]),
+      // Behind on its bookkeeping: nothing filed for February.
+      mk('late', 'UGX', [['2026-01-01', 900]]),
+    ]
+    const r = likeForLikeRevenue(clients, ['2026-01', '2026-02'], 'UGX')!
+    expect(r.from).toBe(100)
+    expect(r.to).toBe(120)
+    expect(r.diff).toBe(20)
+    expect(r.businesses).toBe(1)
+    expect(r.restricted).toBe(true)
+  })
+
+  it('never adds money across currencies', () => {
+    const clients = [
+      mk('ugx', 'UGX', [['2026-01-01', 100], ['2026-02-01', 120]]),
+      mk('kes', 'KES', [['2026-01-01', 5000], ['2026-02-01', 6000]]),
+    ]
+    const r = likeForLikeRevenue(clients, ['2026-01', '2026-02'], 'UGX')!
+    expect(r.from).toBe(100)
+    expect(r.to).toBe(120)
+    expect(r.businesses).toBe(1)
+  })
+
+  it('reports nothing comparable rather than a made-up zero', () => {
+    const clients = [
+      mk('a', 'UGX', [['2026-01-01', 100]]),
+      mk('b', 'UGX', [['2026-02-01', 200]]),
+    ]
+    const r = likeForLikeRevenue(clients, ['2026-01', '2026-02'], 'UGX')!
+    expect(r.from).toBeNull()
+    expect(r.to).toBeNull()
+    expect(r.diff).toBeNull()
+    expect(r.businesses).toBe(0)
+    expect(r.restricted).toBe(true)
+  })
+
+  it('names the months it compared', () => {
+    const clients = [mk('a', 'UGX', [['2025-10-01', 100], ['2026-02-01', 120]])]
+    const r = likeForLikeRevenue(clients, ['2025-10', '2025-11', '2026-02'], 'UGX')!
+    expect(r.fromLabel).toBe('Oct 25')
+    expect(r.toLabel).toBe('Feb 26')
+    expect(r.months).toBe(2)
   })
 })

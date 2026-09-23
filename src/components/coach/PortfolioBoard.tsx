@@ -28,7 +28,7 @@
 // ============================================================
 
 import { useMemo, useState } from 'react'
-import { changeAcross, type MonthlyPoint } from '@/lib/portfolio-monthly'
+import { changeAcross, type MonthlyPoint, type LikeForLike } from '@/lib/portfolio-monthly'
 
 const C = {
   navy: 'var(--cv-navy)', slate: 'var(--cv-slate)', faint: 'var(--cv-faint)',
@@ -62,6 +62,13 @@ interface Measure {
   series: (number | null)[] | null
   /** Used when there is no series: the reading as it stands now. */
   latest: number | null
+  /** A count of who filed, not a performance measure, so it carries no verdict. */
+  neutral?: boolean
+  /**
+   * Where a straight first-to-last comparison would be misleading because the
+   * set of businesses changed, the honest comparison to use instead.
+   */
+  lfl?: LikeForLike | null
 }
 
 const th: React.CSSProperties = {
@@ -122,11 +129,11 @@ function changeText(kind: Fmt, diff: number | null, currency: string): string {
 
 /** Which measures lead, per view. Every view still shows all of them. */
 const ORDER: Record<BoardView, string[]> = {
-  portfolio: ['revenue', 'grossMargin', 'operatingMargin', 'readiness', 'marketReady', 'verified', 'dscr', 'confidence'],
-  programme: ['readiness', 'marketReady', 'confidence', 'revenue', 'grossMargin', 'operatingMargin', 'verified', 'dscr'],
-  funder: ['verified', 'confidence', 'readiness', 'marketReady', 'revenue', 'grossMargin', 'operatingMargin', 'dscr'],
-  lender: ['dscr', 'operatingMargin', 'grossMargin', 'revenue', 'verified', 'confidence', 'marketReady', 'readiness'],
-  buyer: ['revenue', 'grossMargin', 'marketReady', 'operatingMargin', 'readiness', 'dscr', 'verified', 'confidence'],
+  portfolio: ['reporting', 'revenue', 'grossMargin', 'operatingMargin', 'readiness', 'marketReady', 'verified', 'dscr', 'confidence'],
+  programme: ['reporting', 'readiness', 'marketReady', 'confidence', 'revenue', 'grossMargin', 'operatingMargin', 'verified', 'dscr'],
+  funder: ['reporting', 'verified', 'confidence', 'readiness', 'marketReady', 'revenue', 'grossMargin', 'operatingMargin', 'dscr'],
+  lender: ['reporting', 'dscr', 'operatingMargin', 'grossMargin', 'revenue', 'verified', 'confidence', 'marketReady', 'readiness'],
+  buyer: ['reporting', 'revenue', 'grossMargin', 'marketReady', 'operatingMargin', 'readiness', 'dscr', 'verified', 'confidence'],
 }
 
 const CARDS: Record<BoardView, string[]> = {
@@ -140,6 +147,7 @@ const CARDS: Record<BoardView, string[]> = {
 const ACCENT: Record<string, string> = {
   revenue: C.teal, grossMargin: C.cyan, operatingMargin: C.cyan, readiness: C.amber,
   marketReady: C.green, verified: C.green, dscr: C.teal, confidence: C.purple,
+  reporting: C.slate,
 }
 
 export interface PortfolioBoardProps {
@@ -150,6 +158,7 @@ export interface PortfolioBoardProps {
     currency: string | null
     currencies: string[]
     businesses: number
+    lfl?: LikeForLike | null
   } | null | undefined
   /** Current readings for the measures a model cannot give month by month. */
   current: {
@@ -176,9 +185,13 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
     const gross = points.map((p) => p.grossMargin)
     const ebitda = points.map((p) => p.ebitdaMargin)
     return [
-      { key: 'revenue', name: 'Combined revenue', fmt: 'money', good: 'up', series: revenue, latest: null,
+      { key: 'reporting', name: 'Businesses reporting', fmt: 'count', good: 'up', series: points.map((p) => p.n), latest: null, neutral: true,
+        what: 'How many businesses had recorded their actual figures for that month when this page was drawn.',
+        how: 'Counted from the months each business has entered against its plan. A business that has not yet closed a month is not counted for that month, and its sales are not in that month’s total.',
+        looks: 'Steady at the full number. Where it dips in the most recent month it usually means bookkeeping is behind, not that trading stopped, which is why the change below is measured on the same businesses in both months.' },
+      { key: 'revenue', name: 'Combined revenue', fmt: 'money', good: 'up', series: revenue, latest: null, lfl: monthly?.lfl ?? null,
         what: 'What these businesses actually sold that month, added together.',
-        how: 'Taken from each business’s own financial model, from the months it has recorded actual figures for. A month still in forecast is never counted as history.',
+        how: 'Taken from each business’s own financial model, from the months it has recorded actual figures for. A month still in forecast is never counted as history. Each month’s total covers whoever had reported by then, so the change is measured on the businesses that reported in both the first month and the last.',
         looks: 'Rising, and rising across most businesses rather than one large one.' },
       { key: 'grossMargin', name: 'Median gross margin', fmt: 'pct', good: 'up', series: gross, latest: null,
         what: 'What is left of each sale after paying for the goods sold, as a share of the sale.',
@@ -209,13 +222,42 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
         how: 'Built from whether records are complete, internally consistent, and confirmed by independent payments.',
         looks: 'Rising. It is what lets a figure from this platform be quoted rather than argued about.' },
     ]
-  }, [points, current])
+  }, [points, current, monthly])
+
+  // One place decides what a measure's change is and what verdict it carries,
+  // so the cards, the table and the headline can never disagree.
+  const readingFor = (m: Measure) => {
+    if (m.lfl && m.lfl.diff !== null) {
+      const rd = m.neutral
+        ? { word: 'Count', colour: C.slate, dim: 'var(--cv-amber-dim)' }
+        : readingOf(m.lfl.diff, m.lfl.from, m.good)
+      return {
+        ch: { from: m.lfl.from, to: m.lfl.to, diff: m.lfl.diff, pct: null, months: m.lfl.months },
+        rd,
+        /** The latest month as it actually stands, which is what people turned over. */
+        headline: m.series ? (m.series[m.series.length - 1] ?? m.lfl.to) : m.lfl.to,
+        note: m.lfl.restricted
+          ? `like for like, the ${m.lfl.businesses} ${m.lfl.businesses === 1 ? 'business' : 'businesses'} reporting in both months`
+          : `over ${m.lfl.months} month${m.lfl.months === 1 ? '' : 's'}`,
+      }
+    }
+    const ch = m.series ? changeAcross(m.series) : { from: null, to: m.latest, diff: null, pct: null, months: 0 }
+    const rd = m.neutral
+      ? { word: 'Count', colour: C.slate, dim: 'var(--cv-amber-dim)' }
+      : readingOf(ch.diff, ch.from, m.good)
+    return {
+      ch, rd,
+      headline: ch.to,
+      note: ch.diff === null ? null : `over ${ch.months} month${ch.months === 1 ? '' : 's'}`,
+    }
+  }
 
   const byKey = useMemo(() => Object.fromEntries(measures.map((m) => [m.key, m])), [measures])
   const ordered = ORDER[view].map((k) => byKey[k]).filter(Boolean) as Measure[]
 
   const headline = useMemo(() => {
-    const rev = changeAcross(points.map((p) => p.revenue))
+    const lfl = monthly?.lfl ?? null
+    const latestRevenue = points.length ? points[points.length - 1].revenue : null
     const nice = (v: number | null, kind: Fmt) => fmtFull(kind, v, currency)
     if (view === 'funder') {
       return current.verified === null
@@ -233,14 +275,32 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
     if (view === 'buyer') {
       return `${businesses} businesses, ${current.marketReady === null ? '—' : Math.round(current.marketReady)} of them market ready or better.`
     }
-    if (rev.to === null) return `${businesses} businesses on the platform.`
-    if (rev.diff === null) return `${businesses} businesses, turning over ${nice(rev.to, 'money')} in the latest month on record.`
-    const dir = rev.diff >= 0 ? 'up' : 'down'
-    return `${businesses} businesses, turning over ${nice(rev.to, 'money')} a month, ${dir} from ${nice(rev.from, 'money')}.`
-  }, [view, points, current, businesses, currency])
+    if (latestRevenue === null) return `${businesses} businesses on the platform.`
+    if (!lfl || lfl.diff === null) {
+      return `${businesses} businesses, turning over ${nice(latestRevenue, 'money')} in the latest month on record.`
+    }
+    // Like for like. A business that has not yet closed the latest month would
+    // otherwise read as the whole portfolio shrinking.
+    const dir = lfl.diff >= 0 ? 'up' : 'down'
+    const sameSet = lfl.restricted
+      ? ` for the ${lfl.businesses} reporting in both months`
+      : ''
+    return `${businesses} businesses, turning over ${nice(latestRevenue, 'money')} in ${lfl.toLabel}, ${dir} from ${nice(lfl.from, 'money')} in ${lfl.fromLabel}${sameSet}.`
+  }, [view, points, current, businesses, currency, monthly])
 
   return (
     <div style={{ marginBottom: '1.4rem' }}>
+      {/*
+        The measure, its latest figure, its change and its verdict stay put
+        while the months scroll, so the four things a reader needs are on
+        screen whether the portfolio has three months of record or twenty-four.
+        On a narrow screen there is no room to pin anything, so the whole table
+        scrolls together instead.
+      */}
+      <style>{`
+        .pb-pin { position: sticky; }
+        @media (max-width: 760px) { .pb-pin { position: static; box-shadow: none; } }
+      `}</style>
       <div style={{ fontSize: '1.5rem', fontWeight: 700, color: C.navy, letterSpacing: '-0.02em',
                     lineHeight: 1.2, maxWidth: '46ch', marginBottom: '0.45rem' }}>
         {headline}
@@ -258,8 +318,7 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
         {CARDS[view].map((key) => {
           const m = byKey[key] as Measure
           if (!m) return null
-          const ch = m.series ? changeAcross(m.series) : { from: null, to: m.latest, diff: null, pct: null, months: 0 }
-          const rd = readingOf(ch.diff, ch.from, m.good)
+          const { ch, rd, headline: big, note } = readingFor(m)
           return (
             <div key={key} style={{ background: C.card, border: `1px solid ${C.border}`,
                                     borderTop: `3px solid ${ACCENT[key] || C.teal}`, borderRadius: 10,
@@ -268,15 +327,14 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
               <span style={{ fontFamily: 'var(--cv-font-mono)', fontVariantNumeric: 'tabular-nums',
                              fontSize: '1.9rem', fontWeight: 700, letterSpacing: '-0.03em',
                              lineHeight: 1.05, color: C.navy }}>
-                {fmtFull(m.fmt, ch.to, currency)}
+                {fmtFull(m.fmt, big, currency)}
               </span>
-              <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.86rem', fontWeight: 700, color: rd.colour }}>
+              <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.86rem', fontWeight: 700,
+                             color: rd.colour, lineHeight: 1.45 }}>
                 {ch.diff === null
                   ? <span style={{ color: C.faint, fontWeight: 400 }}>{m.series ? 'no earlier month' : 'latest reading'}</span>
                   : <>{changeText(m.fmt, ch.diff, currency)}
-                      <span style={{ color: C.faint, fontWeight: 400, marginLeft: 5 }}>
-                        over {ch.months} month{ch.months === 1 ? '' : 's'}
-                      </span></>}
+                      {note && <span style={{ color: C.faint, fontWeight: 400, marginLeft: 5 }}>{note}</span>}</>}
               </span>
             </div>
           )
@@ -284,32 +342,33 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
       </div>
 
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflowX: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.88rem',
-                        minWidth: Math.max(620, 280 + Math.max(monthCount, 1) * 70 + 200) }}>
+        <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: '0.88rem',
+                        minWidth: 560 + Math.max(monthCount, 1) * 66 }}>
           <thead>
             <tr>
-              <th style={{ ...th, textAlign: 'left', minWidth: 240, position: 'sticky', left: 0, zIndex: 2 }}>Measure</th>
-              {monthCount === 0
-                ? <th style={th}>Latest</th>
-                : points.map((p, i) => (
-                    <th key={p.month} style={{ ...th, color: i === monthCount - 1 ? '#FFF' : 'rgba(255,255,255,0.72)' }}>
-                      {p.label}
-                    </th>
-                  ))}
-              <th style={th}>Change</th>
-              <th style={{ ...th, textAlign: 'left' }}>Reading</th>
+              <th className="pb-pin" style={{ ...th, textAlign: 'left', width: 226, minWidth: 226, left: 0, zIndex: 3 }}>Measure</th>
+              <th className="pb-pin" style={{ ...th, width: 92, minWidth: 92, left: 226, zIndex: 3, color: '#FFF' }}>
+                {monthCount === 0 ? 'Latest' : points[monthCount - 1].label}
+              </th>
+              <th className="pb-pin" style={{ ...th, width: 118, minWidth: 118, left: 318, zIndex: 3 }}>Change</th>
+              <th className="pb-pin" style={{ ...th, width: 124, minWidth: 124, left: 436, textAlign: 'left', zIndex: 3,
+                                              boxShadow: '4px 0 6px -4px rgba(0,0,0,0.28)' }}>Reading</th>
+              {points.map((p, i) => (
+                <th key={p.month} style={{ ...th, color: i === monthCount - 1 ? '#FFF' : 'rgba(255,255,255,0.72)' }}>
+                  {p.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {ordered.map((m, rowIndex) => {
-              const ch = m.series ? changeAcross(m.series) : { from: null, to: m.latest, diff: null, pct: null, months: 0 }
-              const rd = readingOf(ch.diff, ch.from, m.good)
+              const { ch, rd, headline: big } = readingFor(m)
               const zebra = rowIndex % 2 === 1 ? C.alt : C.card
               return (
                 <tr key={m.key}>
-                  <td style={{ ...td, textAlign: 'left', fontFamily: 'var(--cv-font)', fontWeight: 600,
-                               color: C.navy, background: zebra, position: 'sticky', left: 0, zIndex: 1,
-                               borderRight: `1px solid ${C.borderSoft}`, whiteSpace: 'normal' }}>
+                  <td className="pb-pin" style={{ ...td, textAlign: 'left', fontFamily: 'var(--cv-font)', fontWeight: 600,
+                               color: C.navy, background: zebra, left: 0, zIndex: 2,
+                               whiteSpace: 'normal' }}>
                     <button type="button" onClick={() => setOpen(open === m.key ? null : m.key)}
                       aria-expanded={open === m.key} title={`What ${m.name} means`}
                       style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit',
@@ -324,31 +383,33 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
                       <span>{m.name}</span>
                     </button>
                   </td>
-                  {monthCount === 0
-                    ? <td style={{ ...td, background: 'var(--cv-cyan-dim)', fontWeight: 700, color: C.navy }}>
-                        {fmtCell(m.fmt, m.latest)}
-                      </td>
-                    : points.map((p, i) => {
-                        const last = i === monthCount - 1
-                        const v = m.series ? m.series[i] : (last ? m.latest : null)
-                        return (
-                          <td key={p.month} style={{ ...td, background: last ? 'var(--cv-cyan-dim)' : zebra,
-                                                     fontWeight: last ? 700 : 400, color: last ? C.navy : C.slate }}>
-                            {fmtCell(m.fmt, v)}
-                          </td>
-                        )
-                      })}
-                  <td style={{ ...td, background: 'var(--cv-cyan-dim)', fontWeight: 700, color: rd.colour }}>
+                  <td className="pb-pin" style={{ ...td, left: 226, zIndex: 2,
+                                                  background: 'var(--cv-cyan-dim)', fontWeight: 700, color: C.navy }}>
+                    {fmtCell(m.fmt, big)}
+                  </td>
+                  <td className="pb-pin" style={{ ...td, left: 318, zIndex: 2,
+                                                  background: 'var(--cv-cyan-dim)', fontWeight: 700, color: rd.colour }}>
                     {ch.diff === null ? <span style={{ color: C.faint, fontWeight: 400 }}>
                       {m.series ? 'no earlier month' : 'latest only'}</span> : changeText(m.fmt, ch.diff, currency)}
                   </td>
-                  <td style={{ ...td, textAlign: 'left', background: zebra }}>
+                  <td className="pb-pin" style={{ ...td, left: 436, zIndex: 2, textAlign: 'left', background: zebra,
+                                                  boxShadow: '4px 0 6px -4px rgba(0,0,0,0.18)' }}>
                     <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700,
                                    letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px',
                                    borderRadius: 4, whiteSpace: 'nowrap', color: rd.colour, background: rd.dim }}>
                       {rd.word}
                     </span>
                   </td>
+                  {points.map((p, i) => {
+                    const last = i === monthCount - 1
+                    const v = m.series ? m.series[i] : (last ? m.latest : null)
+                    return (
+                      <td key={p.month} style={{ ...td, background: zebra,
+                                                 fontWeight: last ? 700 : 400, color: last ? C.navy : C.slate }}>
+                        {fmtCell(m.fmt, v)}
+                      </td>
+                    )
+                  })}
                 </tr>
               )
             })}
@@ -388,7 +449,9 @@ export default function PortfolioBoard({ view, monthly, current, businesses, fal
 
       <p style={{ margin: '0.7rem 0 0', fontSize: '0.9rem', color: C.faint, lineHeight: 1.6 }}>
         Percentages are medians across the businesses in view, never averages, so one large business cannot move
-        them. A dash means no actual reading was recorded for that month.
+        them. A dash means no actual reading was recorded for that month. Each month’s combined revenue covers the
+        businesses that had reported by then, so the change is measured on the businesses that reported in both the
+        first month and the last, and a business whose bookkeeping is behind cannot read as a fall in trading.
         {others.length > 0 && <> Money is shown in <b>{currency}</b> only; {others.join(' and ')} {others.length === 1 ? 'is' : 'are'} held
         in this view and left out of the totals, because a sum across currencies means nothing.</>}
       </p>
