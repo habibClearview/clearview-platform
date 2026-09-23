@@ -70,6 +70,15 @@ export function revenueGrowthPctFromSeries(monthlyRevenue: number[], monthsPerYe
   if (!Array.isArray(monthlyRevenue) || monthlyRevenue.length < monthsPerYear * 2) return null
   const y1 = monthlyRevenue.slice(0, monthsPerYear).reduce((a, b) => a + (b || 0), 0)
   const y2 = monthlyRevenue.slice(monthsPerYear, monthsPerYear * 2).reduce((a, b) => a + (b || 0), 0)
+  // A second year that trades and a second year nobody has filled in look
+  // identical here: both are a run of zeros. Reporting −100% growth off the
+  // second is stating a collapse that was never planned, and it is the figure
+  // that appeared against every business on the market intelligence page on
+  // 23 September 2026. A business that plans to stop trading records the wind
+  // down month by month and does not reach exactly zero for twelve straight
+  // months, so a blank year is an unfilled horizon and there is no growth
+  // figure to give.
+  if (y1 > 0 && y2 === 0) return null
   const r = safeDiv(y2 - y1, y1)
   return r === null ? null : round(r * 100)
 }

@@ -111,7 +111,7 @@ export interface ClientSnapshot {
    * model. Optional because fixtures and older cached snapshots predate it.
    * See src/lib/portfolio-monthly.ts.
    */
-  monthly?: { period: string; revenue: number | null; grossProfit: number | null; ebitda: number | null }[]
+  monthly?: { period: string; plannedRevenue?: number | null; revenue: number | null; grossProfit: number | null; ebitda: number | null }[]
 }
 
 export interface SegmentFilter {

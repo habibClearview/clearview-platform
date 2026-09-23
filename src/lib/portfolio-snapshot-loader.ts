@@ -14,6 +14,7 @@ import { computeLiquidityReadinessScore, computeLRSTimeSeries } from './liquidit
 import { computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, monthlyRateToAnnualRate } from './investment-metrics'
 import { periodForMonthIndex } from './month-end-close'
 import { combinedActual } from './actuals'
+import { trimToPlannedMonths } from './plan-horizon'
 import {
   clientMonthsFrom, aggregateMonthly, monthsAcross, reportingCurrency, currenciesOf,
   likeForLikeRevenue,
@@ -75,7 +76,30 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
     actualsForEngine[row.unit_id][row.period] = forPeriod
   })
 
-  const result = runGenericModel(config, actualsForEngine)
+  // A MONTH NOBODY HAS PLANNED IS NOT A FORECAST OF ZERO. 23 September 2026.
+  //
+  // Habib's page showed revenue growth of −100% and debt cover of −60.7× for
+  // every business. Both came from the same thing: a model whose horizon was
+  // extended to two years while only the first year has been filled in. The
+  // engine read the empty months as a forecast of no trading, so growth against
+  // a blank year is −100%, costs and debt repayments carried on against no
+  // revenue so cover went deeply negative, and the annual totals behind every
+  // margin added a year of pure loss to a year of trading.
+  //
+  // The model is run over the months it actually plans for. A month the
+  // business has recorded actuals for is never cut, because it happened.
+  // See src/lib/plan-horizon.ts.
+  const actualPeriods = new Set<string>()
+  Object.values(actualsForEngine).forEach((byPeriod) => {
+    Object.keys(byPeriod).forEach((period) => actualPeriods.add(period))
+  })
+  let monthsWithActuals = 0
+  for (let i = 0; i < config.planning_months; i++) {
+    if (actualPeriods.has(periodForMonthIndex(config.start_date, i))) monthsWithActuals = i + 1
+  }
+  const plannedConfig = trimToPlannedMonths(config, monthsWithActuals)
+
+  const result = runGenericModel(plannedConfig, actualsForEngine)
   const m = result.metrics
   const s = result.scores
   const assess = config.settings.coach_assessment || defaultCoachAssessment()
@@ -90,8 +114,8 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
   const monthsClosedFlags = Array.from({ length: monthsN }, (_, i) => closedPeriodsSet.has(periodForMonthIndex(config.start_date, i)))
   const monthsWithFieldAppFlags = Array.from({ length: monthsN }, (_, i) => fieldAppPeriodsSet.has(periodForMonthIndex(config.start_date, i)))
 
-  const yearGroups = buildYearGroups(config.start_date, config.planning_months)
-  const monthLabelsFull = buildMonthLabels(config.start_date, config.planning_months)
+  const yearGroups = buildYearGroups(plannedConfig.start_date, plannedConfig.planning_months)
+  const monthLabelsFull = buildMonthLabels(plannedConfig.start_date, plannedConfig.planning_months)
   const capitalStructure = config.settings.capital_structure
   const capitalAtRisk = (capitalStructure?.shareholder_contribution || 0) + (capitalStructure?.grant_recoverable || 0)
   const lrsCashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
@@ -218,7 +242,7 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
     // and its con.act_* arrays carry one entry per month, null for a month
     // that has not happened. That is real history for a real client, and the
     // market intelligence board was reading an empty table instead of it.
-    monthly: clientMonthsFrom(result.con, (i) => periodForMonthIndex(config.start_date, i)),
+    monthly: clientMonthsFrom(result.con, (i) => periodForMonthIndex(plannedConfig.start_date, i)),
   }
 }
 
