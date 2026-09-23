@@ -79,6 +79,7 @@ import PlanVsActual from './PlanVsActual'
 import MonthTable from './MonthTable'
 import StageLadder from './StageLadder'
 import LineChart from './LineChart'
+import DownloadSection from './DownloadSection'
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────
 const C = {
@@ -1492,6 +1493,12 @@ function PortfolioIntelligenceHub({clients,programmes}){
     if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
     return s.map(p=>p&&typeof p.value==='number'?p.value:null)
   },[history])
+  const scopeLabel=(()=>{
+    const parts=[filter.programmeId&&(programmesById[filter.programmeId]?.name||'A programme'),filter.sector,filter.country,
+      filter.readinessStage&&READINESS_STAGE_LABELS[filter.readinessStage]].filter(Boolean)
+    return parts.length?parts.join(' · '):'Every business on the platform'
+  })()
+
   const planPoints=((data.monthly&&data.monthly.points)||[]).filter(p=>p.plannedRevenue!==null&&p.revenue!==null)
   const moneyShort=useCallback((v)=>{
     if(v===null||!Number.isFinite(v))return '—'
@@ -1501,6 +1508,37 @@ function PortfolioIntelligenceHub({clients,programmes}){
     if(a>=1e3)return Math.round(v/1e3)+'k'
     return String(Math.round(v))
   },[])
+  // WHAT THE PRINTED PAGE CARRIES. The same readings the screen above shows,
+  // at quarterly columns so a first page holds them, so the download can never
+  // disagree with the page somebody read before pressing it.
+  const paperPoints=((data.monthly&&data.monthly.points)||[])
+  const paperMonths=paperPoints.length
+    ? `${paperPoints[0].label} to ${paperPoints[paperPoints.length-1].label}`
+    : 'No month recorded yet'
+  const paperCols=(()=>{
+    if(paperPoints.length===0)return []
+    const step=Math.max(1,Math.ceil(paperPoints.length/6))
+    const idx=[]
+    for(let i=0;i<paperPoints.length;i+=step)idx.push(i)
+    if(idx[idx.length-1]!==paperPoints.length-1)idx.push(paperPoints.length-1)
+    return idx
+  })()
+  const paperColumns=paperCols.map(i=>paperPoints[i].label)
+  const pctText=(v)=>v===null||v===undefined||!Number.isFinite(v)?'—':Math.round(v)+'%'
+  const paperRows=paperPoints.length===0?[]:[
+    {label:'Combined revenue',cells:paperCols.map(i=>{const v=paperPoints[i].revenue;return v===null?'—':moneyShort(v)})},
+    {label:'Median gross margin',cells:paperCols.map(i=>pctText(paperPoints[i].grossMargin))},
+    {label:'Median operating margin',cells:paperCols.map(i=>pctText(paperPoints[i].ebitdaMargin))},
+    {label:'Businesses reporting',cells:paperCols.map(i=>String(paperPoints[i].n))},
+    {label:'Delivered against plan',cells:paperCols.map(i=>pctText(paperPoints[i].achievedPct))},
+  ]
+  const paperKpis=[
+    {value:String(view.totalBusinesses),label:'Businesses in this view'},
+    {value:`${Math.round(view.avgIRScore)}/30`,label:'Median investment readiness'},
+    {value:String((view.readinessPipeline.investment_ready||0)+(view.readinessPipeline.near_ready||0)),label:'At market ready or above'},
+    {value:`${Math.round(view.avgLRSScore)}/100`,label:'Average liquidity readiness'},
+  ]
+
   const stageSeries=useCallback((stage)=>{
     const s=history&&history.stages?history.stages[stage]:null
     if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
@@ -1763,99 +1801,54 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>How each sector is performing, and who is already there</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>The same ratios cut by sector, so a sector can be read against the others rather than only against itself.</p>
-      {perfSum&&(
-        <div style={card}>
-          <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.9rem'}}>
-            The same ratios, cut by sector. Every sector on the platform, whichever programme its businesses
-            belong to, so a sector can be read against the others rather than only against itself.
-          </p>
-
-          {data.performanceBySector&&data.performanceBySector.length>0&&(
-            <div style={{marginTop:'1.1rem'}}>
-              <div style={{fontFamily:'var(--cv-font)',fontSize: '1.01rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Quality ratios by sector</div>
-              <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.6rem'}}>Every sector on the platform, whichever programme its businesses belong to. Each figure is the middle business in that sector, so one large one cannot move it.</p>
-              <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:680}}>
-                  <thead>
-                    <tr>{['Sector','Businesses','Gross margin','EBITDA margin','Net margin','Return on investment'].map((h,i)=>(
-                      <th key={h} style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
-                    ))}</tr>
-                  </thead>
-                  <tbody>
-                    {data.performanceBySector.map((row:any)=>(
-                      <tr key={row.sector} style={{borderTop:'1px solid var(--cv-border-soft)'}}>
-                        <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{row.sector}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.count}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:C.navy}}>{med(row.summary.grossMargin,'%')}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.ebitdaMargin,'%')}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.netMargin,'%')}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.roi,'%')}</td>
-                      </tr>
-                    ))}
-                    <tr style={{borderTop:`2px solid ${C.cyan}`,background:'var(--cv-tint-cyan)',fontWeight:700}}>
-                      <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>Portfolio median</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum.total}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.grossMargin,'%')}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.ebitdaMargin,'%')}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.netMargin,'%')}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.roi,'%')}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.6rem',background:'var(--cv-tint-amber)',borderLeft:`3px solid ${C.amber}`,borderRadius:6,padding:'0.6rem 0.8rem'}}>
-                Every figure here comes from the financial model each business already runs. Nothing on this table waits on anything being collected.
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-
       {data.performanceBySector&&data.performanceBySector.length>0&&(
-        <div style={card}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Benchmarked by segment</div>
-          <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.7rem'}}>Every factor cut by sector, ranked strongest-first. The portfolio row is the baseline. Peer comparisons within this portfolio, not external industry norms.</p>
-          <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:640}}>
-              <thead>
-                <tr>{['Sector','Biz','Ready','LRS','Growth','Cost','Cover','EBITDA','Weakest'].map((h,i)=>(
-                  <th key={h} style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
-                ))}</tr>
-              </thead>
-              <tbody>
-                {[...data.performanceBySector].sort((a:any,b:any)=>(b.overview.avgLRSScore||0)-(a.overview.avgLRSScore||0)).map((row:any)=>{
-                  const g=row.summary.revenueGrowth
-                  return(
-                  <tr key={row.sector} style={{borderTop:'1px solid var(--cv-border-soft)'}}>
-                    <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{row.sector}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.count}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.overview.readinessPipeline.investment_ready}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:C.navy}}>{Math.round(row.overview.avgLRSScore)}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{g&&g.median!==null?`${g.median>0?'+':''}${g.median}%`:'—'}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.costRatio,'%')}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.dscr,'×',1)}</td>
-                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.ebitdaMargin,'%')}</td>
-                    <td style={{padding:'7px 10px',textAlign:'left',color:C.slate}}>{row.overview.mostCommonWeakDimension?LRS_DIM_LABELS[row.overview.mostCommonWeakDimension]:'—'}</td>
-                  </tr>
-                )})}
-                <tr style={{borderTop:`2px solid ${C.cyan}`,background:'var(--cv-tint-cyan)',fontWeight:700}}>
-                  <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>Portfolio</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{portfolio.totalBusinesses}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{portfolio.readinessPipeline.investment_ready}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{Math.round(portfolio.avgLRSScore)}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum&&perfSum.revenueGrowth.median!==null?`${perfSum.revenueGrowth.median>0?'+':''}${perfSum.revenueGrowth.median}%`:'—'}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum?med(perfSum.costRatio,'%'):'—'}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum?med(perfSum.dscr,'×',1):'—'}</td>
-                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum?med(perfSum.ebitdaMargin,'%'):'—'}</td>
-                  <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{portfolio.mostCommonWeakDimension?LRS_DIM_LABELS[portfolio.mostCommonWeakDimension]:'—'}</td>
+        <div style={{overflowX:'auto',border:`1px solid ${'var(--cv-border)'}`,borderRadius:10,background:'var(--cv-card)'}}>
+          <table style={{borderCollapse:'separate',borderSpacing:0,width:'100%',fontSize:'0.88rem',minWidth:880}}>
+            <thead>
+              <tr>{['Sector','Businesses','Median margin','Data confidence','Revenue change','Readiness','Weakest dimension','Reading'].map((h,i)=>(
+                <th key={h} style={{background:'var(--cv-header)',color:'rgba(255,255,255,0.72)',fontFamily:'var(--cv-font-mono)',fontSize:'0.68rem',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',padding:'8px 7px',textAlign:i===0||i===6||i===7?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {[...data.performanceBySector].sort((a,b)=>(b.overview.avgLRSScore||0)-(a.overview.avgLRSScore||0)).map((row,ri)=>{
+                // A sector of fewer than five businesses is named but its
+                // ratios are withheld, because at that size a reader could
+                // work out which business is which.
+                const thin=row.count<5
+                const g=row.summary.revenueGrowth
+                const growth=g&&g.median!==null?g.median:null
+                const ready=row.overview.readinessPipeline.investment_ready+row.overview.readinessPipeline.near_ready
+                let word='Served', ink=C.slate, dim='var(--cv-amber-dim)'
+                if(thin){word=`Only ${row.count}`}
+                else if(ready===0){word='Nobody market ready';ink=C.red;dim='var(--cv-red-dim)'}
+                else if(ready>=Math.ceil(row.count/2)){word='Strongest here';ink=C.green;dim='rgba(46,125,50,0.12)'}
+                const zebra=ri%2===1?'var(--cv-alt)':'var(--cv-card)'
+                const td={padding:'8px 7px',borderBottom:'1px solid var(--cv-border-soft)',textAlign:'right',fontFamily:'var(--cv-font-mono)',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',background:zebra,color:C.slate}
+                return(
+                <tr key={row.sector}>
+                  <td style={{...td,textAlign:'left',fontFamily:'var(--cv-font)',fontWeight:600,color:C.navy,whiteSpace:'normal'}}>{row.sector}</td>
+                  <td style={td}>{row.count}</td>
+                  <td style={{...td,fontWeight:700,color:C.navy}}>{thin?'—':med(row.summary.grossMargin,'%')}</td>
+                  <td style={td}>{thin?'—':Math.round(row.overview.avgConfidenceScore)}</td>
+                  <td style={{...td,color:growth===null||thin?C.faint:(growth>0?C.green:growth<0?C.red:C.slate)}}>
+                    {thin||growth===null?'—':`${growth>0?'▲ +':growth<0?'▼ ':''}${growth}%`}
+                  </td>
+                  <td style={td}>{Math.round(row.overview.avgLRSScore)}</td>
+                  <td style={{...td,textAlign:'left',fontFamily:'var(--cv-font)',whiteSpace:'normal'}}>{row.overview.mostCommonWeakDimension?LRS_DIM_LABELS[row.overview.mostCommonWeakDimension]:'—'}</td>
+                  <td style={{...td,textAlign:'left'}}>
+                    <span style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',padding:'3px 8px',borderRadius:4,whiteSpace:'nowrap',color:ink,background:dim}}>{word}</span>
+                  </td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
+              )})}
+            </tbody>
+          </table>
         </div>
       )}
-
+      <p style={{fontSize:'0.9rem',color:C.faint,lineHeight:1.6,margin:'0.7rem 0 0',maxWidth:'80ch'}}>
+        Every business on the platform, grouped by sector, whichever programme it belongs to and whether or
+        not it belongs to one. A sector with fewer than five businesses keeps its name and count, and its
+        ratios are withheld, because at that size a reader could work out which business is which.
+      </p>
 
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>Each enterprise, every month</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Anonymised by default. A business shows its real name only once its owner has consented.</p>
@@ -1909,6 +1902,21 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>The download</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What comes out as a PDF</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        Same figures, same months, same definitions, on paper. Below is the first page at roughly its real
+        size. Word carries the identical content; the monthly tables also come as CSV.
+      </p>
+      <DownloadSection
+        scopeLabel={scopeLabel}
+        businesses={view.totalBusinesses}
+        monthsCovered={paperMonths}
+        issued={new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
+        fileLabel={`ClearView_${scopeLabel.replace(/[^A-Za-z0-9]+/g,'_')}_${BOARD_VIEWS.find(v=>v.id===boardView)?.label||'Portfolio'}`}
+        kpis={paperKpis}
+        columns={paperColumns}
+        rows={paperRows}/>
 
       {/* The methodology block that stood here listed every factor in one
           place, in the platform's own vocabulary, and told a reader nothing.
