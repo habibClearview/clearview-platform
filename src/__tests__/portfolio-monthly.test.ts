@@ -31,7 +31,15 @@ describe('pulling a client’s own months out of the engine', () => {
     }
     const months = clientMonthsFrom(con, periodFor)
     expect(months).toHaveLength(2)
-    expect(months[0]).toEqual({ period: '2026-01-01', revenue: 100, grossProfit: 40, ebitda: 10 })
+    expect(months[0]).toEqual({ period: '2026-01-01', plannedRevenue: null, revenue: 100, grossProfit: 40, ebitda: 10 })
+  })
+
+  it('carries the planned figure for the same month, where the model has one', () => {
+    const months = clientMonthsFrom({
+      act_rev: [100, 120, null], act_gp: [40, 50, null], act_ebitda: [10, 12, null],
+      rev: [90, 150, 200],
+    }, periodFor)
+    expect(months.map(m => m.plannedRevenue)).toEqual([90, 150])
   })
 
   it('never treats a plan as history', () => {

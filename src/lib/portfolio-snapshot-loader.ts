@@ -242,7 +242,7 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
     // and its con.act_* arrays carry one entry per month, null for a month
     // that has not happened. That is real history for a real client, and the
     // market intelligence board was reading an empty table instead of it.
-    monthly: clientMonthsFrom(result.con, (i) => periodForMonthIndex(config.start_date, i)),
+    monthly: clientMonthsFrom(result.con, (i) => periodForMonthIndex(plannedConfig.start_date, i)),
   }
 }
 

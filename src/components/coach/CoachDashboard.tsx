@@ -75,6 +75,7 @@ import {
 import { GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
 import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
 import PortfolioBoard, { BOARD_VIEWS, type BoardView } from './PortfolioBoard'
+import PlanVsActual from './PlanVsActual'
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────
 const C = {
@@ -1570,53 +1571,109 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
-      {/* The four figures that stood here -- businesses, readiness, confidence --
-          are on the board above with their movement, so repeating them as
-          averages with no trend was showing the same thing twice. What is left
-          is the one score the board does not carry and the two claims about
-          the method, which are statements about the product rather than
-          readings of the portfolio. */}
-      <div className="cv-grid-4" style={{marginBottom:'1.25rem',gap:'0.6rem'}}>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>What they planned, against what they achieved</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Every business sets a monthly plan. This is what they sold against it, for the months where both figures exist.</p>
+      <div style={card}>
+        <PlanVsActual points={data.monthly?.points||[]} currency={data.monthly?.currency||currencies[0]||'UGX'}/>
+      </div>
+
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>The four stages, and movement between them</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Where each business sits today, and the seven dimensions behind the score that moves it between stages.</p>
+      <div className="cv-grid-4" style={{marginBottom:'0.9rem',gap:'0.6rem'}}>
         <GlanceKPI label="Avg Liquidity Readiness" value={`${Math.round(view.avgLRSScore)}/100`} sub="seven dimensions" color={C.purple}/>
-        <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{snapshotCount} model{snapshotCount===1?'':'s'}</div>
-          <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>Full standardised financial models, not survey estimates.</div>
-        </div>
-        <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Independent</div>
-          <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>Model-derived, with no payment relationship with the business rated.</div>
-        </div>
-        <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Median-based</div>
-          <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>One outlier cannot distort a benchmark; only present values are counted.</div>
+      </div>
+      <div style={card}>
+        <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+          {pipelineEntries.map(([stage,color])=>(
+            <div key={stage} style={{flex:'1 1 140px',borderLeft:`4px solid ${color}`,padding:'0.5rem 0.8rem',background:'var(--cv-tint-cyan)',borderRadius:4}}>
+              <div style={{fontSize:'1.3rem',fontWeight:700,color}}>{view.readinessPipeline[stage]}</div>
+              <div style={{fontSize: '1.01rem',color:C.slate}}>{READINESS_STAGE_LABELS[stage]} · {Math.round(view.readinessPipelinePct[stage])}%</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {perfSum&&(
-        <div style={card}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Performance — the numbers that decide bankability</div>
-          <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.9rem'}}>
-            Each figure is the <b>median</b> shown over the <b>spread across businesses</b> — the distribution, not a single
-            average, is what a lender reads. The highlighted bar is where the median sits. These ratios are currency-neutral,
-            so they compare across the whole {hasFilter?'segment':'portfolio'}.
-          </p>
-          <div className="cv-grid-4" style={{marginBottom:'0.7rem'}}>
-            <PerfDist label="Revenue growth" summary={perfSum.revenueGrowth} unit="%"/>
-            <PerfDist label="Cost ratio" summary={perfSum.costRatio} unit="%"/>
-            <PerfDist label="EBITDA margin" summary={perfSum.ebitdaMargin} unit="%"/>
-            <PerfDist label="Debt coverage (DSCR)" summary={perfSum.dscr} unit="×" decimals={1} note={`${perfSum.bankableCount} bankable (1.5×+)`}/>
-          </div>
-          <div className="cv-grid-4">
-            <PerfDist label="Gross margin" summary={perfSum.grossMargin} unit="%" note="pricing &amp; cost control"/>
-            <PerfDist label="Net margin" summary={perfSum.netMargin} unit="%" note="after everything"/>
-            <PerfDist label="Return on investment" summary={perfSum.roi} unit="%" note="net profit ÷ capital at risk"/>
-          </div>
+      <div style={card}>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.4rem'}}>
+          Seven-dimension average{hasFilter?' — this segment vs. portfolio':''}
         </div>
-      )}
+        {view.mostCommonWeakDimension&&<div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Weakest dimension: <b style={{color:C.red}}>{LRS_DIM_LABELS[view.mostCommonWeakDimension]}</b></div>}
+        <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+          {Object.entries(view.dimensionAverages).map(([dim,avg])=>{
+            const portfolioAvg=portfolio.dimensionAverages[dim]
+            return(
+              <div key={dim} style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+                <div style={{width:150,fontSize: '1.01rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
+                <div style={{flex:1,background:'var(--cv-tint-cyan)',borderRadius:4,height:14,position:'relative'}}>
+                  <div style={{width:`${Math.max(2,avg)}%`,background:C.teal,height:'100%',borderRadius:4}}/>
+                  {hasFilter&&<div style={{position:'absolute',left:`${Math.max(0,portfolioAvg-0.5)}%`,top:-2,width:2,height:18,background:'var(--cv-header)'}} title={`Portfolio average: ${Math.round(portfolioAvg)}`}/>}
+                </div>
+                <div style={{width:40,fontSize: '1.01rem',color:C.slate,textAlign:'right'}}>{Math.round(avg)}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>How much of what they declare, the money confirms</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>A figure counts as confirmed only where a payment record can be matched to a specific recorded sale.</p>
+      <div style={card}>
+        <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end',height:100}}>
+          {view.verificationDistribution.map(b=>{
+            const maxCount=Math.max(1,...view.verificationDistribution.map(x=>x.count))
+            return(
+              <div key={b.label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'0.3rem'}}>
+                <div style={{fontSize: '1.01rem',color:C.navy,fontWeight:600}}>{b.count}</div>
+                <div style={{width:'100%',height:`${Math.max(4,(b.count/maxCount)*70)}px`,background:C.cyan,borderRadius:'3px 3px 0 0'}}/>
+                <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>{b.label}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>What these enterprises could take on</div>
+      <div style={card}>
+        <div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Average of what each business could absorb TODAY, by type -- not a hypothetical "if all were investment-ready" ceiling. Shown separately per currency; never blended across currencies.</div>
+        {currencies.length===0?(
+          <div style={{color:C.slate,fontSize: '1.01rem'}}>Not yet available.</div>
+        ):currencies.map(cc=>(
+          <div key={cc} style={{marginBottom:'0.8rem'}}>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.slate,marginBottom:'0.4rem'}}>{cc}</div>
+            <div className="cv-grid-4">
+              {Object.entries(portfolio.currentFundAbsorption[cc]).map(([type,val])=>(
+                <div key={type} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.6rem 0.8rem'}}>
+                  <div style={{fontSize:'0.8rem',color:C.slate}}>{FAC_TYPE_LABELS[type]}</div>
+                  <div style={{fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{fmtPortfolioMoney(val,cc)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>The farmers, agents and retailers behind these enterprises</div>
+      {/* Impact & inclusion — roadmap (not yet collected; no fabricated figures) */}
+      <div style={card}>
+        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.3rem',flexWrap:'wrap'}}>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>The reach behind the numbers</div>
+          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
+        </div>
+        <p style={{fontSize: '1.01rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem'}}>
+          The reach a donor or impact investor weighs — smallholder farmers and farmer groups reached, and the share of
+          <b> women</b> and <b>youth</b> spelled out by where it sits: <b>supply chain</b>, <b>customers</b>, or <b>workforce</b>.
+          Captured per enterprise via a short per-period return, then rolled up and cut by sector, geography and size.
+          Not yet collected — shown here so the structure is ready.
+        </p>
+        <div style={{fontSize: '1.01rem',color:C.slate,background:'var(--cv-tint-cyan)',borderRadius:8,padding:'0.7rem 0.9rem'}}>
+          Maps to <b>IRIS+</b> (supply-chain &amp; client counts by gender/age), the <b>2X Criteria</b> (gender), and <b>SDGs 1 / 5 / 8</b>.
+        </div>
+      </div>
+
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>How each sector is performing, and who is already there</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>The same ratios cut by sector, so a sector can be read against the others rather than only against itself.</p>
       {perfSum&&(
         <div style={card}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Business quality &amp; durability</div>
           <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.9rem'}}>
             The same ratios, cut by sector. Every sector on the platform, whichever programme its businesses
             belong to, so a sector can be read against the others rather than only against itself.
@@ -1663,6 +1720,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       )}
 
+
       {data.performanceBySector&&data.performanceBySector.length>0&&(
         <div style={card}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Benchmarked by segment</div>
@@ -1707,95 +1765,11 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       )}
 
-      <div style={card}>
-        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Readiness pipeline</div>
-        <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
-          {pipelineEntries.map(([stage,color])=>(
-            <div key={stage} style={{flex:'1 1 140px',borderLeft:`4px solid ${color}`,padding:'0.5rem 0.8rem',background:'var(--cv-tint-cyan)',borderRadius:4}}>
-              <div style={{fontSize:'1.3rem',fontWeight:700,color}}>{view.readinessPipeline[stage]}</div>
-              <div style={{fontSize: '1.01rem',color:C.slate}}>{READINESS_STAGE_LABELS[stage]} · {Math.round(view.readinessPipelinePct[stage])}%</div>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      <div style={card}>
-        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.4rem'}}>
-          Seven-dimension average{hasFilter?' — this segment vs. portfolio':''}
-        </div>
-        {view.mostCommonWeakDimension&&<div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Weakest dimension: <b style={{color:C.red}}>{LRS_DIM_LABELS[view.mostCommonWeakDimension]}</b></div>}
-        <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
-          {Object.entries(view.dimensionAverages).map(([dim,avg])=>{
-            const portfolioAvg=portfolio.dimensionAverages[dim]
-            return(
-              <div key={dim} style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-                <div style={{width:150,fontSize: '1.01rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
-                <div style={{flex:1,background:'var(--cv-tint-cyan)',borderRadius:4,height:14,position:'relative'}}>
-                  <div style={{width:`${Math.max(2,avg)}%`,background:C.teal,height:'100%',borderRadius:4}}/>
-                  {hasFilter&&<div style={{position:'absolute',left:`${Math.max(0,portfolioAvg-0.5)}%`,top:-2,width:2,height:18,background:'var(--cv-header)'}} title={`Portfolio average: ${Math.round(portfolioAvg)}`}/>}
-                </div>
-                <div style={{width:40,fontSize: '1.01rem',color:C.slate,textAlign:'right'}}>{Math.round(avg)}</div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div style={card}>
-        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Verification confidence distribution</div>
-        <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end',height:100}}>
-          {view.verificationDistribution.map(b=>{
-            const maxCount=Math.max(1,...view.verificationDistribution.map(x=>x.count))
-            return(
-              <div key={b.label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'0.3rem'}}>
-                <div style={{fontSize: '1.01rem',color:C.navy,fontWeight:600}}>{b.count}</div>
-                <div style={{width:'100%',height:`${Math.max(4,(b.count/maxCount)*70)}px`,background:C.cyan,borderRadius:'3px 3px 0 0'}}/>
-                <div style={{fontSize:'0.9rem',color:C.slate,lineHeight:1.5}}>{b.label}</div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div style={card}>
-        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Current fund absorption capacity</div>
-        <div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Average of what each business could absorb TODAY, by type -- not a hypothetical "if all were investment-ready" ceiling. Shown separately per currency; never blended across currencies.</div>
-        {currencies.length===0?(
-          <div style={{color:C.slate,fontSize: '1.01rem'}}>Not yet available.</div>
-        ):currencies.map(cc=>(
-          <div key={cc} style={{marginBottom:'0.8rem'}}>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize: '1.01rem',color:C.slate,marginBottom:'0.4rem'}}>{cc}</div>
-            <div className="cv-grid-4">
-              {Object.entries(portfolio.currentFundAbsorption[cc]).map(([type,val])=>(
-                <div key={type} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.6rem 0.8rem'}}>
-                  <div style={{fontSize:'0.8rem',color:C.slate}}>{FAC_TYPE_LABELS[type]}</div>
-                  <div style={{fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{fmtPortfolioMoney(val,cc)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {hasFilter&&segment&&(
-        <div style={card}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Weakest dimensions in this segment, ranked</div>
-          <ol style={{margin:0,paddingLeft:'1.2rem'}}>
-            {segment.weakestDimensionsInSegment.slice(0,3).map(dim=>{
-              const cmp=segment.dimensionComparison.find(d=>d.dimension===dim)
-              return(
-                <li key={dim} style={{fontSize: '1.01rem',color:C.navy,marginBottom:'0.3rem'}}>
-                  {LRS_DIM_LABELS[dim]}: {Math.round(cmp.segmentAvg)} vs. portfolio {Math.round(cmp.portfolioAvg)}
-                  {cmp.delta<0&&<span style={{color:C.red}}> ({Math.round(cmp.delta)} below portfolio)</span>}
-                </li>
-              )
-            })}
-          </ol>
-        </div>
-      )}
-
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>Each enterprise, every month</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Anonymised by default. A business shows its real name only once its owner has consented.</p>
       <DrillConnector>↓ individual businesses within this view ↓</DrillConnector>
-      <LevelMarker n={3} label="Individual businesses" sub="click one to drill in"/>
+      <LevelMarker n={3} label="Each enterprise, every month" sub="click one to drill in"/>
       <div style={card}>
         <div style={{fontSize: '1.01rem',color:C.slate,marginBottom:'0.8rem'}}>Anonymised by default -- a business only shows its real name here once its owner has explicitly consented (toggled from the Client Health tab).</div>
         {(data.profiles||[]).length===0
@@ -1844,22 +1818,6 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
-      {/* Impact & inclusion — roadmap (not yet collected; no fabricated figures) */}
-      <div style={card}>
-        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.3rem',flexWrap:'wrap'}}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>Impact &amp; inclusion</div>
-          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
-        </div>
-        <p style={{fontSize: '1.01rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem'}}>
-          The reach a donor or impact investor weighs — smallholder farmers and farmer groups reached, and the share of
-          <b> women</b> and <b>youth</b> spelled out by where it sits: <b>supply chain</b>, <b>customers</b>, or <b>workforce</b>.
-          Captured per enterprise via a short per-period return, then rolled up and cut by sector, geography and size.
-          Not yet collected — shown here so the structure is ready.
-        </p>
-        <div style={{fontSize: '1.01rem',color:C.slate,background:'var(--cv-tint-cyan)',borderRadius:8,padding:'0.7rem 0.9rem'}}>
-          Maps to <b>IRIS+</b> (supply-chain &amp; client counts by gender/age), the <b>2X Criteria</b> (gender), and <b>SDGs 1 / 5 / 8</b>.
-        </div>
-      </div>
 
       {/* The methodology block that stood here listed every factor in one
           place, in the platform's own vocabulary, and told a reader nothing.

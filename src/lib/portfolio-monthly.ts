@@ -30,6 +30,8 @@
 export interface ClientMonth {
   /** First day of the calendar month, YYYY-MM-01. */
   period: string
+  /** What the business planned to sell that month, where the model carries one. */
+  plannedRevenue?: number | null
   revenue: number | null
   grossProfit: number | null
   ebitda: number | null
@@ -53,6 +55,10 @@ export interface MonthlyPoint {
    * reading. On a single-currency portfolio the two are always equal.
    */
   nRevenue: number
+  /** What those same businesses planned to sell that month. */
+  plannedRevenue: number | null
+  /** Actual as a share of plan, where both are known and the plan is not zero. */
+  achievedPct: number | null
   revenue: number | null
   grossMargin: number | null
   ebitdaMargin: number | null
@@ -78,18 +84,20 @@ export function labelOf(key: string): string {
  * that happened.
  */
 export function clientMonthsFrom(
-  con: { act_rev?: (number | null)[]; act_gp?: (number | null)[]; act_ebitda?: (number | null)[] },
+  con: { act_rev?: (number | null)[]; act_gp?: (number | null)[]; act_ebitda?: (number | null)[]; rev?: number[] },
   periodFor: (index: number) => string,
 ): ClientMonth[] {
   const rev = con.act_rev || []
   const gp = con.act_gp || []
   const ebitda = con.act_ebitda || []
+  const plan = con.rev || []
   const out: ClientMonth[] = []
   for (let i = 0; i < rev.length; i++) {
     const r = rev[i]
     if (r === null || r === undefined || !Number.isFinite(r)) continue
     out.push({
       period: periodFor(i),
+      plannedRevenue: typeof plan[i] === 'number' && Number.isFinite(plan[i]) ? plan[i] : null,
       revenue: r,
       grossProfit: typeof gp[i] === 'number' && Number.isFinite(gp[i] as number) ? (gp[i] as number) : null,
       ebitda: typeof ebitda[i] === 'number' && Number.isFinite(ebitda[i] as number) ? (ebitda[i] as number) : null,
@@ -173,6 +181,18 @@ export function aggregateMonthly(
       .map(({ m }) => m.revenue)
       .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
 
+    // Plan is added over the same businesses as the actual, so the two lines
+    // describe one population. A business with an actual but no planned figure
+    // for that month is left out of both sides rather than counted against a
+    // plan of zero.
+    const paired = forMoney
+      .map(({ m }) => ({ a: m.revenue, p: m.plannedRevenue }))
+      .filter((x): x is { a: number; p: number } =>
+        typeof x.a === 'number' && Number.isFinite(x.a) &&
+        typeof x.p === 'number' && Number.isFinite(x.p))
+    const plannedTotal = paired.length ? paired.reduce((s, x) => s + x.p, 0) : null
+    const actualPaired = paired.length ? paired.reduce((s, x) => s + x.a, 0) : null
+
     const grossMargins = readings
       .map(({ m }) => (m.revenue && m.revenue > 0 && m.grossProfit !== null
         ? (m.grossProfit / m.revenue) * 100 : null))
@@ -188,6 +208,9 @@ export function aggregateMonthly(
       label: labelOf(month),
       n: readings.length,
       nRevenue: revenues.length,
+      plannedRevenue: plannedTotal,
+      achievedPct: plannedTotal !== null && plannedTotal > 0 && actualPaired !== null
+        ? (actualPaired / plannedTotal) * 100 : null,
       revenue: revenues.length ? revenues.reduce((s, v) => s + v, 0) : null,
       grossMargin: median(grossMargins),
       ebitdaMargin: median(ebitdaMargins),
