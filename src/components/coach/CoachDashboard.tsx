@@ -78,6 +78,7 @@ import PortfolioBoard, { BOARD_VIEWS, type BoardView } from './PortfolioBoard'
 import PlanVsActual from './PlanVsActual'
 import MonthTable from './MonthTable'
 import StageLadder from './StageLadder'
+import LineChart from './LineChart'
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────
 const C = {
@@ -1491,6 +1492,15 @@ function PortfolioIntelligenceHub({clients,programmes}){
     if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
     return s.map(p=>p&&typeof p.value==='number'?p.value:null)
   },[history])
+  const planPoints=((data.monthly&&data.monthly.points)||[]).filter(p=>p.plannedRevenue!==null&&p.revenue!==null)
+  const moneyShort=useCallback((v)=>{
+    if(v===null||!Number.isFinite(v))return '—'
+    const a=Math.abs(v)
+    if(a>=1e9)return (v/1e9).toFixed(1)+'bn'
+    if(a>=1e6)return (v/1e6).toFixed(1)+'m'
+    if(a>=1e3)return Math.round(v/1e3)+'k'
+    return String(Math.round(v))
+  },[])
   const stageSeries=useCallback((stage)=>{
     const s=history&&history.stages?history.stages[stage]:null
     if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
@@ -1609,13 +1619,31 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>What they planned, against what they achieved</div>
-      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Every business sets a monthly plan. This is what they sold against it, for the months where both figures exist.</p>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Trading</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What they planned, against what they achieved</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        Purple is what these businesses forecast for a month before it happened. Teal is what they achieved.
+        The gap is the only honest way to judge whether a forward plan is worth reading.
+      </p>
+      {planPoints.length>0&&(
+        <div style={{marginBottom:'0.9rem'}}>
+          <LineChart
+            title="Planned and achieved monthly revenue as two lines, with the shortfall shaded between them."
+            months={planPoints.map(p=>p.label)}
+            axisLabel={`${data.monthly?.currency||currencies[0]||'UGX'} PER MONTH`}
+            shadeBetween={[0,1]}
+            format={(v)=>moneyShort(v)}
+            series={[
+              {values:planPoints.map(p=>p.plannedRevenue),colour:C.purple,width:2.2,dashed:true,name:'Planned for that month'},
+              {values:planPoints.map(p=>p.revenue),colour:C.teal,width:2.8,dots:true,name:'Achieved'},
+            ]}/>
+        </div>
+      )}
       <div style={card}>
         <PlanVsActual points={data.monthly?.points||[]} currency={data.monthly?.currency||currencies[0]||'UGX'}/>
       </div>
 
-      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.7rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'1.8rem 0 0.2rem'}}>Movement</div>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Movement</div>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>The four stages, and movement between them</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
         Every enterprise sits at one of four stages. <b>Slipped back</b> means an enterprise is now at a lower
@@ -1645,12 +1673,21 @@ function PortfolioIntelligenceHub({clients,programmes}){
           {label:'Median readiness score',fmt:'score',values:seriesValues('readiness'),good:'up',note:'out of 30'},
         ]}/>
 
-      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.7rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'1.8rem 0 0.2rem'}}>Evidence</div>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Evidence</div>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>How much of what they declare, the money confirms</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
         A sale counts as verified only once a payment record has been matched to it. Money that arrived but was
         never matched to a sale is counted separately and never quietly added in.
       </p>
+      {historyMonths.length>0&&seriesValues('verified').some(v=>v!==null)&&(
+        <div style={{marginBottom:'0.9rem'}}>
+          <LineChart
+            title="Verified share of declared revenue month by month, every month labelled."
+            months={historyMonths}
+            suffix="%"
+            series={[{values:seriesValues('verified'),colour:C.green,width:2.8,dots:true,area:true,labelEvery:true}]}/>
+        </div>
+      )}
       <MonthTable
         months={historyMonths}
         empty="No month has been filed yet, so there is nothing to confirm against. This fills in from the first month end."
@@ -1661,12 +1698,22 @@ function PortfolioIntelligenceHub({clients,programmes}){
           {label:'Median data confidence',fmt:'score',values:seriesValues('confidence'),good:'up',note:'out of 100'},
         ]}/>
 
-      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.7rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'1.8rem 0 0.2rem'}}>Capital</div>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Capital</div>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What these enterprises could take on</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
         Capacity, not money anyone has lent. Worked out per enterprise from its own cash position and existing
         obligations, then added up. Never blended across currencies.
       </p>
+      {historyMonths.length>0&&seriesValues('absorbable').some(v=>v!==null)&&(
+        <div style={{marginBottom:'0.9rem'}}>
+          <LineChart
+            title="Capacity these businesses could take on, month by month."
+            months={historyMonths}
+            axisLabel={historyCurrency?`${historyCurrency} OF CAPACITY`:'CAPACITY'}
+            format={(v)=>moneyShort(v)}
+            series={[{values:seriesValues('absorbable'),colour:C.teal,width:2.8,dots:true,name:'Total capacity'}]}/>
+        </div>
+      )}
       <div style={{marginBottom:'0.9rem'}}>
         <MonthTable
           months={historyMonths}
