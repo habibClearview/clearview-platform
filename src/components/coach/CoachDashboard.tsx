@@ -1539,6 +1539,14 @@ function PortfolioIntelligenceHub({clients,programmes}){
     {value:`${Math.round(view.avgLRSScore)}/100`,label:'Average liquidity readiness'},
   ]
 
+  // THE SPECIMEN'S FIGURES ARE INVENTED, AND NOTHING ON THE PLATFORM FEEDS
+  // THEM. They exist so the shape of the instrument can be read before anybody
+  // commits to collecting it. They are never mixed with a real reading.
+  const specimenMonths=(historyMonths.length>=6?historyMonths:['Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26']).slice(-12)
+  const specimenFarmers=specimenMonths.map((_,i)=>4100+i*180)
+  const specimenPaid=specimenMonths.map((_,i)=>2480000+i*126000)
+  const specimenJobs=specimenMonths.map((_,i)=>312+i*9)
+
   const stageSeries=useCallback((stage)=>{
     const s=history&&history.stages?history.stages[stage]:null
     if(!Array.isArray(s))return (history&&history.months?history.months:[]).map(()=>null)
@@ -1781,22 +1789,42 @@ function PortfolioIntelligenceHub({clients,programmes}){
         ))}
       </div>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>The farmers, agents and retailers behind these enterprises</div>
-      {/* Impact & inclusion — roadmap (not yet collected; no fabricated figures) */}
-      <div style={card}>
-        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.3rem',flexWrap:'wrap'}}>
-          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>The reach behind the numbers</div>
-          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
+      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Network</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>The farmers, agents and retailers behind these enterprises</div>
+      <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
+        <b>Not collected yet.</b> It needs one file from each business, after which it is tracked every month
+        like everything else. Below is the same instrument with invented figures, so the shape of what it will
+        report can be read before anybody commits to collecting it.
+      </p>
+      {/* SPECIMEN, AND SAID SO IN THREE PLACES. The dashed border, the tag and
+          the caption all say the figures are invented, because a reader who
+          takes one of these numbers into a funder conversation would be
+          quoting something nobody has measured. */}
+      <div style={{border:`1px dashed ${C.purple}`,borderRadius:10,background:'var(--cv-card)',padding:'1rem'}}>
+        <span style={{display:'inline-block',fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',color:C.purple,border:`1px solid ${C.purple}`,padding:'3px 9px',borderRadius:4,marginBottom:'0.7rem'}}>Specimen · invented figures</span>
+        <LineChart
+          title="Farmers bought from and value paid to them, month by month. Invented figures."
+          months={specimenMonths}
+          format={(v)=>moneyShort(v)}
+          series={[
+            {values:specimenFarmers,colour:C.green,width:2.6,dots:true,name:'Farmers bought from'},
+            {values:specimenPaid,colour:C.cyan,width:2.4,dashed:true,name:'Value paid to farmers'},
+          ]}/>
+        <div style={{marginTop:'0.9rem'}}>
+          <MonthTable
+            months={specimenMonths}
+            empty="—"
+            rows={[
+              {label:'Smallholder farmers bought from',fmt:'count',values:specimenFarmers,good:'up',note:'counted once each, so a farmer selling to two businesses is not counted twice'},
+              {label:'Value paid to farmers',fmt:'money',values:specimenPaid,good:'up',note:'from purchase records, not estimated from yields'},
+              {label:'Jobs created or sustained',fmt:'count',values:specimenJobs,good:'up',note:'payroll records, permanent and seasonal added'},
+            ]}/>
         </div>
-        <p style={{fontSize: '1.01rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem'}}>
-          The reach a donor or impact investor weighs — smallholder farmers and farmer groups reached, and the share of
-          <b> women</b> and <b>youth</b> spelled out by where it sits: <b>supply chain</b>, <b>customers</b>, or <b>workforce</b>.
-          Captured per enterprise via a short per-period return, then rolled up and cut by sector, geography and size.
-          Not yet collected — shown here so the structure is ready.
+        <p style={{margin:'0.7rem 0 0',fontSize:'0.9rem',color:C.faint,lineHeight:1.6}}>
+          Every figure in this block is invented. No business on the platform has reported any of it. It maps
+          to <b>IRIS+</b> for supply chain and client counts by gender and age, the <b>2X Criteria</b> for
+          gender, and <b>SDGs 1, 5 and 8</b>.
         </p>
-        <div style={{fontSize: '1.01rem',color:C.slate,background:'var(--cv-tint-cyan)',borderRadius:8,padding:'0.7rem 0.9rem'}}>
-          Maps to <b>IRIS+</b> (supply-chain &amp; client counts by gender/age), the <b>2X Criteria</b> (gender), and <b>SDGs 1 / 5 / 8</b>.
-        </div>
       </div>
 
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>How each sector is performing, and who is already there</div>
