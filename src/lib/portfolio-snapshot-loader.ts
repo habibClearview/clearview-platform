@@ -13,6 +13,11 @@ import { defaultCoachAssessment } from './scoring-engine'
 import { computeLiquidityReadinessScore, computeLRSTimeSeries } from './liquidity-readiness'
 import { computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, monthlyRateToAnnualRate } from './investment-metrics'
 import { periodForMonthIndex } from './month-end-close'
+import { combinedActual } from './actuals'
+import {
+  clientMonthsFrom, aggregateMonthly, monthsAcross, reportingCurrency, currenciesOf,
+  type ClientMonthly, type MonthlyPoint,
+} from './portfolio-monthly'
 import { assessConfidence } from './confidence'
 import { buildPeriodSignals } from './verification-display'
 import { computeSeasonalCashProjection } from './seasonal-cash-projection'
@@ -25,7 +30,7 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
 
   const [{ data: events }, { data: actualsRows }, { data: periodCloseRows }, { data: providerLinks }, { data: providerTx }] = await Promise.all([
     admin.from('management_events').select('*').eq('client_id', client.id).order('date', { ascending: false }),
-    admin.from('generic_actuals').select('period,field_line_values').eq('client_id', client.id),
+    admin.from('generic_actuals').select('unit_id,period,line_values,field_line_values').eq('client_id', client.id),
     admin.from('generic_period_close').select('period,closed').eq('client_id', client.id).eq('closed', true),
     admin.from('provider_links').select('status').eq('client_id', client.id),
     admin.from('provider_transactions').select('amount,reconciliation_state').eq('client_id', client.id),
@@ -43,7 +48,33 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
     settings: configRow.settings || {},
   }
 
-  const result = runGenericModel(config)
+  // THE MODEL WAS BEING RUN WITH NO ACTUALS AT ALL. 23 September 2026.
+  //
+  // runGenericModel takes the recorded actuals as its second argument, and
+  // this loader never passed them. So every figure on the coach's portfolio
+  // page -- readiness, liquidity, growth, debt cover -- was computed from the
+  // plan alone, while the client's own Intelligence tab passed its actuals and
+  // computed something different for the same business. The two pages
+  // disagreed about the same client, and the portfolio page had no history
+  // because con.act_* was entirely null.
+  //
+  // Hand-entered and field-app figures live in separate columns that only one
+  // writer each ever touches (docs/ACCOUNTING_ARCHITECTURE.md section 4) and
+  // are summed only when read, which is what combinedActual does.
+  const actualsForEngine: Record<string, Record<string, Record<string, number>>> = {}
+  ;(actualsRows || []).forEach((row: any) => {
+    if (!row.unit_id || !row.period) return
+    const lv = row.line_values || {}
+    const flv = row.field_line_values || {}
+    const ids = new Set([...Object.keys(lv), ...Object.keys(flv)])
+    if (ids.size === 0) return
+    if (!actualsForEngine[row.unit_id]) actualsForEngine[row.unit_id] = {}
+    const forPeriod = actualsForEngine[row.unit_id][row.period] || {}
+    ids.forEach((id) => { forPeriod[id] = (forPeriod[id] || 0) + combinedActual(id, lv, flv) })
+    actualsForEngine[row.unit_id][row.period] = forPeriod
+  })
+
+  const result = runGenericModel(config, actualsForEngine)
   const m = result.metrics
   const s = result.scores
   const assess = config.settings.coach_assessment || defaultCoachAssessment()
@@ -182,6 +213,11 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
     businessUnits,
     consentToBeNamed: !!client.portfolio_consent_named,
     performance,
+    // THE MONTHS THIS CLIENT ALREADY HAS. The engine has just been run above
+    // and its con.act_* arrays carry one entry per month, null for a month
+    // that has not happened. That is real history for a real client, and the
+    // market intelligence board was reading an empty table instead of it.
+    monthly: clientMonthsFrom(result.con, (i) => periodForMonthIndex(config.start_date, i)),
   }
 }
 
@@ -238,6 +274,14 @@ export interface PortfolioViewData {
   performanceSummary: PerformanceSummary
   segmentPerformanceSummary: PerformanceSummary | null
   performanceBySector: SectorPerformance[]
+  /** The portfolio's own month-by-month record, from the models themselves. */
+  monthly: {
+    months: string[]
+    points: MonthlyPoint[]
+    currency: string | null
+    currencies: string[]
+    businesses: number
+  }
 }
 
 // Assembles the full response shape both /api/portfolio-intelligence (coach,
@@ -255,8 +299,24 @@ export function buildPortfolioViewData(snapshots: ClientSnapshot[], filter: Segm
   const profileSnapshots = filter ? snapshots.filter(s => matchesFilter(s, filter)) : snapshots
   const profiles = profileSnapshots.map(s => buildAnonymisedProfile(s, snapshots))
 
+  // THE MONTHLY RECORD, FROM THE MODELS THEMSELVES. Every client already
+  // carries its own months; this is the portfolio read of them, narrowed by
+  // the same filter as everything else on the page.
+  const monthlyClients: ClientMonthly[] = profileSnapshots
+    .filter(s => s.monthly && s.monthly.length > 0)
+    .map(s => ({ clientId: s.clientId, currency: s.currency, months: s.monthly! }))
+  const monthlyCurrency = reportingCurrency(monthlyClients)
+  const monthKeys = monthsAcross(monthlyClients)
+
   return {
     portfolio, segment, snapshotCount: snapshots.length, profiles,
+    monthly: {
+      months: monthKeys,
+      points: aggregateMonthly(monthlyClients, monthKeys, monthlyCurrency),
+      currency: monthlyCurrency,
+      currencies: currenciesOf(monthlyClients),
+      businesses: monthlyClients.length,
+    },
     filterOptions: {
       sectors: distinctValues(s => s.sector),
       countries: distinctValues(s => s.country),
