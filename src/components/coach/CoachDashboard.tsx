@@ -74,6 +74,7 @@ import {
 } from '@/lib/notice-dismissal'
 import { GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
 import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
+import PortfolioBoard, { BOARD_VIEWS, type BoardView } from './PortfolioBoard'
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────
 const C = {
@@ -1414,6 +1415,10 @@ function PortfolioIntelligenceHub({clients,programmes}){
   const [showAccess,setShowAccess]=useState(false)
   const [downloading,setDownloading]=useState(false)
   const [downloadError,setDownloadError]=useState('')
+  // Which reading of the same figures is showing. A view changes what leads
+  // and in what order the page reads; it never changes a figure, hides an
+  // indicator, or addresses the reader. This page belongs to no programme.
+  const [boardView,setBoardView]=useState<BoardView>('portfolio')
 
   async function downloadBrief(currentFilter){
     setDownloading(true);setDownloadError('')
@@ -1519,6 +1524,24 @@ function PortfolioIntelligenceHub({clients,programmes}){
       </div>
       {showAccess&&<ExternalAccessPanel portfolioFilter={hasFilter?filter:undefined} clients={clients} programmes={programmes} onClose={()=>setShowAccess(false)}/>}
 
+      {/* THE VIEW TABS. Habib, 23 September 2026: "maybe the view should be tabs
+          and programme, sector and others dropdown as they are now". The filters
+          above decide WHICH businesses; these decide what leads. */}
+      <div className="no-print" style={{background:'var(--cv-nav)',borderRadius:8,marginBottom:'1rem',overflowX:'auto'}}>
+        <div style={{display:'flex',flexWrap:'nowrap',gap:0,padding:'0 0.4rem'}}>
+          {BOARD_VIEWS.map(v=>(
+            <button key={v.id} type="button" aria-pressed={boardView===v.id} onClick={()=>setBoardView(v.id)}
+              style={{fontFamily:'var(--cv-font)',fontSize:'1.0rem',fontWeight:600,padding:'0.65rem 1.1rem',
+                      background:'none',border:0,borderBottom:`3px solid ${boardView===v.id?C.teal:'transparent'}`,
+                      color:boardView===v.id?'#FFF':'rgba(255,255,255,0.66)',cursor:'pointer',whiteSpace:'nowrap'}}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <PortfolioBoard view={boardView} filter={filter} currency={currencies[0]||'UGX'} snapshotCount={snapshotCount}/>
+
       {hasFilter&&(
         <DrillConnector>↓ filtered to {[filter.programmeId&&(programmesById[filter.programmeId]?.name||'a programme'),filter.sector,filter.country,filter.readinessStage&&READINESS_STAGE_LABELS[filter.readinessStage]].filter(Boolean).join(' · ')} ↓</DrillConnector>
       )}
@@ -1577,7 +1600,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
             <PerfDist label="Debt coverage (DSCR)" summary={perfSum.dscr} unit="×" decimals={1} note={`${perfSum.bankableCount} bankable (1.5×+)`}/>
           </div>
           <div className="cv-grid-4">
-            <PerfDist label="Rule of 40" summary={perfSum.ruleOf40} note={`${perfSum.ruleOf40StrongCount} score 40+`}/>
+            <PerfDist label="Gross margin" summary={perfSum.grossMargin} unit="%" note="pricing &amp; cost control"/>
             <PerfDist label="Net margin" summary={perfSum.netMargin} unit="%"/>
           </div>
         </div>
@@ -1587,30 +1610,24 @@ function PortfolioIntelligenceHub({clients,programmes}){
         <div style={card}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Business quality &amp; durability</div>
           <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.9rem'}}>
-            The efficiency and durability ratios — the numbers that tell a funder whether growth is economically
-            real and whether revenue will still be there to repay. Distributions across the {hasFilter?'segment':'portfolio'}; cut by sector below.
+            Whether growth is economically real: what each business keeps from a sale, what it earns on the
+            capital at risk, and whether it could service a loan. Distributions across the {hasFilter?'segment':'portfolio'}; cut by sector below.
           </p>
           <div className="cv-grid-4" style={{marginBottom:'0.7rem'}}>
-            <PerfDist label="Rule of 40" summary={perfSum.ruleOf40} note={`${perfSum.ruleOf40StrongCount} score 40+ · from the model`}/>
-            <PerfDist label="Burn multiple" summary={perfSum.burnMultiple} unit="×" decimals={1} note="under 1× is efficient"/>
             <PerfDist label="Gross margin" summary={perfSum.grossMargin} unit="%" note="pricing &amp; cost control"/>
             <PerfDist label="Return on investment" summary={perfSum.roi} unit="%" note="net profit ÷ capital at risk"/>
-          </div>
-          <div className="cv-grid-4">
-            <PerfDist label="LTV : CAC" roadmap roadmapNote="Is growth economically real? Healthy above 3×. Needs customer data."/>
-            <PerfDist label="Churn" roadmap roadmapNote="Will revenue still be there to repay? Needs customer data."/>
-            <PerfDist label="Net revenue retention" roadmap roadmapNote="Do existing customers grow or leak? Over 100% grows without new customers. Needs customer data."/>
             <PerfDist label="Net margin" summary={perfSum.netMargin} unit="%" note="after everything"/>
+            <PerfDist label="Debt coverage (DSCR)" summary={perfSum.dscr} unit="×" decimals={1} note={`${perfSum.bankableCount} could service a loan`}/>
           </div>
 
           {data.performanceBySector&&data.performanceBySector.length>0&&(
             <div style={{marginTop:'1.1rem'}}>
               <div style={{fontFamily:'var(--cv-font)',fontSize: '1.01rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Quality ratios by sector</div>
-              <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.6rem'}}>Ranked by Rule of 40. Margins, Rule of 40 and burn compute now; the customer ratios fill in as each business reports.</p>
+              <p style={{fontSize: '1.01rem',color:C.slate,margin:'0 0 0.6rem'}}>Every sector on the platform, whichever programme its businesses belong to. Each figure is the middle business in that sector, so one large one cannot move it.</p>
               <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize: '1.01rem',minWidth:680}}>
                   <thead>
-                    <tr>{['Sector','Biz','Rule of 40','Gross','EBITDA','Net','Burn','LTV:CAC','Churn','NRR'].map((h,i)=>(
+                    <tr>{['Sector','Businesses','Gross margin','EBITDA margin','Net margin','Return on investment'].map((h,i)=>(
                       <th key={h} style={{background:'var(--cv-header)',color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                     ))}</tr>
                   </thead>
@@ -1619,33 +1636,26 @@ function PortfolioIntelligenceHub({clients,programmes}){
                       <tr key={row.sector} style={{borderTop:'1px solid var(--cv-border-soft)'}}>
                         <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{row.sector}</td>
                         <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.count}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:C.navy}}>{med(row.summary.ruleOf40)}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.grossMargin,'%')}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:C.navy}}>{med(row.summary.grossMargin,'%')}</td>
                         <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.ebitdaMargin,'%')}</td>
                         <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.netMargin,'%')}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.burnMultiple,'×',1)}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:'var(--cv-slate)'}}>—</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:'var(--cv-slate)'}}>—</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',color:'var(--cv-slate)'}}>—</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.roi,'%')}</td>
                       </tr>
                     ))}
                     <tr style={{borderTop:`2px solid ${C.cyan}`,background:'var(--cv-tint-cyan)',fontWeight:700}}>
                       <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>Portfolio median</td>
                       <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum.total}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.ruleOf40)}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.grossMargin,'%')}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.ebitdaMargin,'%')}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.netMargin,'%')}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.roi,'%')}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.burnMultiple,'×',1)}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>—</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>—</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>—</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
               <div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.6rem',background:'var(--cv-tint-amber)',borderLeft:`3px solid ${C.amber}`,borderRadius:6,padding:'0.6rem 0.8rem'}}>
-                <b>Available now vs roadmap:</b> Rule of 40, margins and burn compute from the financial model we already run. LTV:CAC, churn and NRR need a short per-period customer input from each business — they populate as businesses start reporting and stay blank until then.
+                Every figure here comes from the financial model each business already runs. Nothing on this table waits on anything being collected.
               </div>
             </div>
           )}
@@ -1850,25 +1860,14 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
-      {/* Methodology */}
-      <div style={card}>
-        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.6rem'}}>Methodology — every factor, defined</div>
-        <div style={{display:'grid',gridTemplateColumns:'minmax(150px,190px) minmax(0,1fr)',gap:'0.5rem 1.2rem',fontSize: '1.01rem'}}>
-          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Growth / cost / DSCR / EBITDA</div>
-          <div style={{color:C.navy}}>Year-on-year revenue change; total costs ÷ revenue; operating cash ÷ debt due (1.5× = lender comfort line); operating profit ÷ revenue. Medians over the full distribution.</div>
-          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Readiness &amp; LRS</div>
-          <div style={{color:C.navy}}>A 0–30 readiness stage and a 0–100 Liquidity Readiness score from seven weighted dimensions.</div>
-          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Data confidence</div>
-          <div style={{color:C.navy}}>How much of each model is verified vs estimated. Feeds OPIM Principle 9 (disclosure &amp; independent verification).</div>
-          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Benchmarks</div>
-          <div style={{color:C.navy}}>Computed from businesses in this portfolio; peer comparisons, not industry norms. Medians so one outlier can't distort.</div>
-          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Impact &amp; inclusion</div>
-          <div style={{color:C.navy}}>Farmers &amp; groups reached; women/youth share of chain, customers, workforce. Maps to IRIS+, HIPSO/JII and 2X. Not yet collected.</div>
-        </div>
-        <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.8rem',background:'var(--cv-tint-amber)',borderLeft:`3px solid ${C.amber}`,borderRadius:6,padding:'0.6rem 0.8rem'}}>
-          <b>Honest limitations.</b> (1) Everything is as at the latest model — tracking factors over time needs historical snapshots we don't yet store. (2) A cohort of this size demonstrates the engine; sector cells become statistically robust as the dataset grows. We show what's possible now and the trajectory — we don't overclaim significance.
-        </div>
-      </div>
+      {/* The methodology block that stood here listed every factor in one
+          place, in the platform's own vocabulary, and told a reader nothing.
+          Each measure now carries its own definition on the board above:
+          what it is, how it is worked out, and what good looks like, read
+          where the figure is rather than in a glossary at the foot of a page.
+          The honest limitations it carried are answered by the board too: it
+          shows how many months are on the record and withholds any month
+          drawn from fewer than five businesses. */}
 
       {openProfile&&(
         <div style={{position:'fixed',inset:0,background:'rgba(11,31,51,0.45)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'1rem'}} onClick={()=>setOpenProfile(null)}>
