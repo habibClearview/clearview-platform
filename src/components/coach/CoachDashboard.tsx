@@ -141,6 +141,23 @@ function ScoreDonut({label,display,frac,rating,color}){const r=26,circ=2*Math.PI
 // Compact currency formatter matching the approved design ($182k, not
 // "USD 182,000") -- only ever formats real computed values, never invents one.
 const fmtGlance=(n,cur)=>formatMoneyShort(n,cur)
+// THE BAND THAT SEPARATES ONE SECTION FROM THE NEXT.
+//
+// 24 September 2026. Habib: "make the section bar a lot more prominent ... so
+// the sections can be distinct." It was a small chip that read as a caption.
+// A reader scanning a long page uses this to find where they are, so it is set
+// large, with a rule above it and real space either side, and every section
+// carries one so none of them is the odd one out.
+function SectionTag({children}){
+  return(
+    <div style={{borderTop:`1px solid ${'var(--cv-border-soft)'}`,margin:'3rem 0 1rem',paddingTop:'1.7rem'}}>
+      <span style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.95rem',fontWeight:700,letterSpacing:'0.18em',
+                    textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,
+                    padding:'9px 20px',borderRadius:6,display:'inline-block',lineHeight:1.1}}>{children}</span>
+    </div>
+  )
+}
+
 function Kicker({children,style}){return<div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.75rem',...style}}>{children}</div>}
 function GlanceKPI({label,value,sub,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderLeft:`4px solid ${color||C.navy}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.55rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.3rem'}}>{sub}</div>}</div>)}
 function GlanceBar({frac,color}){return<div style={{height:6,borderRadius:3,background:'var(--cv-track)',marginTop:'0.75rem',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(Math.max(0,Math.min(1,frac||0))*100)}%`,background:color,borderRadius:3}}/></div>}
@@ -1689,7 +1706,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
-      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Trading</div>
+      <SectionTag>Trading</SectionTag>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What they planned, against what they achieved</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
         Purple is what these businesses forecast for a month before it happened. Teal is what they achieved.
@@ -1713,7 +1730,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
         <PlanVsActual points={data.monthly?.points||[]} currency={data.monthly?.currency||currencies[0]||'UGX'}/>
       </div>
 
-      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Movement</div>
+      <SectionTag>Movement</SectionTag>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>The four stages, and movement between them</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
         Every enterprise sits at one of four stages. <b>Slipped back</b> means an enterprise is now at a lower
@@ -1743,7 +1760,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
           {label:'Median readiness score',fmt:'score',values:seriesValues('readiness'),good:'up',note:'out of 30'},
         ]}/>
 
-      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Evidence</div>
+      <SectionTag>Evidence</SectionTag>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>How much of what they declare, the money confirms</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
         A sale counts as verified only once a payment record has been matched to it. Money that arrived but was
@@ -1768,7 +1785,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
           {label:'Median data confidence',fmt:'score',values:seriesValues('confidence'),good:'up',note:'out of 100'},
         ]}/>
 
-      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Capital</div>
+      <SectionTag>Capital</SectionTag>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What these enterprises could take on</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
         Capacity, not money anyone has lent. Worked out per enterprise from its own cash position and existing
@@ -1813,7 +1830,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
         ))}
       </div>
 
-      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>Network</div>
+      <SectionTag>Network</SectionTag>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>The farmers, agents and retailers behind these enterprises</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
         <b>Not collected yet.</b> It needs one file from each business, after which it is tracked every month
@@ -1851,7 +1868,8 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </p>
       </div>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>How each sector is performing, and who is already there</div>
+      <SectionTag>Across the platform</SectionTag>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>How each sector is performing, and who is already there</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>The same ratios cut by sector, so a sector can be read against the others rather than only against itself.</p>
       {data.performanceBySector&&data.performanceBySector.length>0&&(
         <div style={{overflowX:'auto',border:`1px solid ${'var(--cv-border)'}`,borderRadius:10,background:'var(--cv-card)'}}>
@@ -1902,7 +1920,8 @@ function PortfolioIntelligenceHub({clients,programmes}){
         ratios are withheld, because at that size a reader could work out which business is which.
       </p>
 
-      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'1.6rem 0 0.35rem'}}>Each enterprise, every month</div>
+      <SectionTag>Drill down</SectionTag>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>Each enterprise, every month</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'78ch'}}>Anonymised by default. A business shows its real name only once its owner has consented.</p>
       <DrillConnector>↓ individual businesses within this view ↓</DrillConnector>
       <LevelMarker n={3} label="Each enterprise, every month" sub="click one to drill in"/>
@@ -1954,7 +1973,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       </div>
 
-      <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.14em',textTransform:'uppercase',color:'var(--cv-on-cyan)',background:C.cyan,padding:'3px 9px',borderRadius:4,display:'inline-block',margin:'1.8rem 0 0.5rem'}}>The download</div>
+      <SectionTag>The download</SectionTag>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,letterSpacing:'-0.01em',margin:'0 0 0.35rem'}}>What comes out as a PDF</div>
       <p style={{fontSize:'1.01rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem',maxWidth:'78ch'}}>
         Same figures, same months, same definitions, on paper. Below is the first page at roughly its real
