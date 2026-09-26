@@ -208,3 +208,18 @@ describe('the page fits the screen it is on', () => {
     expect(phone).not.toContain('overflow-x: auto !important')
   })
 })
+
+describe('the booking calendar on the public site', () => {
+  // 26 September 2026. Chapter 07 embeds Cal.com: a loader script and a frame,
+  // both from app.cal.com. The policy has to let both through, and nothing
+  // wider, or the calendar is refused without a word on screen.
+  it('may load the calendar script and show its frame', () => {
+    expect(csp['script-src']).toContain('https://app.cal.com')
+    expect(csp['frame-src']).toContain('https://app.cal.com')
+  })
+
+  it('opens frames to that one host and nothing wider', () => {
+    expect(csp['frame-src']).not.toMatch(/(^|\s)\*|https:\s|https:$/)
+    expect(csp['script-src']).not.toMatch(/(^|\s)\*(\s|$)/)
+  })
+})

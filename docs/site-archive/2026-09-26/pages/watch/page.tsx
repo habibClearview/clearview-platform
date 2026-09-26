@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import CanvasCoachSite from '@/components/site/design/CanvasCoachSite'
+import CanvasCoachSite from '../../CanvasCoachSite'
 
 export const metadata: Metadata = {
   title: 'Watch — twenty years of implementation, in short pieces',

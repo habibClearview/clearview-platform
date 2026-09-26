@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import CanvasCoachSite from '@/components/site/design/CanvasCoachSite'
+import CanvasCoachSite from '../../../CanvasCoachSite'
 
 export const metadata: Metadata = {
   title: 'Enterprise Trade Liquidity Multiplier — Habib Onifade',

@@ -30,7 +30,19 @@ export const SOURCE_TAGS = {
   enquiry: 'Enquiry',
   newsletter: 'Viable by Design',
   intel: 'Market Intelligence',
+  // The Chapter 06 form on the home page, 26 September 2026. The name is the
+  // one in Habib's brief, colon and all.
+  website: 'source: website',
 } as const
+
+/**
+ * A capture point that also files people into a Kit form. Kit's API cannot
+ * create a form, so Habib creates it by hand and its id goes in the setting
+ * named here. Until the setting exists, people are tagged but not filed.
+ */
+const SOURCE_FORM_ENV: Partial<Record<keyof typeof SOURCE_TAGS, string>> = {
+  website: 'KIT_WEBSITE_FORM_ID',
+}
 
 export type CaptureSource = keyof typeof SOURCE_TAGS
 
@@ -42,6 +54,29 @@ export const BAND_TAGS: Record<string, string> = {
 
 /** name -> id, resolved once per process rather than on every submission. */
 let tagIdCache: Record<string, number> | null = null
+
+/**
+ * A tag that does not exist yet is created rather than skipped. Kit's create
+ * call returns the existing tag when the name is already taken, so this is
+ * safe to repeat.
+ */
+async function ensureTag(key: string, name: string, ids: Record<string, number>): Promise<number | undefined> {
+  const known = ids[name.toLowerCase()]
+  if (known) return known
+  const res = await fetch('https://api.kit.com/v4/tags', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Kit-Api-Key': key },
+    body: JSON.stringify({ name }),
+  })
+  if (!(res.status === 200 || res.status === 201)) {
+    console.error('kit: could not create tag', name, res.status)
+    return undefined
+  }
+  const body = await res.json().catch(() => ({}))
+  const id = body?.tag?.id
+  if (id) ids[name.toLowerCase()] = id
+  return id
+}
 
 export async function tagIds(key: string): Promise<Record<string, number>> {
   if (tagIdCache) return tagIdCache
@@ -74,6 +109,8 @@ export interface CaptureInput {
 export interface CaptureResult {
   added: boolean
   tagged: string[]
+  /** The Kit form id the subscriber was added to, if any. */
+  form?: string
   reason?: string
 }
 
@@ -120,7 +157,7 @@ export async function capture(input: CaptureInput): Promise<CaptureResult> {
     const wanted = [SOURCE_TAGS[input.source], ...(input.extraTags || [])].filter(Boolean)
     const tagged: string[] = []
     for (const name of wanted) {
-      const id = ids[name.toLowerCase()]
+      const id = await ensureTag(key, name, ids)
       if (!id) { console.error('kit: no tag named', name); continue }
       const t = await fetch(`https://api.kit.com/v4/tags/${id}/subscribers`, {
         method: 'POST', headers, body: JSON.stringify({ email_address: input.email }),
@@ -128,7 +165,20 @@ export async function capture(input: CaptureInput): Promise<CaptureResult> {
       if (t.status === 200 || t.status === 201) tagged.push(name)
       else console.error('kit: tagging failed', name, t.status)
     }
-    return { added: true, tagged }
+
+    // Filed into the source's Kit form as well, when one has been set up.
+    const formEnv = SOURCE_FORM_ENV[input.source]
+    const formId = formEnv ? (process.env[formEnv] || '').trim() : ''
+    let form: string | undefined
+    if (formId) {
+      const f = await fetch(`https://api.kit.com/v4/forms/${encodeURIComponent(formId)}/subscribers`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ email_address: input.email, referrer: input.referrer || undefined }),
+      })
+      if (f.status === 200 || f.status === 201) form = formId
+      else console.error('kit: adding to form failed', formId, f.status)
+    }
+    return { added: true, tagged, form }
   } catch (e: any) {
     return { added: false, tagged: [], reason: `Kit request threw: ${e?.message || 'unknown'}` }
   }
