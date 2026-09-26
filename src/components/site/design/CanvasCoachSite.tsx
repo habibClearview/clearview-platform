@@ -238,15 +238,18 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
     return () => obs.disconnect()
   }, [screen])
 
-  const sendContact = () => {
+  const sendContact = async () => {
     if (!cName.trim() || !cEmail.trim() || cEmail.indexOf('@') < 1 || !cMsg.trim()) {
       setCError('Name, a working email and a note about the situation, please.'); return
     }
     // The note reaches Habib through the server, which emails it to him and
-    // keeps it off the mailing list.
-    capture('enquiry', {
+    // keeps it off the mailing list. The page waits for the server's answer:
+    // if it refuses the note (a bad address, too many attempts), the visitor
+    // sees the server's own reason rather than being told it arrived.
+    const res = await capture('enquiry', {
       email: cEmail.trim(), firstName: cName.trim(), organisation: cOrg.trim(), message: cMsg.trim(),
     })
+    if (!res.ok && res.out?.error) { setCError(res.out.error); return }
     setCError(''); setContactSent(true)
   }
 
