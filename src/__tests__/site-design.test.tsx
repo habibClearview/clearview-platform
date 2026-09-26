@@ -207,7 +207,12 @@ describe('measurement', () => {
 
   it('never counts the private walkthrough links', () => {
     expect(dropPrivate({ url: 'https://habibonifade.com/how-i-work/abc123' })).toBeNull()
+    expect(dropPrivate({ url: 'https://habibonifade.com/how-i-work/abc123/remote' })).toBeNull()
+    expect(dropPrivate({ url: 'https://habibonifade.com/site/how-i-work/abc123' })).toBeNull()
     expect(dropPrivate({ url: 'https://habibonifade.com/' })).not.toBeNull()
+    // The public walkthrough page, and a public page whose query mentions it.
+    expect(dropPrivate({ url: 'https://habibonifade.com/how-i-work' })).not.toBeNull()
+    expect(dropPrivate({ url: 'https://habibonifade.com/?ref=/how-i-work/abc123' })).not.toBeNull()
   })
 
   it('adds no advertising pixel, recorder or heatmap', () => {

@@ -152,18 +152,28 @@ export async function capture(input: CaptureInput): Promise<CaptureResult> {
 
     // Tagging happens after the subscriber exists, and a tag that will not
     // apply is reported rather than raised. On the list untagged beats not on
-    // the list.
+    // the list. But the SOURCE tag is how a sign-up is filed, so if that one
+    // does not apply the capture is reported as failed: the route then emails
+    // Habib, rather than a subscriber sitting unfiled with nobody told.
+    const sourceTag = SOURCE_TAGS[input.source]
     const ids = await tagIds(key)
-    const wanted = [SOURCE_TAGS[input.source], ...(input.extraTags || [])].filter(Boolean)
+    const wanted = [sourceTag, ...(input.extraTags || [])].filter(Boolean)
     const tagged: string[] = []
     for (const name of wanted) {
       const id = await ensureTag(key, name, ids)
-      if (!id) { console.error('kit: no tag named', name); continue }
-      const t = await fetch(`https://api.kit.com/v4/tags/${id}/subscribers`, {
-        method: 'POST', headers, body: JSON.stringify({ email_address: input.email }),
-      })
-      if (t.status === 200 || t.status === 201) tagged.push(name)
-      else console.error('kit: tagging failed', name, t.status)
+      let ok = false
+      if (!id) console.error('kit: no tag named', name)
+      else {
+        const t = await fetch(`https://api.kit.com/v4/tags/${id}/subscribers`, {
+          method: 'POST', headers, body: JSON.stringify({ email_address: input.email }),
+        })
+        ok = t.status === 200 || t.status === 201
+        if (ok) tagged.push(name)
+        else console.error('kit: tagging failed', name, t.status)
+      }
+      if (!ok && name === sourceTag) {
+        return { added: false, tagged, reason: `Subscribed, but the tag "${name}" could not be applied` }
+      }
     }
 
     // Filed into the source's Kit form as well, when one has been set up.
@@ -176,7 +186,10 @@ export async function capture(input: CaptureInput): Promise<CaptureResult> {
         body: JSON.stringify({ email_address: input.email, referrer: input.referrer || undefined }),
       })
       if (f.status === 200 || f.status === 201) form = formId
-      else console.error('kit: adding to form failed', formId, f.status)
+      else {
+        console.error('kit: adding to form failed', formId, f.status)
+        return { added: false, tagged, reason: `Subscribed and tagged, but Kit form ${formId} returned ${f.status}` }
+      }
     }
     return { added: true, tagged, form }
   } catch (e: any) {
