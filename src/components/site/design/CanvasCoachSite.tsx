@@ -200,13 +200,16 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
       config: {
         layout: 'month_view',
         theme: 'light',
-        // Keyed by the identifiers of the booking questions on the event type,
-        // read from the live booking form: "Programme Name" is Programme-Name,
-        // the country question is Location. "What is this meeting about?" is
-        // Cal.com's own required title, answered with the programme name so
-        // the visitor is not asked for anything twice.
-        'Programme-Name': qProgramme.trim(),
-        Location: qCountry.trim(),
+        // Keyed by the identifiers of the event's own booking questions,
+        // "Programme Name" (programme-name) and "Location" (country). Both are
+        // hidden on Cal.com, so the visitor answers once, here, and the
+        // answers still arrive on the booking. Set 26 September 2026 through
+        // Cal.com's API, which only accepts lowercase identifiers; "location"
+        // itself is reserved by Cal.com for where the meeting happens.
+        // "What is this meeting about?" is Cal.com's own required title,
+        // answered with the programme name for the same reason.
+        'programme-name': qProgramme.trim(),
+        country: qCountry.trim(),
         title: qProgramme.trim(),
         notes: qNotes.trim(),
         'metadata[programme]': qProgramme.trim(),

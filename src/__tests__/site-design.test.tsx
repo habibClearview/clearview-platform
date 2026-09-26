@@ -186,8 +186,8 @@ describe('one call to action', () => {
   })
 
   it('answers Cal.com\'s own questions from the site, so nothing is asked twice', () => {
-    expect(SRC).toContain("'Programme-Name': qProgramme.trim()")
-    expect(SRC).toContain('Location: qCountry.trim()')
+    expect(SRC).toContain("'programme-name': qProgramme.trim()")
+    expect(SRC).toContain('country: qCountry.trim()')
     expect(SRC).toContain('title: qProgramme.trim()')
     // Never the visitor's email: Cal.com fills that itself only for someone
     // signed in to Cal.com, which is Habib.
