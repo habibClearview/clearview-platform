@@ -52,15 +52,31 @@ describe('the locked lines, word for word', () => {
 })
 
 describe('the chapters', () => {
-  it('runs Chapter 00 to Chapter 07 in order', () => {
-    const at = ['00', '01', '02', '03', '04', '05', '06', '07'].map((n) => SRC.indexOf(`>Chapter ${n}<`))
+  it('runs the sections in order, named without chapter numbers', () => {
+    const at = ['What changed', 'Who this is for', 'What I do', 'How the work gets done', 'What the work found.', 'Three questions worth answering', 'Book twenty minutes']
+      .map((name) => SRC.indexOf(`>${name}<`))
     at.forEach((i) => expect(i).toBeGreaterThan(-1))
     expect([...at].sort((a, b) => a - b)).toEqual(at)
+    expect(PUBLIC).not.toMatch(/>Chapter 0\d</)
+  })
+
+  it('keeps one row of cards per set on a desktop screen', () => {
+    const css = fs.readFileSync('src/components/site/design/design.css.ts', 'utf8')
+    expect(css).toContain('grid-template-columns: repeat(var(--om-n), minmax(0, 1fr))')
+    for (const n of [4, 5, 6]) expect(SRC).toContain(`"--om-n": ${n}`)
   })
 
   it('speaks to programmes, implementers and funders only', () => {
     expect(AUDIENCES.map((a) => a.who)).toEqual(['Programmes', 'Implementers', 'Funders'])
     expect(PUBLIC).not.toMatch(/\bNGOs?\b/)
+  })
+
+  it('gives each moment its question, Habib\'s paragraph, then the output', () => {
+    for (const m of MOMENTS) expect(m.body.length).toBeGreaterThan(100)
+    expect(MOMENTS[5].body).toContain('across seventy-two market systems documents reviewed in 2024, there were three ex-post evaluations')
+    const q = SRC.indexOf('{m.q}'), b = SRC.indexOf('{m.body}'), o = SRC.indexOf('{m.out}')
+    expect(q).toBeLessThan(b)
+    expect(b).toBeLessThan(o)
   })
 
   it('lays out the six moments in order', () => {
@@ -75,7 +91,10 @@ describe('the chapters', () => {
       'Grant to Commercial Viability Canvas', 'Market Intelligence', 'Investment Case Canvas',
       'Intervention Design Canvas', 'Enterprise Trade Liquidity Multiplier',
     ])
-    expect(SRC).toContain('Five tools do that work. They are how it is done, not what you buy.')
+    expect(SRC).toContain('>How the work gets done<')
+    expect(SRC.indexOf('>How the work gets done<')).toBeLessThan(SRC.indexOf('Five tools do that work. They are how it is done, not what you buy.'))
+    expect(SRC).not.toContain('That is the whole idea.')
+    expect(METHODS[0].blocks).toBe('How a business a programme backs gets to paying its own way.')
     expect(PUBLIC).not.toMatch(/subscription|founding subscriber/i)
   })
 
@@ -163,6 +182,16 @@ describe('one call to action', () => {
     expect(SRC).toMatch(/\{\(calShown\) \? \(\s*<div id="book-calendar"/)
     expect(SRC).toContain("qProgramme.trim().length > 0 && qCountry.trim().length > 0")
     expect(CAL_LINK).toBe('habib-onifade-veikrh/20min')
+    expect(SRC).toContain('>SHOW ME AVAILABLE TIMES<')
+  })
+
+  it('answers Cal.com\'s own questions from the site, so nothing is asked twice', () => {
+    expect(SRC).toContain("'Programme-Name': qProgramme.trim()")
+    expect(SRC).toContain('Location: qCountry.trim()')
+    expect(SRC).toContain('title: qProgramme.trim()')
+    // Never the visitor's email: Cal.com fills that itself only for someone
+    // signed in to Cal.com, which is Habib.
+    expect(SRC).not.toMatch(/email:\s*q/)
   })
 })
 
@@ -181,6 +210,21 @@ describe('measurement', () => {
   it('adds no advertising pixel, recorder or heatmap', () => {
     const everything = PUBLIC + fs.readFileSync('app/site/layout.tsx', 'utf8') + fs.readFileSync('app/layout.tsx', 'utf8')
     expect(everything).not.toMatch(/fbq|googletagmanager|gtag\(|hotjar|clarity\.ms|fullstory|replayIntegration/i)
+  })
+})
+
+describe('the replacement copy, approved 26 September 2026', () => {
+  it('is used wherever the old lines were', () => {
+    const line = 'Assess the businesses. Fix the ones worth fixing. Take the ready ones to finance. Prove what lasted.'
+    expect(SRC.split(line).length - 1).toBe(2)
+    expect(PUBLIC).not.toContain('Find out who pays. Design the service for them.')
+    expect(SRC).toContain('Every Wednesday. One idea about what makes the businesses programmes back actually work.')
+    expect(PUBLIC).not.toContain('from funded to paid')
+    const contact = fs.readFileSync('app/site/contact/page.tsx', 'utf8')
+    for (const text of [SRC, contact]) {
+      expect(text).toContain('Your programme, the country, and what you are trying to prove.')
+      expect(text).not.toContain('who pays for it now')
+    }
   })
 })
 

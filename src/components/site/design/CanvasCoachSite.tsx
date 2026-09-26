@@ -200,8 +200,14 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
       config: {
         layout: 'month_view',
         theme: 'light',
-        programme: qProgramme.trim(),
-        country: qCountry.trim(),
+        // Keyed by the identifiers of the booking questions on the event type,
+        // read from the live booking form: "Programme Name" is Programme-Name,
+        // the country question is Location. "What is this meeting about?" is
+        // Cal.com's own required title, answered with the programme name so
+        // the visitor is not asked for anything twice.
+        'Programme-Name': qProgramme.trim(),
+        Location: qCountry.trim(),
+        title: qProgramme.trim(),
         notes: qNotes.trim(),
         'metadata[programme]': qProgramme.trim(),
         'metadata[country]': qCountry.trim(),
@@ -393,16 +399,12 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
 
     {/* ── Chapter 00 ── */}
     <section style={{background: "#121213", color: "#f5f5dc", position: "relative"}}>
-      <div style={{maxWidth: "1440px", margin: "0 auto", padding: "60px 40px 0"}}>
-        <div data-rise data-delay="0" style={{display: "flex", alignItems: "center", gap: "16px", margin: "0 0 40px"}}>
-          <span style={{width: "60px", height: "3px", background: "#00afef", display: "block", flex: "0 0 auto"}}></span>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00afef", fontWeight: "700"}}>Chapter 00</span>
-        </div>
+      <div style={{maxWidth: "1440px", margin: "0 auto", padding: "36px 40px 0"}}>
         <div style={{display: "flex", flexWrap: "wrap", gap: "40px 56px", alignItems: "flex-start"}}>
           <div style={{flex: "1 1 520px", minWidth: "0"}}>
             <h1 data-rise data-delay="60" style={{fontSize: "clamp(40px, 5.6vw, 88px)", fontWeight: "700", lineHeight: "0.98", letterSpacing: "-0.04em", margin: "0", maxWidth: "20ch", textWrap: "balance"}}>Do you want the businesses you back to become <span style={{color: "#00afef"}}>commercially viable?</span></h1>
-            <p data-rise data-delay="200" style={{margin: "40px 0 0", fontSize: "clamp(21px, 1.8vw, 27px)", color: "rgba(245,245,220,0.82)", maxWidth: "46ch", lineHeight: "1.5", textWrap: "pretty"}}>I do the work that gets them there, and give you the numbers your funder is asking for.</p>
-            <div data-rise data-delay="300" style={{margin: "46px 0 0"}}>
+            <p data-rise data-delay="200" style={{margin: "32px 0 0", fontSize: "clamp(24px, 3.1vw, 48px)", fontWeight: "500", color: "rgba(245,245,220,0.86)", maxWidth: "30ch", lineHeight: "1.2", letterSpacing: "-0.02em", textWrap: "pretty"}}>I do the work that gets them there, and give you the numbers your funder is asking for.</p>
+            <div data-rise data-delay="300" style={{margin: "40px 0 0"}}>
               <span className="hv10" onClick={heroCta} style={{display: "inline-block", fontSize: "18px", fontWeight: "600", padding: "23px 36px", cursor: "pointer", background: "#00afef", color: "#12222c", whiteSpace: "nowrap"}}>SHOW ME HOW</span>
               <p style={{margin: "20px 0 0"}}>
                 <span className="hv18" onClick={goContact} style={{fontSize: "16.5px", color: "rgba(245,245,220,0.7)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px"}}>Send me an enquiry instead</span>
@@ -420,12 +422,11 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
     <section data-chapter="01" style={{background: "#f5f5dc", color: "#12222c", padding: "clamp(72px, 9vw, 132px) 40px"}}>
       <div style={{maxWidth: "1440px", margin: "0 auto"}}>
         <div data-rise style={{display: "flex", alignItems: "baseline", gap: "20px", marginBottom: "44px", flexWrap: "wrap"}}>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00767a", fontWeight: "700"}}>Chapter 01</span>
+          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00767a", fontWeight: "700", margin: "0"}}>What changed</span>
           <span style={{flex: "1 1 60px", height: "1px", background: "rgba(18,34,44,0.25)", display: "block"}}></span>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(18,34,44,0.5)", fontWeight: "700"}}>What changed</span>
         </div>
         <h2 data-rise style={{fontSize: "clamp(38px, 6vw, 92px)", fontWeight: "700", margin: "0 0 56px", lineHeight: "0.96", letterSpacing: "-0.04em", maxWidth: "27ch", textWrap: "balance"}}>Aid is becoming investment. Investment expects a return.</h2>
-        <div data-rise style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "2px", marginBottom: "56px"}}>
+        <div data-rise className="om-row" style={{"--om-n": 4, marginBottom: "56px"}}>
           <div style={{background: "#12222c", color: "#f5f5dc", padding: "34px 30px 38px"}}>
             <div style={{fontSize: "clamp(48px, 5.5vw, 82px)", fontWeight: "700", letterSpacing: "-0.045em", lineHeight: "0.9"}}><span data-count="28">28</span><span style={{color: "#00afef"}}>%</span></div>
             <p style={{margin: "20px 0 0", fontSize: "17px", color: "rgba(245,245,220,0.72)", lineHeight: "1.5"}}>the top of the range bilateral aid to sub-Saharan Africa was projected to fall by in 2025</p>
@@ -461,9 +462,8 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
     <section data-chapter="02" style={{background: "#12222c", color: "#f5f5dc", padding: "clamp(72px, 9vw, 132px) 40px"}}>
       <div style={{maxWidth: "1440px", margin: "0 auto"}}>
         <div data-rise style={{display: "flex", alignItems: "baseline", gap: "20px", marginBottom: "44px", flexWrap: "wrap"}}>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00afef", fontWeight: "700"}}>Chapter 02</span>
+          <h2 style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00afef", fontWeight: "700", margin: "0"}}>Who this is for</h2>
           <span style={{flex: "1 1 60px", height: "1px", background: "rgba(245,245,220,0.25)", display: "block"}}></span>
-          <h2 style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(245,245,220,0.5)", fontWeight: "700", margin: "0"}}>Who this is for</h2>
         </div>
         <p data-rise style={{fontSize: "clamp(30px, 4.2vw, 62px)", fontWeight: "700", margin: "0 0 36px", lineHeight: "1.02", letterSpacing: "-0.036em", maxWidth: "30ch", textWrap: "balance"}}>Programmes that back private businesses and are judged on whether those businesses last.</p>
         <p data-rise style={{margin: "0 0 60px", fontSize: "22px", color: "rgba(245,245,220,0.8)", lineHeight: "1.55", maxWidth: "62ch", textWrap: "pretty"}}>You are a team leader, a private sector lead, or a results and evidence manager on a market systems or challenge fund programme. Or you are in a head office, carrying the past performance of a closing programme into the next bid. Or you are the funder, and you wrote the indicators.</p>
@@ -483,19 +483,19 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
     <section id="services" data-chapter="03" style={{background: "#f5f5dc", color: "#12222c", padding: "clamp(72px, 9vw, 132px) 40px"}}>
       <div style={{maxWidth: "1440px", margin: "0 auto"}}>
         <div data-rise style={{display: "flex", alignItems: "baseline", gap: "20px", marginBottom: "44px", flexWrap: "wrap"}}>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00767a", fontWeight: "700"}}>Chapter 03</span>
+          <h2 style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00767a", fontWeight: "700", margin: "0"}}>What I do</h2>
           <span style={{flex: "1 1 60px", height: "1px", background: "rgba(18,34,44,0.25)", display: "block"}}></span>
-          <h2 style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(18,34,44,0.5)", fontWeight: "700", margin: "0"}}>What I do</h2>
         </div>
         <ol style={{listStyle: "none", margin: "0", padding: "0", display: "flex", flexDirection: "column"}}>
           {MOMENTS.map((m, i) => (
             <li key={i} data-rise style={{display: "flex", flexWrap: "wrap", gap: "20px 48px", alignItems: "baseline", padding: "40px 0", borderTop: "1px solid rgba(18,34,44,0.2)"}}>
               <span style={{flex: "0 0 64px", fontSize: "clamp(40px, 4.4vw, 62px)", fontWeight: "700", letterSpacing: "-0.045em", lineHeight: "0.9", color: "#00afef"}}>{m.n}</span>
-              <div style={{flex: "1 1 420px", minWidth: "0"}}>
+              <div style={{flex: "1 1 520px", minWidth: "0", maxWidth: "860px"}}>
                 <p style={{margin: "0 0 14px", fontSize: "13.5px", letterSpacing: "0.16em", textTransform: "uppercase", color: "#00767a", fontWeight: "700"}}>{m.label}</p>
                 <p style={{margin: "0", fontSize: "clamp(24px, 2.6vw, 36px)", fontWeight: "600", lineHeight: "1.15", letterSpacing: "-0.026em", textWrap: "pretty"}}>{m.q}</p>
+                <p style={{margin: "20px 0 0", fontSize: "19px", color: "#4a5560", lineHeight: "1.62", textWrap: "pretty"}}>{m.body}</p>
+                <p style={{margin: "22px 0 0", paddingLeft: "20px", borderLeft: "4px solid #00afef", fontSize: "18px", fontWeight: "600", color: "#12222c", lineHeight: "1.5", textWrap: "pretty"}}>{m.out}</p>
               </div>
-              <p style={{flex: "1 1 320px", minWidth: "0", margin: "0", fontSize: "19px", color: "#4a5560", lineHeight: "1.6", textWrap: "pretty"}}>{m.out}</p>
             </li>
           ))}
         </ol>
@@ -506,17 +506,16 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
     <section id="method" data-chapter="04" style={{background: "#c9a84c", color: "#2a1c04", padding: "clamp(56px, 6vw, 88px) 40px"}}>
       <div style={{maxWidth: "1440px", margin: "0 auto"}}>
         <div data-rise style={{display: "flex", alignItems: "baseline", gap: "20px", marginBottom: "32px", flexWrap: "wrap"}}>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#2a1c04", fontWeight: "700"}}>Chapter 04</span>
+          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#2a1c04", fontWeight: "700", margin: "0"}}>The method</span>
           <span style={{flex: "1 1 60px", height: "1px", background: "rgba(42,28,4,0.3)", display: "block"}}></span>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(42,28,4,0.6)", fontWeight: "700"}}>The method</span>
         </div>
-        <p data-rise style={{margin: "0 0 28px", fontSize: "clamp(20px, 1.9vw, 25px)", fontWeight: "600", lineHeight: "1.4", letterSpacing: "-0.015em", maxWidth: "50ch"}}>Five tools do that work. They are how it is done, not what you buy.</p>
-        <h2 data-rise style={{fontSize: "clamp(26px, 3.2vw, 46px)", fontWeight: "700", margin: "0 0 32px", lineHeight: "1.02", letterSpacing: "-0.036em"}}><span style={{display: "block"}}>Every method runs on a canvas.</span><span style={{display: "block"}}>That is the whole idea.</span></h2>
+        <h2 data-rise style={{fontSize: "clamp(26px, 3.2vw, 46px)", fontWeight: "700", margin: "0 0 18px", lineHeight: "1.02", letterSpacing: "-0.036em"}}>How the work gets done</h2>
+        <p data-rise style={{margin: "0 0 32px", fontSize: "clamp(20px, 1.9vw, 25px)", fontWeight: "600", lineHeight: "1.4", letterSpacing: "-0.015em", maxWidth: "50ch"}}>Five tools do that work. They are how it is done, not what you buy.</p>
         <div data-rise style={{display: "flex", flexWrap: "wrap", gap: "40px", marginBottom: "40px"}}>
           <p style={{flex: "1 1 340px", minWidth: "0", margin: "0", fontSize: "18px", color: "rgba(42,28,4,0.82)", lineHeight: "1.62", textWrap: "pretty"}}>Alex Osterwalder made this argument for business models and he was right. Put every decision on one page and three things happen. You see the whole picture at once. You see which pieces do not fit. And everyone in the room is looking at the same thing.</p>
           <p style={{flex: "1 1 340px", minWidth: "0", margin: "0", fontSize: "18px", color: "rgba(42,28,4,0.82)", lineHeight: "1.62", textWrap: "pretty"}}>That last one matters more than it sounds. A canvas is the only format I have found that a chief executive, a field team, a partner and a donor can all read together without a translator. So each method is a canvas of numbered decisions, each with one question, one output, and a test that says whether it is finished.</p>
         </div>
-        <div data-rise style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "2px"}}>
+        <div data-rise className="om-row" style={{"--om-n": 5}}>
           {METHODS.map((c, i) => (
             <div key={i} style={{background: "#2a1c04", color: "#f5f5dc", padding: "26px 24px 28px"}}>
               <div style={{fontSize: "clamp(34px, 3.4vw, 48px)", fontWeight: "700", letterSpacing: "-0.045em", lineHeight: "0.9", color: "#c9a84c"}}><span data-count={c.n}>{c.n}</span></div>
@@ -533,9 +532,8 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
     <section id="evidence" data-chapter="05" style={{background: "#12222c", color: "#f5f5dc", padding: "clamp(72px, 9vw, 132px) 40px"}}>
       <div style={{maxWidth: "1440px", margin: "0 auto"}}>
         <div data-rise style={{display: "flex", alignItems: "baseline", gap: "20px", marginBottom: "44px", flexWrap: "wrap"}}>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00afef", fontWeight: "700"}}>Chapter 05</span>
+          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00afef", fontWeight: "700", margin: "0"}}>Evidence</span>
           <span style={{flex: "1 1 60px", height: "1px", background: "rgba(245,245,220,0.25)", display: "block"}}></span>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(245,245,220,0.5)", fontWeight: "700"}}>Evidence</span>
         </div>
         <div data-rise style={{display: "flex", flexWrap: "wrap", gap: "40px", alignItems: "flex-end", marginBottom: "12px"}}>
           <h2 style={{flex: "1 1 400px", minWidth: "0", fontSize: "clamp(34px, 5.2vw, 78px)", fontWeight: "700", margin: "0", lineHeight: "0.98", letterSpacing: "-0.04em", maxWidth: "16ch"}}>What the work found.</h2>
@@ -554,11 +552,11 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
           ))}
         </div>
 
-        <div data-rise style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "2px", borderTop: "1px solid rgba(245,245,220,0.2)", paddingTop: "44px"}}>
+        <div data-rise className="om-row" style={{"--om-n": 6, borderTop: "1px solid rgba(245,245,220,0.2)", paddingTop: "44px"}}>
           {FIGURES.map((f, i) => (
-            <div key={i} style={{background: "#0b1620", padding: "30px 28px 32px"}}>
-              <div style={{fontSize: "clamp(38px, 4vw, 58px)", fontWeight: "700", letterSpacing: "-0.045em", lineHeight: "0.95", whiteSpace: "nowrap"}}>{f.pre}<span data-count={f.n}>{f.n.toLocaleString('en-GB')}</span><span style={{color: "#00afef"}}>{f.post}</span></div>
-              <p style={{margin: "16px 0 0", fontSize: "17px", color: "rgba(245,245,220,0.72)", lineHeight: "1.5"}}>{f.label}</p>
+            <div key={i} style={{background: "#0b1620", padding: "26px 20px 28px"}}>
+              <div style={{fontSize: "clamp(26px, 2.5vw, 42px)", fontWeight: "700", letterSpacing: "-0.045em", lineHeight: "0.95", whiteSpace: "nowrap"}}>{f.pre}<span data-count={f.n}>{f.n.toLocaleString('en-GB')}</span><span style={{color: "#00afef"}}>{f.post}</span></div>
+              <p style={{margin: "14px 0 0", fontSize: "15.5px", color: "rgba(245,245,220,0.72)", lineHeight: "1.5"}}>{f.label}</p>
             </div>
           ))}
         </div>
@@ -575,7 +573,7 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
 
         <div data-rise style={{marginTop: "72px", borderTop: "1px solid rgba(245,245,220,0.2)", paddingTop: "44px"}}>
           <h3 style={{fontSize: "clamp(26px, 3vw, 42px)", fontWeight: "700", margin: "0 0 32px", lineHeight: "1.02", letterSpacing: "-0.032em"}}>What you will be able to report</h3>
-          <ul style={{listStyle: "none", margin: "0", padding: "0", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "2px"}}>
+          <ul className="om-row" style={{"--om-n": 4, listStyle: "none", margin: "0", padding: "0"}}>
             {REPORTABLE.map((line, i) => (
               <li key={i} style={{background: "#0b1620", borderTop: "4px solid #00afef", padding: "26px 26px 28px", fontSize: "18.5px", lineHeight: "1.5", color: "rgba(245,245,220,0.88)"}}>{line}</li>
             ))}
@@ -608,16 +606,16 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
           <h2 style={{fontSize: "clamp(30px, 4vw, 56px)", fontWeight: "700", margin: "24px 0 28px", lineHeight: "1.0", letterSpacing: "-0.036em", maxWidth: "20ch"}}>Corporate finance first. Development second.</h2>
           <p style={{color: "#4a5560", margin: "0 0 22px", fontSize: "20px", lineHeight: "1.6", maxWidth: "50ch", textWrap: "pretty"}}>That order matters. I came to development from corporate finance, which is why the models I build are meant to be used rather than filed.</p>
           <p style={{color: "#4a5560", margin: "0 0 22px", fontSize: "20px", lineHeight: "1.6", maxWidth: "50ch", textWrap: "pretty"}}>My career began in corporate finance in the City of London: HSBC, ABN Amro, Capita.</p>
-          <p style={{color: "#4a5560", margin: "0 0 30px", fontSize: "20px", lineHeight: "1.6", maxWidth: "50ch", textWrap: "pretty"}}>The steps are the same every time. Find out who pays. Design the service for them. Build the numbers. Test it on a real customer. Hand it over.</p>
-          <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "2px"}}>
-            {(stats || []).map((st, i) => (
-              <div key={i} style={{background: "#12222c", color: "#f5f5dc", padding: "22px 20px 24px"}}>
-                <div style={{fontSize: "clamp(24px, 2.4vw, 34px)", fontWeight: "700", letterSpacing: "-0.032em", lineHeight: "1.05", whiteSpace: "nowrap"}}>{st.pre}<span data-count={st.n}>{st.n}</span>{st.post}</div>
-                <div style={{fontSize: "14.5px", color: "rgba(245,245,220,0.65)", marginTop: "10px", lineHeight: "1.4"}}>{st.label}</div>
-              </div>
-            ))}
-          </div>
+          <p style={{color: "#4a5560", margin: "0", fontSize: "20px", lineHeight: "1.6", maxWidth: "50ch", textWrap: "pretty"}}>The steps are the same every time. Assess the businesses. Fix the ones worth fixing. Take the ready ones to finance. Prove what lasted.</p>
         </div>
+      </div>
+      <div data-rise className="om-row" style={{"--om-n": 4, maxWidth: "1440px", margin: "56px auto 0"}}>
+        {(stats || []).map((st, i) => (
+          <div key={i} style={{background: "#12222c", color: "#f5f5dc", padding: "22px 20px 24px"}}>
+            <div style={{fontSize: "clamp(24px, 2.4vw, 34px)", fontWeight: "700", letterSpacing: "-0.032em", lineHeight: "1.05", whiteSpace: "nowrap"}}>{st.pre}<span data-count={st.n}>{st.n}</span>{st.post}</div>
+            <div style={{fontSize: "14.5px", color: "rgba(245,245,220,0.65)", marginTop: "10px", lineHeight: "1.4"}}>{st.label}</div>
+          </div>
+        ))}
       </div>
     </section>
 
@@ -625,9 +623,8 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
     <section id="newsletter" data-chapter="06" style={{background: "#12222c", color: "#f5f5dc", padding: "clamp(72px, 9vw, 132px) 40px"}}>
       <div style={{maxWidth: "1440px", margin: "0 auto"}}>
         <div data-rise style={{display: "flex", alignItems: "baseline", gap: "20px", marginBottom: "44px", flexWrap: "wrap"}}>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00afef", fontWeight: "700"}}>Chapter 06</span>
+          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00afef", fontWeight: "700", margin: "0"}}>Take something with you</span>
           <span style={{flex: "1 1 60px", height: "1px", background: "rgba(245,245,220,0.25)", display: "block"}}></span>
-          <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(245,245,220,0.5)", fontWeight: "700"}}>Take something with you</span>
         </div>
         <div style={{display: "flex", flexWrap: "wrap", gap: "56px", alignItems: "flex-start"}}>
           <div data-rise style={{flex: "1 1 460px", minWidth: "0"}}>
@@ -674,8 +671,7 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
     {/* ── Chapter 07 ── the one call to action */}
     <section id="book" data-chapter="07" style={{background: "#00afef", color: "#12222c", padding: "clamp(76px, 10vw, 148px) 40px"}}>
       <div style={{maxWidth: "1440px", margin: "0 auto"}}>
-        <span data-rise style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(18,34,44,0.65)", fontWeight: "700"}}>Chapter 07</span>
-        <h2 data-rise style={{fontSize: "clamp(40px, 7vw, 116px)", fontWeight: "700", margin: "30px 0 34px", lineHeight: "0.92", letterSpacing: "-0.045em", maxWidth: "18ch", textWrap: "balance"}}>Book twenty minutes</h2>
+        <h2 data-rise style={{fontSize: "clamp(40px, 7vw, 116px)", fontWeight: "700", margin: "0 0 34px", lineHeight: "0.92", letterSpacing: "-0.045em", maxWidth: "18ch", textWrap: "balance"}}>Book twenty minutes</h2>
         <p data-rise style={{color: "rgba(18,34,44,0.78)", margin: "0 0 46px", fontSize: "clamp(20px, 2vw, 27px)", maxWidth: "40ch", lineHeight: "1.45"}}>Two questions first, so I know who I am talking to. Then pick a time.</p>
         <div data-rise style={{maxWidth: "860px", display: "flex", flexDirection: "column", gap: "28px"}}>
           <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "26px"}}>
@@ -694,8 +690,7 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
           </div>
           {(!calShown) ? (
             <div>
-              {/* TODO(Habib): this button's words were not in the brief. Placeholder until approved. */}
-              <span className="hv22" role="button" tabIndex={0} aria-disabled={!qualified} data-testid="qualifier-submit" onClick={submitQualifier} onKeyDown={(e) => { if (e.key === 'Enter') submitQualifier() }} style={{display: "inline-block", fontSize: "19px", fontWeight: "600", padding: "25px 42px", cursor: qualified ? "pointer" : "not-allowed", background: "#12222c", color: "#f5f5dc", opacity: qualified ? "1" : "0.4"}}>Show me the calendar</span>
+              <span className="hv22" role="button" tabIndex={0} aria-disabled={!qualified} data-testid="qualifier-submit" onClick={submitQualifier} onKeyDown={(e) => { if (e.key === 'Enter') submitQualifier() }} style={{display: "inline-block", fontSize: "19px", fontWeight: "600", padding: "25px 42px", cursor: qualified ? "pointer" : "not-allowed", background: "#12222c", color: "#f5f5dc", opacity: qualified ? "1" : "0.4"}}>SHOW ME AVAILABLE TIMES</span>
             </div>
           ) : null}
         </div>
@@ -720,7 +715,7 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
             <span style={{fontSize: "14.5px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00afef", fontWeight: "700"}}>Get in touch</span>
           </div>
           <h1 style={{fontSize: "clamp(38px, 5.6vw, 84px)", fontWeight: "700", lineHeight: "0.95", letterSpacing: "-0.042em", margin: "0", maxWidth: "16ch"}}>Tell me where you are stuck.</h1>
-          <p style={{margin: "34px 0 0", fontSize: "clamp(20px, 1.9vw, 26px)", color: "rgba(245,245,220,0.8)", maxWidth: "42ch", lineHeight: "1.5"}}>A short note is enough. What you do, who pays for it now, and what happens when that stops. I reply to everything myself.</p>
+          <p style={{margin: "34px 0 0", fontSize: "clamp(20px, 1.9vw, 26px)", color: "rgba(245,245,220,0.8)", maxWidth: "42ch", lineHeight: "1.5"}}>A short note is enough. Your programme, the country, and what you are trying to prove. I reply to everything myself.</p>
           <div style={{marginTop: "48px", borderTop: "1px solid rgba(245,245,220,0.2)", paddingTop: "34px"}}>
             <p style={{margin: "0 0 12px", fontSize: "13.5px", letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(245,245,220,0.55)", fontWeight: "700"}}>Or write directly</p>
             <a href="mailto:hello@habibonifade.com" style={{fontSize: "24px", fontWeight: "600", color: "#00afef", textDecoration: "none"}}>hello@habibonifade.com</a>
@@ -752,7 +747,7 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
               </div>
               <div>
                 <label htmlFor="ec-msg" style={{display: "block", fontSize: "13px", letterSpacing: "0.16em", textTransform: "uppercase", fontWeight: "700", margin: "0 0 12px", color: "rgba(245,245,220,0.6)"}}>What is the situation</label>
-                <textarea id="ec-msg" rows="5" value={cMsg} onChange={onCMsg} placeholder="What you do, who pays for it now, and what happens when that stops." style={{width: "100%", fontFamily: "inherit", fontSize: "20px", lineHeight: "1.5", padding: "16px 0", border: "none", borderBottom: "2px solid rgba(245,245,220,0.35)", background: "transparent", color: "#f5f5dc", resize: "vertical"}}></textarea>
+                <textarea id="ec-msg" rows="5" value={cMsg} onChange={onCMsg} placeholder="Your programme, the country, and what you are trying to prove." style={{width: "100%", fontFamily: "inherit", fontSize: "20px", lineHeight: "1.5", padding: "16px 0", border: "none", borderBottom: "2px solid rgba(245,245,220,0.35)", background: "transparent", color: "#f5f5dc", resize: "vertical"}}></textarea>
               </div>
               <div>
                 <span className="hv38" onClick={sendContact} style={{display: "inline-block", fontSize: "19px", fontWeight: "600", padding: "23px 38px", cursor: "pointer", background: "#00afef", color: "#12222c"}}>Send it</span>
@@ -772,7 +767,7 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
       <div style={{display: "flex", flexWrap: "wrap", gap: "40px 60px", alignItems: "center", paddingBottom: "52px", borderBottom: "1px solid rgba(245,245,220,0.16)"}}>
         <div style={{flex: "1 1 380px", minWidth: "0"}}>
           <img src="/site/viable-by-design.png" alt="Viable by Design" style={{height: "76px", width: "auto", display: "block", marginBottom: "26px"}} />
-          <p style={{margin: "0", fontSize: "19px", color: "rgba(245,245,220,0.85)", maxWidth: "40ch", lineHeight: "1.6"}}>The longer edition, from here rather than LinkedIn. What is working, what is not, and the mistakes organisations make on the way from funded to paid.</p>
+          <p style={{margin: "0", fontSize: "19px", color: "rgba(245,245,220,0.85)", maxWidth: "40ch", lineHeight: "1.6"}}>The longer edition, from here rather than LinkedIn. Every Wednesday. One idea about what makes the businesses programmes back actually work.</p>
           {(showCount) ? (
             <p style={{margin: "16px 0 0", fontSize: "17px", color: "#00afef", fontWeight: "600"}}><span data-count="1145">1145</span> people read it on LinkedIn.</p>
           ) : null}
@@ -785,7 +780,7 @@ export default function CanvasCoachSite({ screen }: { screen: string }) {
       <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "40px", padding: "48px 0", borderBottom: "1px solid rgba(245,245,220,0.16)"}}>
         <div>
           <img src="/site/habib-onifade-wordmark.png" alt="Habib Onifade" style={{height: "38px", width: "auto", display: "block", marginBottom: "24px"}} />
-          <p style={{fontSize: "17px", color: "rgba(245,245,220,0.68)", margin: "0", maxWidth: "30ch", lineHeight: "1.6"}}>Find out who pays. Design the service for them. Build the numbers. Test it on a real customer. Hand it over.</p>
+          <p style={{fontSize: "17px", color: "rgba(245,245,220,0.68)", margin: "0", maxWidth: "30ch", lineHeight: "1.6"}}>Assess the businesses. Fix the ones worth fixing. Take the ready ones to finance. Prove what lasted.</p>
         </div>
         <div>
           <p style={{fontSize: "13px", letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(245,245,220,0.5)", margin: "0 0 20px", fontWeight: "700"}}>What I do</p>

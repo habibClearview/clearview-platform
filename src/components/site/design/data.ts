@@ -30,23 +30,27 @@ export const AUDIENCES = [
   { mark: '03', who: 'Funders', what: 'You are asking for investment readiness and leverage, and getting narrative.' },
 ];
 
-/** Chapter 03. The six moments in a programme's life, in order. */
+/**
+ * Chapter 03. The six moments in a programme's life, in order. Each has the
+ * question, Habib's paragraph (approved 26 September 2026), then the output.
+ */
 export const MOMENTS = [
-  { n: '1', label: 'Designing the intervention', q: 'Is there a market for this, and in which months do those customers actually hold cash?', out: 'A cash calendar for the target population, a real market size, and the portion of it reachable through the traders and agents already operating.' },
-  { n: '2', label: 'Choosing partners', q: 'Which businesses can carry this commercially, rather than which ones apply?', out: 'Every candidate assessed from its own records, ranked, with selection criteria you can defend to your funder.' },
-  { n: '3', label: 'Working with partners', q: 'How does this business get to paying its own way?', out: 'A financial model built with the partner, a priced product or service, and a tested route to a real paying customer.' },
-  { n: '4', label: 'Taking partners to finance', q: 'What does a lender actually need to see?', out: 'An investment case per business, and introductions. The lending decision belongs to the lender.' },
-  { n: '5', label: 'Reporting and closing', q: 'Can we show what happened, and did it last?', out: 'Verified performance per business, mapped to the indicators in your logframe.' },
-  { n: '6', label: 'After the programme', q: 'Does anything continue once you have gone?', out: 'The same businesses, the same figures, still reporting for two years after close.' },
+  { n: '1', label: 'Designing the intervention', q: 'Is there a market for this, and in which months do those customers actually hold cash?', body: 'Most interventions are priced and timed on an assumption. I find out what the people you want to reach actually earn and spend across a year — which months they are in surplus, which months they are not, and what they stop buying first when money is short. That tells you what can be sold, at what price, and in which season.', out: 'A cash calendar for the target population, a real market size, and the portion of it reachable through the traders and agents already operating.' },
+  { n: '2', label: 'Choosing partners', q: 'Which businesses can carry this commercially, rather than which ones apply?', body: 'Selection usually tests whether a business is willing and whether it is able. Neither of those asks whether the business itself is solvent. I build a financial picture of every candidate from its own records — margin, cash cycle, whether it covers its costs without you — and rank them on that.', out: 'Every candidate assessed from its own records, ranked, with selection criteria you can defend to your funder.' },
+  { n: '3', label: 'Working with partners', q: 'How does this business get to paying its own way?', body: 'We work through what the business sells, to whom, at what price and at what cost, until the numbers close. Then we test it on a real paying customer rather than a pilot nobody pays for. Their finance people build the model with me, so it is theirs to run when I go.', out: 'A financial model built with the partner, a priced product or service, and a tested route to a real paying customer.' },
+  { n: '4', label: 'Taking partners to finance', q: 'What does a lender actually need to see?', body: 'Businesses that are ready get prepared the way a lender expects — the accounts, the exposure, what the money would do and how it comes back. Then I introduce them to institutions I work with. I do not promise anyone receives finance. That decision belongs to the lender.', out: 'An investment case per business, and introductions. The lending decision belongs to the lender.' },
+  { n: '5', label: 'Reporting and closing', q: 'Can we show what happened, and did it last?', body: 'Performance comes from each business\'s own records rather than from a survey, so what you report is verified rather than claimed. It maps to the indicators already in your logframe, so it goes into your reporting rather than sitting beside it.', out: 'Verified performance per business, mapped to the indicators in your logframe.' },
+  { n: '6', label: 'After the programme', q: 'Does anything continue once you have gone?', body: 'The businesses keep reporting for two years after you close. If they stop, that is reported as a finding rather than hidden. It is the only way anyone can say what lasted — across seventy-two market systems documents reviewed in 2024, there were three ex-post evaluations.', out: 'The same businesses, the same figures, still reporting for two years after close.' },
 ];
 
 /**
  * Chapter 04. The five methods, with the descriptions the approved design gave
- * them. The fifth line is Habib's, approved 26 September 2026. Its count comes
- * from the design's own copy: "Three ways to build that reserve".
+ * them. The first and fifth lines are Habib's, approved 26 September 2026. The
+ * fifth's count comes from the design's own copy: "Three ways to build that
+ * reserve".
  */
 export const METHODS = [
-  { n: 9, unit: 'decisions', name: 'Grant to Commercial Viability Canvas', blocks: 'From funded delivery to a paying customer.' },
+  { n: 9, unit: 'decisions', name: 'Grant to Commercial Viability Canvas', blocks: 'How a business a programme backs gets to paying its own way.' },
   { n: 7, unit: 'things scored', name: 'Market Intelligence', blocks: 'Four readiness tiers, from real transaction data.' },
   { n: 8, unit: 'steps, then a fork', name: 'Investment Case Canvas', blocks: 'For anyone who has been turned down without a reason.' },
   { n: 9, unit: 'decisions, four stages', name: 'Intervention Design Canvas', blocks: 'For programme teams designing for life after exit.' },
