@@ -4,6 +4,41 @@
 
 # Progress
 
+## Website, email and publishing — master brief of 26 September 2026
+
+Separate from the GtCV specification below. Branch: claude/charming-dirac-p656d2.
+Production deploys from main; nothing is merged without Habib's approval.
+
+### Phase 1, the website — built, on preview, awaiting Habib's review
+
+Status by item:
+- Chapters 00 to 07 rewritten to the brief — complete on preview.
+- Nine retired pages redirect (307) to the home page; pages kept in
+  docs/site-archive/2026-09-26/ — complete, checked with curl on preview.
+- Booking: Cal.com habib-onifade-veikrh/20min, calendar withheld until
+  Programme name and Country are both filled — complete, checked in a browser.
+- Analytics: Vercel Web Analytics (Pro plan, already enabled on the project).
+  Seen firing on preview: page view, chapter_01_reached to chapter_07_reached,
+  hero_cta_click, qualifier_submitted, newsletter_signup. call_booked NOT yet
+  seen: it needs a real booking, which was not made on Habib's calendar.
+- Kit: a test address (habib+sitetest@habibonifade.com) submitted through the
+  Chapter 06 form on preview; Kit returned subscribed, tagged "source: website".
+- Metadata, YouTube link, "fortnightly" -> every Wednesday — complete.
+
+Decisions taken on Habib's behalf (26 September 2026):
+- Chapter 07 button reads "Show me the calendar". Not in the brief; placeholder
+  marked TODO in the code, awaiting his wording.
+- "All fifteen, and the frameworks behind them" link removed: it pointed at
+  /evidence, which now redirects. "Fifteen engagements" kept.
+- Enterprise Trade Liquidity Multiplier tile shows "3 ways to build the
+  reserve", from the design's own copy ("Three ways to build that reserve").
+- Newsletter success message reuses the design's "You are in."
+- Analytics excludes /how-i-work (private walkthrough links).
+- Chapter markers are separate event names (no custom properties), per brief.
+
+Questions waiting for an answer: see the Phase 1 report in the session.
+
+
 ## Specification received so far
 
 Part 1: Context, sections 1 to 5. Received 11 August 2026.
