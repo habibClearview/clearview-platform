@@ -26,8 +26,7 @@ Status by item:
 - Metadata, YouTube link, "fortnightly" -> every Wednesday — complete.
 
 Decisions taken on Habib's behalf (26 September 2026):
-- Chapter 07 button reads "Show me the calendar". Not in the brief; placeholder
-  marked TODO in the code, awaiting his wording.
+- Chapter 07 button placeholder, since replaced by Habib's wording.
 - "All fifteen, and the frameworks behind them" link removed: it pointed at
   /evidence, which now redirects. "Fifteen engagements" kept.
 - Enterprise Trade Liquidity Multiplier tile shows "3 ways to build the
@@ -35,6 +34,20 @@ Decisions taken on Habib's behalf (26 September 2026):
 - Newsletter success message reuses the design's "You are in."
 - Analytics excludes /how-i-work (private walkthrough links).
 - Chapter markers are separate event names (no custom properties), per brief.
+
+Review round, 26 September 2026 (Habib's four adjustments and approved copy):
+- One row of cards per set at desktop width, two on a tablet, one on a phone.
+- Chapter numbers removed, section names kept; the six moments keep numbers.
+- Hero subheadline about 55 per cent of the headline; hero sits higher.
+- Cal.com: site answers prefill the event's own questions, identifiers read
+  from the live form: Programme-Name, Location, and Cal.com's required title.
+  Email is empty for a visitor not signed in to Cal.com (checked).
+- A test booking was made through the preview and cancelled: call_booked fired.
+- Kit test subscriber unsubscribed through the API (Kit's API cannot delete).
+- Double opt-in on the Kit form: OFF, per Habib, once the form exists.
+- Still open: hiding the two prefilled questions in Cal.com needs either a
+  Cal.com API key or two clicks by Habib. No Cal.com key in the environment.
+- Superseded: "Show me the calendar" is now SHOW ME AVAILABLE TIMES.
 
 Questions waiting for an answer: see the Phase 1 report in the session.
 
