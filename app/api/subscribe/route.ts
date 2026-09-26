@@ -1,9 +1,10 @@
 // ============================================================
 // ROUTE: POST /api/subscribe
 //
-// The library unlock, the enquiry form, the newsletter and market
-// intelligence interest all arrive here. The readiness score has its own
-// route because it also has to score answers and send a report.
+// The home page newsletter form, the enquiry form, and the older library,
+// newsletter and market intelligence capture points all arrive here. The
+// readiness score has its own route because it also has to score answers and
+// send a report.
 //
 // The SOURCE decides the tag, and the source is checked against a fixed list
 // rather than trusted: a visitor who posts source "founding-subscriber" should
@@ -106,5 +107,5 @@ export async function POST(req: NextRequest) {
     }).catch(() => undefined)
   }
 
-  return NextResponse.json({ subscribed: result.added, tagged: result.tagged })
+  return NextResponse.json({ subscribed: result.added, tagged: result.tagged, form: result.form ?? null })
 }

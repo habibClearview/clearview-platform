@@ -60,6 +60,17 @@ try {
   livekitHttp = ''
 }
 
+// ---------------------------------------------------------------------------
+// THE BOOKING CALENDAR. 26 September 2026.
+//
+// Chapter 07 of the public site embeds Cal.com. Its loader is a script from
+// app.cal.com, and the calendar itself is a frame from the same host. Neither
+// is loaded until a visitor has answered the two questions in front of it.
+// Without these the browser refuses both, silently, the same way it once
+// refused the call.
+// ---------------------------------------------------------------------------
+const CAL_ORIGIN = 'https://app.cal.com'
+
 const connectSrc = [
   "'self'",
   supabaseOrigin,
@@ -74,6 +85,8 @@ const connectSrc = [
   // region change is not an outage nobody can explain.
   'https://*.livekit.cloud',
   'wss://*.livekit.cloud',
+  // The booking calendar on the public site, 26 September 2026.
+  CAL_ORIGIN,
 ].filter(Boolean).join(' ')
 
 const csp = [
@@ -89,7 +102,8 @@ const csp = [
   "media-src 'self' blob:",
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${CAL_ORIGIN}`,
+  `frame-src 'self' ${CAL_ORIGIN}`,
   `connect-src ${connectSrc}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
@@ -185,6 +199,31 @@ const nextConfig = {
       '/api/tor-extract': ['./node_modules/pdfjs-dist/legacy/build/**/*'],
     },
     serverComponentsExternalPackages: ['pdfjs-dist'],
+  },
+  // ---------------------------------------------------------------------------
+  // THE NINE RETIRED PAGES. 26 September 2026.
+  //
+  // habibonifade.com became one page speaking to programmes, implementers and
+  // funders. These addresses spoke to NGOs, so they now send visitors to the
+  // home page. The pages themselves are kept, unserved, in
+  // docs/site-archive/2026-09-26/, to be rewritten rather than lost.
+  //
+  // Temporary (307), not permanent: a permanent redirect is remembered by
+  // browsers and search engines, and some of these pages are coming back.
+  //
+  // Both spellings are covered: the address a visitor types on
+  // habibonifade.com, and the /site address the same page has on a preview.
+  // ---------------------------------------------------------------------------
+  async redirects() {
+    const retired = [
+      '/score', '/library', '/watch', '/evidence',
+      '/what-i-do', '/what-i-do/:path*',
+    ]
+    const siteHost = { type: 'host', value: '(www\\.)?habibonifade\\.com' }
+    return [
+      ...retired.map((source) => ({ source, destination: '/', permanent: false, has: [siteHost] })),
+      ...retired.map((source) => ({ source: `/site${source}`, destination: '/site', permanent: false })),
+    ]
   },
   async headers() {
     return [

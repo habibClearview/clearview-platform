@@ -1,9 +1,6 @@
 // The approved design's stylesheet, verbatim, plus one rule per style-hover
 // attribute in the markup. The design is almost entirely inline styles; this
 // is everything that could not be.
-//
-// .om-row, 26 September 2026: a set of cards sits in one row on a desktop
-// screen (--om-n is how many), two to a row on a tablet, and stacks on a phone.
 export const DESIGN_CSS = `body { margin: 0; background: #12222c; font-family: 'Poppins', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   a { color: #00afef; }
   a:hover { color: #f5f5dc; }
@@ -12,9 +9,6 @@ export const DESIGN_CSS = `body { margin: 0; background: #12222c; font-family: '
   input::placeholder, textarea::placeholder { color: rgba(245,245,220,0.4); }
   @keyframes om-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
   @keyframes om-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-  .om-row { display: grid; gap: 2px; grid-template-columns: repeat(var(--om-n), minmax(0, 1fr)); }
-  @media (max-width: 1100px) { .om-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 600px) { .om-row { grid-template-columns: minmax(0, 1fr); } }
   .om-rail::-webkit-scrollbar { height: 6px; }
   .om-rail::-webkit-scrollbar-thumb { background: rgba(245,245,220,0.3); }
 .hv1:hover{color: #00afef;}

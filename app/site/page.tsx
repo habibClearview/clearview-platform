@@ -1,11 +1,13 @@
 import type { Metadata } from 'next'
 import CanvasCoachSite from '@/components/site/design/CanvasCoachSite'
 
+const DESCRIPTION = 'I make the businesses that development programmes back able to pay their own way, and prove it from their own numbers — at design, at partner selection, through delivery, and for two years after close.'
+
 export const metadata: Metadata = {
-  title: 'Habib Onifade — your work was funded, now it has to sell',
-  description: 'Being funded proved the need was real. What changes is who pays. Four advisory methods and one subscription, for organisations that have to start earning what they used to be given.',
+  title: 'Habib Onifade — commercial viability in development programmes',
+  description: DESCRIPTION,
   robots: { index: true, follow: true },
-  openGraph: { title: 'Habib Onifade — your work was funded, now it has to sell', description: 'Being funded proved the need was real. What changes is who pays. Four advisory methods and one subscription, for organisations that have to start earning what they used to be given.', type: 'website' },
+  openGraph: { title: 'Do you want the businesses you back to become commercially viable?', description: DESCRIPTION, type: 'website' },
 }
 
 export default function Page() {
